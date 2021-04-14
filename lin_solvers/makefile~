@@ -1,0 +1,7 @@
+# makefile
+
+eigen_lin_solver: eigen_lin_solver.cpp
+	g++ -I eigen_lin_solver.cpp -o eigen_lin_solver
+
+cholmod_eigen: cholmod_eigen.cpp
+	g++ cholmod_eigen.cpp -Ieigen3 -o cholmod_eigen -lcholmod -leigen3 -lm
