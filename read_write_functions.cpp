@@ -161,8 +161,8 @@ int main(int argc, char** argv)
 	 if (argc != 3 + 1) {
     	std::cerr << "test read functions : path_to_folder_file" << std::endl;
     	std::cerr << "[string:path_to_file]  file containing matrix in CSC format (as a list)" << std::endl;      
-      	std::cerr << "[integer]: n_rows" << std::endl;     
-		std::cerr << "[integer]: n_cols" << std::endl;  
+      std::cerr << "[integer]: n_rows" << std::endl;     
+		  std::cerr << "[integer]: n_cols" << std::endl;  
 
     exit(1);
   } 

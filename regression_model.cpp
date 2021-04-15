@@ -1,14 +1,22 @@
 // function evaluation regression model 
 
-
 #include <random>
+#include <vector>
 #include <iostream>
-#include <stdlib.h>
+#include <fstream>
 #include <math.h>
+#include <time.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+// require armadillo for read dense matrix for now
+#include <armadillo>
 
 #include <Eigen/Dense>
 #include <Eigen/CholmodSupport>
 
+using namespace Eigen;
+using namespace std;
 
 // typedef Eigen::Matrix<double, Dynamic, Dynamic> Mat;
 typedef Eigen::SparseMatrix<double> SpMat;
@@ -93,11 +101,10 @@ MatrixXd read_matrix(const string filename,  int n_row, int n_col){
 
     arma::mat X(n_row, n_col);
     X.load(filename, arma::raw_ascii);
-    X.print();
+    // X.print();
 
     return Eigen::Map<MatrixXd>(X.memptr(), X.n_rows, X.n_cols);
 }
-
 
 
 void file_exists(std::string file_name)
@@ -157,11 +164,10 @@ void generate_ex_regression( int nb,  int no, double tau, Eigen::MatrixXd *B, Ve
 	*B = tmp;
 	//*B(B_tmp.data());
 	//Eigen::MatrixXd::Map(*B) = B_tmp.data(); 
-	std::cout << *B << std::endl;
+	//std::cout << *B << std::endl;
 
 	/* -------  construct random solution vector of fixed effects & observations -------- */
 	*b = 2*(Vector::Random(nb) + Vector::Ones(nb)); 
-	std::cout << "original fixed effects : " << b->transpose() << std::endl;
 
 	double mean = 0.0;
 	double sd = 1/sqrt(exp(tau));
@@ -185,14 +191,16 @@ void generate_ex_regression( int nb,  int no, double tau, Eigen::MatrixXd *B, Ve
 
 void eval_likelihood(int no, double theta, double yTy, double *log_det, double *val){
 	
+
 	*log_det = no*theta;
 	*val = exp(theta)*yTy;
 
 	/*std::cout << "in eval eval_likelihood " << std::endl;
+	std::cout << "theta     : " << theta << std::endl;
 	std::cout << "yTy : " << yTy << ", exp(theta) : " << exp(theta) << std::endl;
 
 	std::cout << "log det l : " << *log_det << std::endl;
-	std::cout << "val l     : " << *val << std::endl;*/
+	std::cout << "val l     : " << *val << std::endl; */
 
 }
 
@@ -254,8 +262,8 @@ void eval_post_theta(int nb, int no, double theta, double yTy, Vector y, Eigen::
 	double log_det_l;
 	double val_l; 
 	eval_likelihood(no, theta, yTy, &log_det_l, &val_l);
-	std::cout << "log det l : "  << log_det_l << std::endl;
-	std::cout << "val l     : " << val_l << std::endl;
+	/*std::cout << "log det l : "  << log_det_l << std::endl;
+	std::cout << "val l     : " << val_l << std::endl;*/
 
 	// denominator :
 	// log_det(Q.x|y), mu, t(mu)*Q.x|y*mu
@@ -265,8 +273,8 @@ void eval_post_theta(int nb, int no, double theta, double yTy, Vector y, Eigen::
 	Vector rhs(nb);
 
  	eval_denominator(nb, no, theta, y, B, &log_det_d, &val_d, &Q, &rhs, mu);
-	std::cout << "log det d : " << log_det_d << std::endl;
-	std::cout << "val d     : " <<  val_d << std::endl;
+	/*std::cout << "log det d : " << log_det_d << std::endl;
+	std::cout << "val d     : " <<  val_d << std::endl;*/
 
   	// add everything together
   	*val = -1 * 0.5 * (log_det_l - val_l - log_det_d + val_d);
@@ -274,15 +282,37 @@ void eval_post_theta(int nb, int no, double theta, double yTy, Vector y, Eigen::
 
 }
 
+// 1D version, forward difference
+void eval_gradient(int nb, int no, double theta, double f_theta, double yTy, Vector y, Eigen::MatrixXd B, Vector *mu, double *grad){
+
+
+	double eps = 0.05;
+	double theta_forw = theta + eps;
+
+	double f_theta_forw;
+
+	// have to be careful that mu doesn't get overwritten?
+	// write version such that this doesn't happen?
+	eval_post_theta(nb, no, theta_forw, yTy, y, B, &f_theta_forw, mu);
+	std::cout << "theta_forw   : " << theta_forw << std::endl;
+	std::cout << "f_theta_forw : " << f_theta_forw << std::endl;
+
+	*grad = (1/eps) * (f_theta_forw - f_theta);
+}
+
 
 int main(int argc, char* argv[]) 
 { 
-	if (argc != 1 + 3) {
-		std::cerr << "simple regression model : nb no theta " << std::endl;
+	if (argc != 1 + 5) {
+		std::cerr << "simple regression model : nb no theta path_to_B_file path_to_y_file " << std::endl;
 
-		std::cerr << "[integer]: number of observations (nb)" << std::endl;     
-		std::cerr << "[integer]: number of observations (no)" << std::endl;  
-		std::cerr << "[double] : initial value for theta    " << std::endl;    
+		std::cerr << "[integer]: 		number of observations (nb)" << std::endl;     
+		std::cerr << "[integer]: 		number of observations (no)" << std::endl;  
+		std::cerr << "[double] : 		initial value for theta    " << std::endl;   
+		std::cerr << "[string:B_file]:  dense matrix in raw raw_ascii" << std::endl;   
+		std::cerr << "[string:y_file]:  vector in raw raw_ascii" << std::endl;      
+   
+ 
 
 		exit(1);
 	}
@@ -290,27 +320,52 @@ int main(int argc, char* argv[])
 	int nb = atoi(argv[1]);
 	int no = atoi(argv[2]);
 
-	// initial value 
-	int theta = atoi(argv[3]);
+	// initial value for theta
+	double theta = atof(argv[3]);
+	std::cout << "theta : " << theta << std::endl;	
+
+	/* ---------------------- read in matrices ------------------- */
+  	// write binary. write everything to double. 
+
+	std::string B_file = argv[4];
+	file_exists(B_file);
+	MatrixXd B = read_matrix(B_file, no, nb);
+	//std::cout << "B : " << std::endl; std::cout << B << std::endl;
+
+
+	std::string y_file = argv[5];
+	file_exists(y_file);
+	Vector y = read_matrix(y_file, no, 1);
+	//std::cout << "y : " << std::endl; std::cout << y << std::endl;
+
+	/* ------------------ enable when generating an example in c++ --------------- */
 	// actual solution 
-	double tau = 1.0;
+	/*double tau = 1.0;
 
 	Eigen::MatrixXd B(no, nb);
 	Vector b(nb);
 	Vector y(no);
 
 	generate_ex_regression(nb, no, tau, &B, &b, &y);
-
-	exit(1);
-	double yTy = y.dot(y);
+	std::cout << "original fixed effects : " << b.transpose() << std::endl;*/
 
 	/* ---------------------- call function evaluation ------------------- */
+
+	double yTy = y.dot(y);
+	// std::cout << "yTy : " << yTy << std::endl;
+
+
 	// returns value and estimate of fixed effects mu
-	double val;
+	double f_theta;
 	Vector mu(nb);
 
-	eval_post_theta(nb, no, theta, yTy, y, B, &val, &mu);
-	std::cout << val << std::endl;
+	eval_post_theta(nb, no, theta, yTy, y, B, &f_theta, &mu);
+	std::cout << "f(theta) : " << f_theta << std::endl;
+
+	double grad;
+	eval_gradient(nb, no, theta, f_theta, yTy, y, B, &mu, &grad);
+	std::cout << "grad f : " << grad << std::endl;
+
 
 
   return 0;
