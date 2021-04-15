@@ -294,10 +294,64 @@ void eval_gradient(int nb, int no, double theta, double f_theta, double yTy, Vec
 	// have to be careful that mu doesn't get overwritten?
 	// write version such that this doesn't happen?
 	eval_post_theta(nb, no, theta_forw, yTy, y, B, &f_theta_forw, mu);
-	std::cout << "theta_forw   : " << theta_forw << std::endl;
-	std::cout << "f_theta_forw : " << f_theta_forw << std::endl;
+	/*std::cout << "theta_forw   : " << theta_forw << std::endl;
+	std::cout << "f_theta_forw : " << f_theta_forw << std::endl;*/
 
 	*grad = (1/eps) * (f_theta_forw - f_theta);
+}
+
+
+void eval_invHess(double s, double y, double *invHess){
+	double rho = 1/(y*s);
+	double Id = 1;
+
+	*invHess = (Id - rho*s*y)*(*invHess)*(Id - rho*y*s) + rho*s*s;
+}
+
+double backtracking(int nb, int no, 
+				  double theta, double f_theta, double grad_f, double p,
+				  double yTy, Vector y, Eigen::MatrixXd B, 
+				  double alpha_0, double c, double rho){
+
+	double norm_p = std::abs(p);
+	double alpha_p = 1/norm_p;
+
+	double alpha_min = alpha_0*1e-4;
+	double alpha = std::min(alpha_0, alpha_p);
+
+	int max_iter = 50;
+
+	double val;
+	Vector mu;
+
+	double theta_test;
+	double f_theta_test;
+	double f_comp;
+
+	for(int it = 0; it <= max_iter; it ++){
+
+		theta_test = theta + alpha*p;
+		eval_post_theta(nb, no, theta_test, yTy, y, B, &f_theta_test, &mu);
+		/*std::cout << "theta    : " << theta_test << std::endl;
+		std::cout << "f(theta) : " << f_theta_test << std::endl;*/
+
+		f_comp = f_theta + c*alpha*grad_f*p;
+
+		if(f_theta_test <= f_comp){
+			std::cout << "chosen alpha : " << alpha << std::endl;
+			return(alpha);
+		}
+
+		if(alpha < alpha_min){
+			std::cout << "mininum stepsize reached. chosen alpha : " << alpha << std::endl;
+      		return(alpha);
+		}
+
+		alpha = alpha * rho;
+	}
+
+	return(-1);
+		
 }
 
 
@@ -338,6 +392,10 @@ int main(int argc, char* argv[])
 	Vector y = read_matrix(y_file, no, 1);
 	//std::cout << "y : " << std::endl; std::cout << y << std::endl;
 
+
+	double yTy = y.dot(y);
+	// std::cout << "yTy : " << yTy << std::endl;
+
 	/* ------------------ enable when generating an example in c++ --------------- */
 	// actual solution 
 	/*double tau = 1.0;
@@ -349,25 +407,81 @@ int main(int argc, char* argv[])
 	generate_ex_regression(nb, no, tau, &B, &b, &y);
 	std::cout << "original fixed effects : " << b.transpose() << std::endl;*/
 
-	/* ---------------------- call function evaluation ------------------- */
+	/* ---------------------- initialise BFGS ------------------- */
 
-	double yTy = y.dot(y);
-	// std::cout << "yTy : " << yTy << std::endl;
+	double max_iter_BFGS = 20;
 
+	double alpha_0 = 1.0;
+	double c = 1e-4;
+	double rho = 0.9;
+	double alpha;
 
 	// returns value and estimate of fixed effects mu
 	double f_theta;
 	Vector mu(nb);
+	Vector mu_dummy(nb);
+
+	double theta_old;
+	double theta_update;
+	double f_theta_old;
+	double grad_old;
+	double grad_update;
 
 	eval_post_theta(nb, no, theta, yTy, y, B, &f_theta, &mu);
 	std::cout << "f(theta) : " << f_theta << std::endl;
 
 	double grad;
-	eval_gradient(nb, no, theta, f_theta, yTy, y, B, &mu, &grad);
-	std::cout << "grad f : " << grad << std::endl;
+	eval_gradient(nb, no, theta, f_theta, yTy, y, B, &mu_dummy, &grad);
+	// std::cout << "grad f : " << grad << std::endl;
 
+	double invHess = 1;
 
+	for(int i = 0; i < max_iter_BFGS; i++){
 
-  return 0;
+		double p = -invHess*grad;
+
+		alpha = backtracking(nb, no, theta, f_theta, grad, p, yTy, y, B, alpha_0, c, rho);
+
+		if(alpha == -1){
+			std::cout << "max_iter reached in backtracking. exited function call. " << std::endl;
+			std::cout << "final theta : " << theta << std::endl;
+			std::cout << "mu 		  : " << mu.transpose() << std::endl;
+			std::cout << "gradient f  : " << grad << std::endl;
+			exit(1);
+		}
+
+		// update x
+	    theta_old = theta;
+	    theta = theta + alpha*p;
+	    std::cout << "theta    : " << theta << std::endl;
+	    theta_update = theta - theta_old;
+
+	    // evaluate f
+	    f_theta_old = f_theta;
+	    eval_post_theta(nb, no, theta, yTy, y, B, &f_theta, &mu);
+		std::cout << "f(theta) : " << f_theta << std::endl;
+	    
+	    // evaluate gradient
+	    grad_old = grad;
+		eval_gradient(nb, no, theta, f_theta, yTy, y, B, &mu_dummy, &grad);
+		//std::cout << "grad f : " << grad << std::endl;
+		grad_update = grad - grad_old;  	
+    	
+    	if(std::abs(grad) < 1e-2){
+    		std::cout << "BFGS converged after " << i << " iterations. arg min : " << theta << std::endl;
+    		std::cout << "mu : " << mu.transpose() << std::endl;
+
+      	}
+       
+	    eval_invHess(theta_update, grad_update, &invHess);
+		//std::cout << "invHess   : " << invHess << std::endl;
+
+	}
+
+	std::cout << "final theta : " << theta << std::endl;
+	std::cout << "mu 		  : " << mu.transpose() << std::endl;
+	std::cout << "gradient f  : " << grad << std::endl;
+
+  	return 0;
 
 }
