@@ -48,6 +48,7 @@ public:
     double operator()(Vector& theta, Vector& grad){
 	//void eval_post_theta(int nb, int no, double theta, double yTy, Vector y, Eigen::MatrixXd B, double *val, Vector *mu){
     	*t_grad = grad;
+    	
     	// Vector mu;
     	double f_theta = eval_post_theta(theta, mu);
     	std::cout << "theta   : " << theta << ", f_theta : " << f_theta << std::endl;
