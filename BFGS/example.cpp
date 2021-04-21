@@ -12,6 +12,8 @@
 #include <iostream>
 #include <LBFGS.h>
 
+#include <armadillo>
+
 #include "theta_function.cpp"
 
 
@@ -22,6 +24,27 @@ typedef Eigen::VectorXd Vector;
 
 
 using namespace LBFGSpp;
+
+// for now use armadillo ... do better once we switch to binary
+
+MatrixXd read_matrix(const std::string filename,  int n_row, int n_col){
+
+    arma::mat X(n_row, n_col);
+    X.load(filename, arma::raw_ascii);
+    // X.print();
+
+    return Eigen::Map<MatrixXd>(X.memptr(), X.n_rows, X.n_cols);
+}
+
+void file_exists(std::string file_name)
+{
+    if (std::fstream{file_name}) ;
+    else {
+      std::cerr << file_name << " couldn\'t be opened (not existing or failed to open)\n"; 
+      exit(1);
+    }
+    
+}
 
 
 void rnorm_gen(int no, double mean, double sd,  Eigen::VectorXd * x, int seed){
@@ -79,27 +102,6 @@ void generate_ex_regression( int nb,  int no, double tau, Eigen::MatrixXd *B, Ve
 }
 
 
-class Rosenbrock
-{
-private:
-    int n;
-public:
-    Rosenbrock(int n_) : n(n_) {}
-    double operator()(const VectorXd& x, VectorXd& grad)
-    {
-        double fx = 0.0;
-        for(int i = 0; i < n; i += 2)
-        {
-            double t1 = 1.0 - x[i];
-            double t2 = 10 * (x[i + 1] - x[i] * x[i]);
-            grad[i + 1] = 20 * t2;
-            grad[i]     = -2.0 * (x[i] * grad[i + 1] + t1);
-            fx += t1 * t1 + t2 * t2;
-        }
-        return fx;
-    }
-};
-
 class my_function
 {
 private:
@@ -143,94 +145,113 @@ public:
 };
 
 
-int main()
+int main(int argc, char* argv[])
 {
 
-    int no = 5000;
-    int nb = 3;
+    
+    #if 1
+    if(argc != 1 + 2){
+        std::cout << "wrong number of input parameters. " << std::endl;
+        exit(1);
 
-    double tau = 1.0;
+    }
+
+    std::cout << "generates random sample" << std::endl;
+
+    int nb = atoi(argv[1]);
+    int no = atoi(argv[2]);
 
     Eigen::MatrixXd B(no, nb);
     Vector b(nb);
     Vector y(no);
 
-    generate_ex_regression(nb, no, tau, &B, &b, &y);
-    std::cout << "original fixed effects : " << b.transpose() << std::endl;
-
-    /*my_function fun(no, nb, B, y);
-
-    VectorXd x = VectorXd::Zero(2);
-    VectorXd grad = VectorXd::Zero(2);
-    // const int n = 2;
-
-    double fx = fun(x, grad);
-
-    //std::cout << "fx : " << fx << std::endl;
-
-    /*double yTy = y.dot(y);
-    post_theta f_eval(no, nb, B, y, yTy);
-
-    Vector theta(1);
-    theta[0] = 2.0;
-    Vector grad(1);
-
-    double f_theta = f_eval(theta, grad);
-    std::cout << "f theta : " << f_theta << std::endl;
-    std::cout << "grad    : " << grad << std::endl;
-    // std::cout << "mu      : " << mu.transpose() << std::endl;*/
-
-
+    double tau = 0.5;
+    generate_ex_regression(nb, no, tau, &B, &b, &y); 
     
-    // Set up parameters
-    /*BFGSParam<double> param;
-    param.epsilon = 1e-6;
-    param.max_iterations = 100;
-
-    // Create solver and function object
-    LBFGSSolver<double> solver(param);
-
     // Initial guess
-    // x will be overwritten to be the best point found
-    //double fx;
-    //int niter = solver.minimize(f_eval, theta, fx
-    int niter = solver.minimize(fun, x, fx);
-
-
-    std::cout << niter << " iterations" << std::endl;
-    //std::cout << "theta = \n" << theta << std::endl;
-    std::cout << "x = \n" << x << std::endl;
-    std::cout << "f(x) = " << fx << std::endl;
+    Vector theta(1);
+    theta[0] = 3;
     
+    
+    #endif
 
-    return 0;*/
+    #if 0
 
-    const int n = 10;
+    if(argc != 1 + 5){
+        std::cout << "wrong number of input parameters. " << std::endl;
+        exit(1);
+    }
+
+    std::cout << "reading in example. " << std::endl;
+
+    int nb = atoi(argv[1]);
+    int no = atoi(argv[2]);
+
+    // initial value for theta
+    // Initial guess
+    Vector theta(1);
+    theta[0] = atof(argv[3]);
+    //theta[0] = 3;
+
+
+    // original value for theta
+    //double tau = atof(argv[4]);
+
+    std::string B_file = argv[4];
+    file_exists(B_file);
+    MatrixXd B = read_matrix(B_file, no, nb);
+    // std::cout << "B : \n" << B << std::endl;
+
+    std::string y_file = argv[5];
+    file_exists(y_file);
+    Vector y = read_matrix(y_file, no, 1);
+    // std::cout << "y : \n"  << y << std::endl;
+
+    #endif
+  
     // Set up parameters
-    LBFGSParam<double> param;
-    param.epsilon = 1e-6;
+    LBFGSParam<double> param;    
+    // set convergence criteria
+    // stop if norm of gradient smaller than :
+    param.epsilon = 1e-1;
+    // or if objective function has not decreased by more than  
+    param.epsilon_rel = 1e-1;
+    // in the past ... steps
+    param.past = 1;
+    // maximum line search iterations
     param.max_iterations = 10;
 
+
     // Create solver and function object
     LBFGSSolver<double> solver(param);
-    post_theta fun(no, nb, B, y);
-
-    // Initial guess
-   Vector theta(1);
-   theta[0] = 1.2;
-   // Vector grad(1);    // x will be overwritten to be the best point found
+    PostTheta fun(no, nb, B, y);
     double fx;
+
+    // Vector grad(1);
+    // fx = fun(theta, grad);
+    // std::cout <<  "f(x) = " << fx << std::endl;
+
     int niter = solver.minimize(fun, theta, fx);
 
-    Vector mu = fun.get_mu();
-    std::cout << "mu : " << mu.transpose() << std::endl;
-
     std::cout << niter << " iterations" << std::endl;
-    std::cout << "theta = \n" << theta.transpose() << std::endl;
     std::cout << "f(x) = " << fx << std::endl;
 
     Vector grad = fun.get_grad();
-    std::cout << " grad = " << grad << std::endl;
+    std::cout << "grad = " << grad << std::endl;
+
+    std::cout << "original theta             : " << tau << std::endl;
+    std::cout << "estimated theta            : " << theta.transpose() << std::endl;
+
+    MatrixXd cov = fun.get_Covariance(theta);
+    std::cout << "estimated covariance theta : " << cov << std::endl;
+
+    std::cout << "original fixed effects     : " << b.transpose() << std::endl;
+    Vector mu = fun.get_mu();    
+    std::cout << "estimated fixed effects    : " << mu.transpose() << std::endl;
+
+    Vector marg = fun.get_marginals_f(theta);
+    std::cout << "est. marginals fixed eff.  : " << marg.transpose() << std::endl;
+
 
     return 0;
 }

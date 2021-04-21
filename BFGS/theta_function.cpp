@@ -12,6 +12,8 @@
 #include <Eigen/Dense>
 #include <Eigen/CholmodSupport>
 
+#include "solver.cpp"
+
 
 using namespace Eigen;
 
@@ -30,7 +32,7 @@ orgianise class such that function call will return :
 
 */
 
-class post_theta{
+class PostTheta{
 
 	private:
     int no;
@@ -39,19 +41,30 @@ class post_theta{
     VectorXd y;
     double yTy;
     Vector mu;
-    Vector* t_grad;
+    Vector t_grad;
+    double min_f_theta;
 
 public:
-	post_theta(int no_, int nb_, MatrixXd B_, VectorXd y_) : no(no_), nb(nb_), B(B_), y(y_) {
+	PostTheta(int no_, int nb_, MatrixXd B_, VectorXd y_) : no(no_), nb(nb_), B(B_), y(y_) {
 		yTy = y.dot(y);
+
+		// initialise min_f_theta, min_theta
+		min_f_theta = 1e10;
 	}
     double operator()(Vector& theta, Vector& grad){
-	//void eval_post_theta(int nb, int no, double theta, double yTy, Vector y, Eigen::MatrixXd B, double *val, Vector *mu){
-    	*t_grad = grad;
-    	
+
+    	t_grad = grad;
+
+    	// initialise min_f_theta, min_theta, store current minimum 
+
     	// Vector mu;
     	double f_theta = eval_post_theta(theta, mu);
-    	std::cout << "theta   : " << theta << ", f_theta : " << f_theta << std::endl;
+
+
+    	if(f_theta < min_f_theta){
+    		min_f_theta = f_theta;
+    		std::cout << "theta   : " << theta << ", f_theta : " << f_theta << std::endl;
+    	}
 
     	Vector mu_dummy;
 		eval_gradient(theta, f_theta, mu_dummy, grad);
@@ -66,7 +79,48 @@ public:
 	}
 
 	Vector get_grad(){
-		return *t_grad;
+		return t_grad;
+	}
+
+	MatrixXd get_Covariance(Vector& theta){
+
+		// construct 2nd order cetnral difference
+		Vector eps(1);
+		eps[0] = 0.005;
+
+		Vector theta_forw(1);
+		theta_forw = theta + eps;
+
+		Vector theta_back(1);
+		theta_back = theta - eps;
+
+		Vector mu_dummy(1);
+
+		double f_theta = eval_post_theta(theta, mu);
+		double f_theta_forw = eval_post_theta(theta_forw, mu_dummy);
+		double f_theta_back = eval_post_theta(theta_back, mu_dummy);
+
+		MatrixXd hess(1,1);
+		// careful : require negative hessian (swapped signs in eval post theta) 
+		// but then precision negative hessian -> no swapping
+		hess << (1.0)/(eps[0]*eps[0]) * (f_theta_forw - 2*f_theta + f_theta_back);
+		// std::cout << "hess " << hess << std::endl;
+
+		MatrixXd cov(1,1);
+		cov << 1.0/hess(0,0);
+
+		return cov;
+	}
+
+	Vector get_marginals_f(Vector& theta){
+		
+		SpMat Q(nb, nb);
+		construct_Q(theta, &Q);
+
+		Vector vars(nb);
+		extract_inv_diag(Q, vars);
+
+		return(vars);
 	}
 
 	double eval_post_theta(Vector& theta, Vector& mu){
@@ -94,25 +148,12 @@ public:
 
 	  	// add everything together
 	  	double val = -1 * 0.5 * (log_det_l - val_l - log_det_d + val_d);
-	  	// std::cout << *val << std::endl;
+	  	//std::cout << val << std::endl;
 
 	  	return val;
 	}
 
-	void solve_cholmod(SpMat *A, Vector *f, Vector& u, double *log_det)
-	{
 
-		Solver solver;
-		solver.analyzePattern(*A);
-		solver.factorize(*A);
-
-		u = solver.solve(*f);
-
-		*log_det = solver.logDeterminant();
-
-		//std::cout << "solution vector u : " << *u << std::endl;
-
-	}
 
 	void eval_likelihood(Vector& theta, double *log_det, double *val){
 		
@@ -129,7 +170,7 @@ public:
 
 	}
 
-	void construct_Q_b(Vector& theta, SpMat *Q, Vector *rhs){
+	void construct_Q(Vector& theta, SpMat *Q){
 		double exp_theta = exp(theta[0]);
 
 		SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
@@ -143,6 +184,12 @@ public:
 
 		/*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
 		std::cout << Eigen::MatrixXd(*Q) - exp_theta*B.transpose()*B << std::endl;*/
+
+	}
+
+
+	void construct_b(Vector& theta, Vector *rhs){
+		double exp_theta = exp(theta[0]);
 
 		*rhs = exp_theta*B.transpose()*y;
 
@@ -159,8 +206,11 @@ public:
 
 	void eval_denominator(Vector& theta, double *log_det, double *val, SpMat *Q, Vector *rhs, Vector& mu){
 
-		// construct Q_x|y, b_xey
-		construct_Q_b(theta, Q, rhs);
+		// construct Q_x|y,
+		construct_Q(theta, Q);
+
+		//  construct b_xey
+		construct_b(theta, rhs);
 
 		// solve linear system
 		solve_cholmod(Q, rhs, mu, log_det);
@@ -183,8 +233,9 @@ public:
 	// 1D version, forward difference
 	void eval_gradient(Vector& theta, double f_theta, Vector& mu, Vector& grad){
 
+		// use central difference instead
 		Vector eps(1);
-		eps[0] = 0.05;
+		eps[0] = 0.005;
 		Vector theta_forw(1);
 		theta_forw = theta + eps;
 
@@ -201,3 +252,9 @@ public:
 	}
 
 };
+
+
+// for Hessian approximation : 4-point stencil (2nd order)
+// -> swap sign, invert, get covariance
+
+// once converged call again : extract -> Q.xy -> selected inverse (diagonal), gives me variance wrt mode theta & data y   
