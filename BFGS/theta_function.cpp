@@ -13,7 +13,7 @@
 #include <Eigen/CholmodSupport>
 
 #include "solver.cpp"
-
+// #include "theta_function.hpp"
 
 using namespace Eigen;
 
@@ -35,22 +35,36 @@ orgianise class such that function call will return :
 class PostTheta{
 
 	private:
-    int no;
+	int ns;
     int nb;
+    int no;
     MatrixXd B;
     VectorXd y;
+    // next 4 potentially unused (then B unused)
+    SpMat Ax;
+    SpMat c0;
+    SpMat g1;
+    SpMat g2;
     double yTy;
     Vector mu;
     Vector t_grad;
     double min_f_theta;
 
 public:
-	PostTheta(int no_, int nb_, MatrixXd B_, VectorXd y_) : no(no_), nb(nb_), B(B_), y(y_) {
+	PostTheta(int nb_, int no_, MatrixXd B_, VectorXd y_) : nb(nb_), no(no_), B(B_), y(y_) {
+		ns = 0;
 		yTy = y.dot(y);
 
 		// initialise min_f_theta, min_theta
 		min_f_theta = 1e10;
 	}
+	PostTheta(int ns_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_) : ns(ns_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_)  {
+		yTy = y.dot(y);
+
+		// initialise min_f_theta, min_theta
+		min_f_theta = 1e10;
+	}
+
     double operator()(Vector& theta, Vector& grad){
 
     	t_grad = grad;
@@ -82,7 +96,7 @@ public:
 		return t_grad;
 	}
 
-	MatrixXd get_Covariance(Vector& theta){
+	MatrixXd get_Covariance_hyperparam(Vector& theta){
 
 		// construct 2nd order cetnral difference
 		Vector eps(1);
@@ -111,6 +125,73 @@ public:
 
 		return cov;
 	}
+
+	MatrixXd get_Covariance(Vector& theta){
+
+		// TODO: multivariate Hessian approximation!
+
+		/*int dim_th = theta.size();
+		double eps = 0.005;
+		MatrixXd epsId_mat(dim_th, dim_th); 
+		epsId_mat = eps*epsId_mat.setIdentity();
+		//std::cout << "epsId_mat : " << epsId_mat << std::endl;
+
+		// temp vector
+		Vector theta_forw(dim_th);
+		Vector theta_backw(dim_th);
+
+		Vector f_forw(dim_th);
+		Vector f_backw(dim_th);
+
+		Vector mu_dummy(dim_th);
+
+		// compute final f(theta) 
+		double f_theta = eval_post_theta(theta, mu);
+
+
+		// parallelise loop later
+		for(int i=0; i<dim_th; i++){
+			theta_forw = theta + epsId_mat.col(i);
+			theta_backw = theta - epsId_mat.col(i);
+
+			f_forw[i] = eval_post_theta(theta_forw, mu_dummy);
+			f_backw[i] = eval_post_theta(theta_backw, mu_dummy);
+
+		} 
+
+
+		// compute finite difference in each direction
+		grad = 1.0/(2.0*eps)*(f_forw - f_backw);
+		// std::cout << "grad  : " << grad << std::endl;*/
+
+		// construct 2nd order cetnral difference
+		Vector eps(1);
+		eps[0] = 0.005;
+
+		Vector theta_forw(1);
+		theta_forw = theta + eps;
+
+		Vector theta_back(1);
+		theta_back = theta - eps;
+
+		Vector mu_dummy(1);
+
+		double f_theta = eval_post_theta(theta, mu);
+		double f_theta_forw = eval_post_theta(theta_forw, mu_dummy);
+		double f_theta_back = eval_post_theta(theta_back, mu_dummy);
+
+		MatrixXd hess(1,1);
+		// careful : require negative hessian (swapped signs in eval post theta) 
+		// but then precision negative hessian -> no swapping
+		hess << (1.0)/(eps[0]*eps[0]) * (f_theta_forw - 2*f_theta + f_theta_back);
+		// std::cout << "hess " << hess << std::endl;
+
+		MatrixXd cov(1,1);
+		cov << 1.0/hess(0,0);
+
+		return cov;
+	}
+
 
 	Vector get_marginals_f(Vector& theta){
 		
@@ -170,6 +251,16 @@ public:
 
 	}
 
+	// SPDE discretisation -- matrix construction
+	void construct_Q_spatial(Vector& theta, SpMat* Qs){
+		// Qs <- g[1]^2*Qgk.fun(sfem, g[2], order)
+		// return(g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2)
+		*Qs = pow(theta[1],2)*(pow(theta[2], 4) * c0 + 2*pow(theta[2],2) * g1 + g2);
+		// extract triplet indices and insert into Qx
+
+
+	}
+
 	void construct_Q(Vector& theta, SpMat *Q){
 		double exp_theta = exp(theta[0]);
 
@@ -178,9 +269,37 @@ public:
 		std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
 		//Q_b = 1e-5*Q_b.setIdentity();
 
-		// Q.e <- Diagonal(no, exp(theta))
-		// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
-		*Q = Q_b + exp_theta*B.transpose()*B;
+		if(ns > 0){
+			SpMat Qs(ns, ns);
+			// TODO: find good way to assemble Qx
+			construct_Q_spatial(theta, &Qs);
+			//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
+			// construct Qx from Qs values, extend by zeros 
+			int nnz = Qs.nonZeros();
+
+			Qs.makeCompressed();
+			Map<SparseMatrix<double> > Qx(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
+                               Qs.innerIndexPtr(),Qs.valuePtr());
+
+
+			std::cout << Qx << std::endl;
+
+			for(int i=ns; i<(ns+nb); i++){
+				Qx.insert(i,i) = 1e-5;
+			}
+
+			std::cout << "Qx \n" << Qx << std::endl;
+
+			exit(1);
+
+			*Q = Qx + exp_theta * Ax.transpose() * Ax;
+		}
+
+		if(ns == 0){
+			// Q.e <- Diagonal(no, exp(theta))
+			// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
+			*Q = Q_b + exp_theta*B.transpose()*B;
+		}
 
 		/*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
 		std::cout << Eigen::MatrixXd(*Q) - exp_theta*B.transpose()*B << std::endl;*/
@@ -191,7 +310,11 @@ public:
 	void construct_b(Vector& theta, Vector *rhs){
 		double exp_theta = exp(theta[0]);
 
-		*rhs = exp_theta*B.transpose()*y;
+		if(ns == 0){
+			*rhs = exp_theta*B.transpose()*y;
+		} else {
+			*rhs = exp_theta*Ax.transpose()*y;
+		}
 
 		// exp(theta)*yTy
 
@@ -213,6 +336,7 @@ public:
 		construct_b(theta, rhs);
 
 		// solve linear system
+		// returns vector mu, which is of the same size as rhs
 		solve_cholmod(Q, rhs, mu, log_det);
 
 		// compute value
@@ -224,31 +348,44 @@ public:
 		std::cout << "mu " << std::endl; std::cout << *mu << std::endl;
 		std::cout << "Q " << std::endl; std::cout << Eigen::MatrixXd(*Q) << std::endl;
 
-
 		std::cout << "log det d : " << *log_det << std::endl;
 		std::cout << "val d     : " << *val << std::endl; */
 	}
 
 
-	// 1D version, forward difference
 	void eval_gradient(Vector& theta, double f_theta, Vector& mu, Vector& grad){
 
-		// use central difference instead
-		Vector eps(1);
-		eps[0] = 0.005;
-		Vector theta_forw(1);
-		theta_forw = theta + eps;
+		int dim_th = theta.size();
 
-		double f_theta_forw;
+		double eps = 0.005;
+		MatrixXd epsId_mat(dim_th, dim_th); 
+		epsId_mat = eps*epsId_mat.setIdentity();
+		//std::cout << "epsId_mat : " << epsId_mat << std::endl;
 
-		// have to be careful that mu doesn't get overwritten?
-		// write version such that this doesn't happen?
-		f_theta_forw = eval_post_theta(theta_forw, mu);
-		/*std::cout << "theta_forw   : " << theta_forw << std::endl;
-		std::cout << "f_theta_forw : " << f_theta_forw << std::endl;*/
+		// temp vector
+		Vector theta_forw(dim_th);
+		Vector theta_backw(dim_th);
 
-		grad[0] = (1.0/eps[0]) * (f_theta_forw - f_theta);
-		// std::cout << "grad : " << grad.transpose() << std::endl;
+		Vector f_forw(dim_th);
+		Vector f_backw(dim_th);
+
+		Vector mu_dummy;
+
+		// parallelise loop later
+		for(int i=0; i<dim_th; i++){
+			theta_forw = theta + epsId_mat.col(i);
+			theta_backw = theta - epsId_mat.col(i);
+
+			f_forw[i] = eval_post_theta(theta_forw, mu_dummy);
+			f_backw[i] = eval_post_theta(theta_backw, mu_dummy);
+
+		}
+
+
+		// compute finite difference in each direction
+		grad = 1.0/(2.0*eps)*(f_forw - f_backw);
+		// std::cout << "grad  : " << grad << std::endl;
+
 	}
 
 };

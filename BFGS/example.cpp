@@ -12,9 +12,12 @@
 #include <iostream>
 #include <LBFGS.h>
 
+#include <optional>
+
 #include <armadillo>
 
 #include "theta_function.cpp"
+#include "../read_write_functions.cpp"
 
 
 using Eigen::VectorXd;
@@ -27,16 +30,16 @@ using namespace LBFGSpp;
 
 // for now use armadillo ... do better once we switch to binary
 
-MatrixXd read_matrix(const std::string filename,  int n_row, int n_col){
+/*MatrixXd read_matrix(const std::string filename,  int n_row, int n_col){
 
     arma::mat X(n_row, n_col);
     X.load(filename, arma::raw_ascii);
     // X.print();
 
     return Eigen::Map<MatrixXd>(X.memptr(), X.n_rows, X.n_cols);
-}
+}*/
 
-void file_exists(std::string file_name)
+/*void file_exists(std::string file_name)
 {
     if (std::fstream{file_name}) ;
     else {
@@ -44,7 +47,7 @@ void file_exists(std::string file_name)
       exit(1);
     }
     
-}
+}*/
 
 
 void rnorm_gen(int no, double mean, double sd,  Eigen::VectorXd * x, int seed){
@@ -149,7 +152,7 @@ int main(int argc, char* argv[])
 {
 
     
-    #if 1
+    #if 0
     if(argc != 1 + 2){
         std::cout << "wrong number of input parameters. " << std::endl;
         exit(1);
@@ -175,39 +178,105 @@ int main(int argc, char* argv[])
     
     #endif
 
-    #if 0
+    #if 1
 
-    if(argc != 1 + 5){
+    if(argc != 1 + 4){
         std::cout << "wrong number of input parameters. " << std::endl;
         exit(1);
     }
 
     std::cout << "reading in example. " << std::endl;
 
-    int nb = atoi(argv[1]);
-    int no = atoi(argv[2]);
+    size_t ns = atoi(argv[1]);
+    //int nt = atoi
+    size_t nb = atoi(argv[2]);
+    size_t no = atoi(argv[3]);
 
-    // initial value for theta
-    // Initial guess
-    Vector theta(1);
-    theta[0] = atof(argv[3]);
-    //theta[0] = 3;
+    // also save as string
+    std::string ns_s = std::to_string(ns);
+    //std::string nt_s = std::to_string(nt);
+    std::string nb_s = std::to_string(nb);
+    std::string no_s = std::to_string(no); 
+    std::string nu_s = std::to_string(ns + nb);
 
 
-    // original value for theta
-    //double tau = atof(argv[4]);
+    std::string base_path = argv[4];
 
-    std::string B_file = argv[4];
-    file_exists(B_file);
-    MatrixXd B = read_matrix(B_file, no, nb);
+    // dimension hyperparamter initialised to 1
+    int dim_th = 1;
+
+    /* ---------------- read in matrices ---------------- */
+
+    MatrixXd B;
+    SpMat Ax; 
+    SpMat c0; 
+    SpMat g1; 
+    SpMat g2;
+
+    // data y
+    std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
+    file_exists(y_file);
+
+    Vector y = read_matrix(y_file, no, 1);
+
+    if(ns == 0 ){
+        // read in design matrix 
+        // files containing B
+        std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
+        file_exists(B_file); 
+
+        B = read_matrix(B_file, no, nb);
+    }
+
+    // std::cout << "y : \n"  << y << std::endl;    
     // std::cout << "B : \n" << B << std::endl;
 
-    std::string y_file = argv[5];
-    file_exists(y_file);
-    Vector y = read_matrix(y_file, no, 1);
-    // std::cout << "y : \n"  << y << std::endl;
+    // read in spatial component of the model
+    if(ns > 0){
+        dim_th = 3;
+
+        // check spatial FEM matrices
+        std::string c0_file       =  base_path + "/c0_" + ns_s + ".dat";
+        file_exists(c0_file);
+        std::string g1_file       =  base_path + "/g1_" + ns_s + ".dat";
+        file_exists(g1_file);
+        std::string g2_file       =  base_path + "/g2_" + ns_s + ".dat";
+        file_exists(g2_file);
+
+        // check projection matrix for A.st
+        std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + nu_s + ".dat";
+        file_exists(Ax_file);
+
+        // read in matrices
+        c0 = read_sym_CSC(c0_file);
+        g1 = read_sym_CSC(g1_file);
+        g2 = read_sym_CSC(g2_file);
+
+        Ax = readCSC(Ax_file);
+
+        /*std::cout << "g1 : \n" << g1.block(0,0,10,10) << std::endl;
+        std::cout << "g2 : \n" << g2.block(0,0,10,10) << std::endl;
+
+        std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;*/
+
+    }
 
     #endif
+
+    Vector theta(dim_th);
+    // initialise theta
+    if(ns == 0){
+        // Initial guess
+        theta[0] = 3;
+    } else {
+        theta << 0.5, 0.5, 0.5;
+        std::cout << "theta : \n"  << theta.transpose() << std::endl;    
+
+    }
+
+    //exit(1);
+
+    Vector b(nb);
   
     // Set up parameters
     LBFGSParam<double> param;    
@@ -224,7 +293,16 @@ int main(int argc, char* argv[])
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
-    PostTheta fun(no, nb, B, y);
+
+    /*std::optional<PostTheta> fun;
+
+    if(ns == 0){
+        fun.emplace(nb, no, B, y);
+    }*/
+
+    // PostTheta fun(nb, no, B, y);
+    PostTheta fun(ns, nb, no, Ax, y, c0, g1, g2);
+       
     double fx;
 
     // Vector grad(1);
@@ -239,18 +317,18 @@ int main(int argc, char* argv[])
     Vector grad = fun.get_grad();
     std::cout << "grad = " << grad << std::endl;
 
-    std::cout << "original theta             : " << tau << std::endl;
+    // std::cout << "original theta             : " << tau << std::endl;
     std::cout << "estimated theta            : " << theta.transpose() << std::endl;
 
-    MatrixXd cov = fun.get_Covariance(theta);
-    std::cout << "estimated covariance theta : " << cov << std::endl;
+    //MatrixXd cov = fun.get_Covariance(theta);
+    //std::cout << "estimated covariance theta : " << cov << std::endl;
 
-    std::cout << "original fixed effects     : " << b.transpose() << std::endl;
+    //std::cout << "original fixed effects     : " << b.transpose() << std::endl;
     Vector mu = fun.get_mu();    
-    std::cout << "estimated fixed effects    : " << mu.transpose() << std::endl;
+    std::cout << "estimated fixed & random effects    : " << mu.transpose() << std::endl;
 
-    Vector marg = fun.get_marginals_f(theta);
-    std::cout << "est. marginals fixed eff.  : " << marg.transpose() << std::endl;
+    //Vector marg = fun.get_marginals_f(theta);
+    //std::cout << "est. marginals fixed eff.  : " << marg.transpose() << std::endl;
 
 
     return 0;
