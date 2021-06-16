@@ -38,6 +38,7 @@ class PostTheta{
 	int ns;
     int nb;
     int no;
+    int nu;
     MatrixXd B;
     VectorXd y;
     // next 4 potentially unused (then B unused)
@@ -60,6 +61,7 @@ public:
 	}
 	PostTheta(int ns_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_) : ns(ns_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_)  {
 		yTy = y.dot(y);
+		nu = nb + ns;
 
 		// initialise min_f_theta, min_theta
 		min_f_theta = 1e10;
@@ -77,7 +79,7 @@ public:
 
     	if(f_theta < min_f_theta){
     		min_f_theta = f_theta;
-    		std::cout << "theta   : " << theta << ", f_theta : " << f_theta << std::endl;
+    		std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
     	}
 
     	Vector mu_dummy;
@@ -251,6 +253,7 @@ public:
 
 	}
 
+	
 	// SPDE discretisation -- matrix construction
 	void construct_Q_spatial(Vector& theta, SpMat* Qs){
 		// Qs <- g[1]^2*Qgk.fun(sfem, g[2], order)
@@ -275,24 +278,31 @@ public:
 			construct_Q_spatial(theta, &Qs);
 			//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
 			// construct Qx from Qs values, extend by zeros 
+			SpMat Qx(nu,nu);         // default is column major			
+
 			int nnz = Qs.nonZeros();
+			Qx.reserve(nnz);
 
-			Qs.makeCompressed();
-			Map<SparseMatrix<double> > Qx(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
-                               Qs.innerIndexPtr(),Qs.valuePtr());
+			for (int k=0; k<Qs.outerSize(); ++k)
+			  for (SparseMatrix<double>::InnerIterator it(Qs,k); it; ++it)
+			  {
+			    Qx.insert(it.row(),it.col()) = it.value();                 
+			  }
 
-
-			std::cout << Qx << std::endl;
+			//Qs.makeCompressed();
+			//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
+            //                   Qs.innerIndexPtr(),Qs.valuePtr());
 
 			for(int i=ns; i<(ns+nb); i++){
-				Qx.insert(i,i) = 1e-5;
+				Qx.coeffRef(i,i) = 1e-5;
 			}
 
-			std::cout << "Qx \n" << Qx << std::endl;
+			Qx.makeCompressed();
 
-			exit(1);
+			//std::cout << "Qx  " << Qx << std::endl;
 
-			*Q = Qx + exp_theta * Ax.transpose() * Ax;
+			//std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
+			*Q =  Qx + exp_theta * Ax.transpose() * Ax;
 		}
 
 		if(ns == 0){

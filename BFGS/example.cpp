@@ -212,12 +212,12 @@ int main(int argc, char* argv[])
     SpMat c0; 
     SpMat g1; 
     SpMat g2;
+    Vector y;
 
     // data y
     std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
     file_exists(y_file);
-
-    Vector y = read_matrix(y_file, no, 1);
+    y = read_matrix(y_file, no, 1);
 
     if(ns == 0 ){
         // read in design matrix 
@@ -282,50 +282,56 @@ int main(int argc, char* argv[])
     LBFGSParam<double> param;    
     // set convergence criteria
     // stop if norm of gradient smaller than :
-    param.epsilon = 1e-1;
+    param.epsilon = 1e-3;
     // or if objective function has not decreased by more than  
-    param.epsilon_rel = 1e-1;
+    param.epsilon_rel = 1e-3;
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 10;
+    param.max_iterations = 20;
 
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
 
-    /*std::optional<PostTheta> fun;
+    std::cout << "g1 size : " << g1.rows() << " " << g1.cols() << std::endl;
+    std::cout << "Ax size : " << Ax.rows() << " " << Ax.cols() << std::endl;
+
+    //std::optional<PostTheta> fun;
+    PostTheta * fun;
 
     if(ns == 0){
-        fun.emplace(nb, no, B, y);
-    }*/
-
-    // PostTheta fun(nb, no, B, y);
-    PostTheta fun(ns, nb, no, Ax, y, c0, g1, g2);
+        // fun.emplace(nb, no, B, y);
+        fun = new PostTheta(nb, no, B, y);
+    } else {
+        // PostTheta fun(nb, no, B, y);
+        fun = new PostTheta(ns, nb, no, Ax, y, c0, g1, g2);
+    }
        
+    //exit(1);
     double fx;
 
     // Vector grad(1);
     // fx = fun(theta, grad);
     // std::cout <<  "f(x) = " << fx << std::endl;
 
-    int niter = solver.minimize(fun, theta, fx);
+    int niter = solver.minimize(*fun, theta, fx);
 
     std::cout << niter << " iterations" << std::endl;
-    std::cout << "f(x) = " << fx << std::endl;
+    std::cout << "f(x)            : " << fx << std::endl;
 
-    Vector grad = fun.get_grad();
-    std::cout << "grad = " << grad << std::endl;
+    Vector grad = fun->get_grad();
+    std::cout << "grad            : " << grad.transpose() << std::endl;
 
     // std::cout << "original theta             : " << tau << std::endl;
-    std::cout << "estimated theta            : " << theta.transpose() << std::endl;
+    std::cout << "estimated theta : " << theta.transpose() << std::endl;
 
     //MatrixXd cov = fun.get_Covariance(theta);
     //std::cout << "estimated covariance theta : " << cov << std::endl;
 
     //std::cout << "original fixed effects     : " << b.transpose() << std::endl;
-    Vector mu = fun.get_mu();    
-    std::cout << "estimated fixed & random effects    : " << mu.transpose() << std::endl;
+    //Vector mu = fun->get_mu();    
+    //std::cout << "estimated fixed & random effects    : " << mu.transpose() << std::endl;
 
     //Vector marg = fun.get_marginals_f(theta);
     //std::cout << "est. marginals fixed eff.  : " << marg.transpose() << std::endl;

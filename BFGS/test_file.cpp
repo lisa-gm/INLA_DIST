@@ -12,6 +12,10 @@
 #include <Eigen/Dense>
 #include <Eigen/CholmodSupport>
 
+#include <armadillo>
+#include "../read_write_functions.cpp"
+
+
 
 using namespace Eigen;
 
@@ -47,11 +51,43 @@ int main(int argc, char* argv[]){
 	int nnz = Qx.nonZeros();
 
 	Qx.makeCompressed();
-	Map<SparseMatrix<double> > Qs(12,12,nnz,Qx.outerIndexPtr(), // read-write
+	SpMat Qs = Map<SparseMatrix<double> >(12,12,nnz,Qx.outerIndexPtr(), // read-write
                                Qx.innerIndexPtr(),Qx.valuePtr());
 
 
 	std::cout << Qs << std::endl;
+	std::cout << Qs.rows() << std::endl;
+	std::cout << Qs.cols() << std::endl;
+
+	std::string filename = "/home/x_gaedkelb/b_INLA/data/ns6252/y_11646_1.dat";
+	int n_row = 11646;
+	int n_col = 6252;
+
+	arma::mat X(n_row, n_col);
+    X.load(filename, arma::raw_ascii);
+    X.submat(0,0,10,0).print();
+        
+
+	std::string g1_file = "/home/x_gaedkelb/b_INLA/data/ns42/g1_42.dat";
+    SpMat g1 = read_sym_CSC(g1_file);
+    g1 = g1.block(0,0,10,10);
+    std::cout << "g1\n" << g1 << std::endl;
+
+	SparseMatrix<double> Qv(13,13);         // default is column major
+	Qv.reserve(60);
+	//for each i,j such that v_ij != 0
+
+	for (int k=0; k<g1.outerSize(); ++k)
+	  for (SparseMatrix<double>::InnerIterator it(g1,k); it; ++it)
+	  {
+	    Qv.insert(it.row(),it.col()) = it.value();                 
+	  }
+
+	  Qv.makeCompressed();     
+
+
+    std::cout << "Qv\n" << Qv << std::endl;
+
 
 
 	return 1;

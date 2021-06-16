@@ -1,6 +1,6 @@
 # hard code example to see if code runs
 
-ns=42
+ns=2252
 nb=2
 no=11646
 
