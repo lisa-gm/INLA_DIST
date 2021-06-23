@@ -182,6 +182,8 @@ int main(int argc, char* argv[])
 
     if(argc != 1 + 4){
         std::cout << "wrong number of input parameters. " << std::endl;
+
+
         exit(1);
     }
 
@@ -269,7 +271,8 @@ int main(int argc, char* argv[])
         // Initial guess
         theta[0] = 3;
     } else {
-        theta << 0.5, 0.5, 0.5;
+        theta << 1, -1, 1;
+        //theta << 0.5, -1, 2;
         std::cout << "theta : \n"  << theta.transpose() << std::endl;    
 
     }
@@ -288,7 +291,7 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 20;
+    param.max_iterations = 30;
 
 
     // Create solver and function object
@@ -315,16 +318,21 @@ int main(int argc, char* argv[])
     // fx = fun(theta, grad);
     // std::cout <<  "f(x) = " << fx << std::endl;
 
+    std::cout << "Call BFGS solver now. " << std::endl;
+
     int niter = solver.minimize(*fun, theta, fx);
 
     std::cout << niter << " iterations" << std::endl;
-    std::cout << "f(x)            : " << fx << std::endl;
+    std::cout << "f(x)                    : " << fx << std::endl;
 
     Vector grad = fun->get_grad();
-    std::cout << "grad            : " << grad.transpose() << std::endl;
+    std::cout << "grad                    : " << grad.transpose() << std::endl;
 
     // std::cout << "original theta             : " << tau << std::endl;
-    std::cout << "estimated theta : " << theta.transpose() << std::endl;
+    std::cout << "estimated theta         : " << theta.transpose() << std::endl;
+
+    Vector fixed_eff = fun->get_mu();
+    std::cout << "estimated fixed effects : " << fixed_eff[ns] << " " << fixed_eff[ns+1] << std::endl;
 
     //MatrixXd cov = fun.get_Covariance(theta);
     //std::cout << "estimated covariance theta : " << cov << std::endl;

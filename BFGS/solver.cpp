@@ -13,6 +13,19 @@ typedef Eigen::CholmodSimplicialLDLT  <SpMat > Solver;
 typedef Eigen::VectorXd Vector;
 
 
+void log_det_cholmod(SpMat *A, double *log_det)
+{
+
+	Solver solver;
+	solver.analyzePattern(*A);
+	solver.factorize(*A);
+
+	*log_det = solver.logDeterminant();
+
+	//std::cout << "solution vector u : " << *u << std::endl;
+
+}
+
 void solve_cholmod(SpMat *A, Vector *f, Vector& u, double *log_det)
 {
 

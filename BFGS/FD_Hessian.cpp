@@ -95,13 +95,13 @@ f_hess(x)
 
 */
 
-double f_eval(Vector x){
+double f_eval(Vector& x){
 	// x[1]^3*x[2]^2*x[3]
 
 	return(pow(x[0],3)*pow(x[1],2)*x[2]);
 }
 
-MatrixXd hess_eval(Vector x){
+MatrixXd hess_eval(Vector& x){
 
 	double eps = 0.005;
 
@@ -115,15 +115,20 @@ MatrixXd hess_eval(Vector x){
 		for(int j=i; j < dim_x; j++){
 
 			if(i == j){
-				hessUpper(i,i) = (f_eval(x+epsId.col(i)) - 2 * f_eval(x) + f_eval(x-epsId.col(i)))/(eps*eps);
+				Vector x_forw_i = x+epsId.col(i);
+				Vector x_back_i = x-epsId.col(i);
+
+				hessUpper(i,i) = (f_eval(x_forw_i) - 2 * f_eval(x) + f_eval(x_back_i))/(eps*eps);
 			} else {
-          		hessUpper(i,j) = (  f_eval(x+epsId.col(i)+epsId.col(j)) \
-                             - f_eval(x+epsId.col(i)-epsId.col(j)) - f_eval(x-epsId.col(i)+epsId.col(j)) \
-                             + f_eval(x-epsId.col(i)-epsId.col(j))) / (4*eps*eps);
-        }
+				Vector x_forw_i_j 		= x+epsId.col(i)+epsId.col(j);
+				Vector x_forw_i_back_j = x+epsId.col(i)-epsId.col(j);
+				Vector x_back_i_forw_j = x-epsId.col(i)+epsId.col(j);
+				Vector x_back_i_j 		= x-epsId.col(i)-epsId.col(j);
 
-
-
+    		hessUpper(i,j) = (  f_eval(x_forw_i_j) \
+                       - f_eval(x_forw_i_back_j) - f_eval(x_back_i_forw_j) \
+                       + f_eval(x_back_i_j)) / (4*eps*eps);
+       }
 		}
 	}
 
@@ -137,7 +142,7 @@ int main(int argc, char* argv[]){
 
 
 	Vector x(3);
-	x << 5,2,3;
+	x << -5,2,3;
 
 	double f = f_eval(x);
 
