@@ -95,6 +95,41 @@ f_hess(x)
 
 */
 
+// HESSIAN 1D
+
+#if 0
+
+// OLD 1D VERSION
+		// construct 2nd order cetnral difference
+		Vector eps(1);
+		eps[0] = 0.005;
+
+		Vector theta_forw(1);
+		theta_forw = theta + eps;
+
+		Vector theta_back(1);
+		theta_back = theta - eps;
+
+		Vector mu_dummy(1);
+
+		double f_theta = eval_post_theta(theta, mu);
+		double f_theta_forw = eval_post_theta(theta_forw, mu_dummy);
+		double f_theta_back = eval_post_theta(theta_back, mu_dummy);
+
+		MatrixXd hess(1,1);
+		// careful : require negative hessian (swapped signs in eval post theta) 
+		// but then precision negative hessian -> no swapping
+		hess << (1.0)/(eps[0]*eps[0]) * (f_theta_forw - 2*f_theta + f_theta_back);
+		
+		std::cout << "hess " << hess << std::endl;
+
+		MatrixXd cov(1,1);
+		cov << 1.0/hess(0,0);
+
+
+#endif
+
+
 double f_eval(Vector& x){
 	// x[1]^3*x[2]^2*x[3]
 

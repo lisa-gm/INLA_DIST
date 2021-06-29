@@ -53,3 +53,11 @@ void extract_inv_diag(SpMat& Q, Vector& vars){
 
 
 }
+
+void compute_inverse(MatrixXd& Q, MatrixXd& Q_inv){
+
+		Q_inv = Q.inverse();		
+		//std::cout << "Q inv :\n" << Q_inv << std::endl; 
+
+
+}

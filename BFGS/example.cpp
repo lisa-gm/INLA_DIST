@@ -178,11 +178,17 @@ int main(int argc, char* argv[])
     
     #endif
 
-    #if 1
-
-    if(argc != 1 + 4){
+    if(argc != 1 + 5){
         std::cout << "wrong number of input parameters. " << std::endl;
 
+        std::cerr << "INLA Call : ns nt nb no path/to/files" << std::endl;
+
+        std::cerr << "[integer:ns]                number of spatial grid points " << std::endl;
+        std::cerr << "[integer:nt]                number of temporal grid points " << std::endl;
+        std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
+        std::cerr << "[integer:no]                number of data samples" << std::endl;
+
+        std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
 
         exit(1);
     }
@@ -190,51 +196,60 @@ int main(int argc, char* argv[])
     std::cout << "reading in example. " << std::endl;
 
     size_t ns = atoi(argv[1]);
-    //int nt = atoi
-    size_t nb = atoi(argv[2]);
-    size_t no = atoi(argv[3]);
+    size_t nt = atoi(argv[2]);
+    size_t nb = atoi(argv[3]);
+    size_t no = atoi(argv[4]);
+
+    // set nt = 1 if ns > 0 & nt = 0
+    if(ns > 0 && nt == 0){
+        nt = 1;
+    } 
 
     // also save as string
     std::string ns_s = std::to_string(ns);
-    //std::string nt_s = std::to_string(nt);
+    std::string nt_s = std::to_string(nt);
     std::string nb_s = std::to_string(nb);
     std::string no_s = std::to_string(no); 
-    std::string nu_s = std::to_string(ns + nb);
+    std::string n_s  = std::to_string(ns*nt + nb);
 
-
-    std::string base_path = argv[4];
+    std::string base_path = argv[5];
 
     // dimension hyperparamter initialised to 1
     int dim_th = 1;
 
     /* ---------------- read in matrices ---------------- */
 
-    MatrixXd B;
-    SpMat Ax; 
+    // spatial component
     SpMat c0; 
     SpMat g1; 
     SpMat g2;
+
+    // spatial-temporal parts
+    SpMat g3;
+    SpMat M0;
+    SpMat M1;
+    SpMat M2;
+
+    // data component / fixed effects
+    MatrixXd B;
+    SpMat Ax; 
     Vector y;
 
-    // data y
-    std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
-    file_exists(y_file);
-    y = read_matrix(y_file, no, 1);
-
-    if(ns == 0 ){
+    if(ns == 0 && nt == 0){
         // read in design matrix 
         // files containing B
         std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
         file_exists(B_file); 
 
         B = read_matrix(B_file, no, nb);
-    }
 
-    // std::cout << "y : \n"  << y << std::endl;    
-    // std::cout << "B : \n" << B << std::endl;
+        // std::cout << "y : \n"  << y << std::endl;    
+        // std::cout << "B : \n" << B << std::endl;
 
-    // read in spatial component of the model
-    if(ns > 0){
+    } else if(ns > 0 && nt == 1){
+
+        std::cout << "spatial model." << std::endl;
+
         dim_th = 3;
 
         // check spatial FEM matrices
@@ -246,7 +261,7 @@ int main(int argc, char* argv[])
         file_exists(g2_file);
 
         // check projection matrix for A.st
-        std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + nu_s + ".dat";
+        std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
         file_exists(Ax_file);
 
         // read in matrices
@@ -261,20 +276,78 @@ int main(int argc, char* argv[])
 
         std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;*/
 
+    } else if(ns > 0 && nt > 1) {
+
+        std::cout << "spatial-temporal model." << std::endl;
+
+        dim_th = 4;
+
+        // files to construct Q.u depending on HYPERPARAMETERS theta
+        std::string c0_file      =  base_path + "/c0_" + ns_s + ".dat";
+        file_exists(c0_file);
+        std::string g1_file      =  base_path + "/g1_" + ns_s + ".dat";
+        file_exists(g1_file);
+        std::string g2_file      =  base_path + "/g2_" + ns_s + ".dat";
+        file_exists(g2_file);
+        std::string g3_file      =  base_path + "/g3_" + ns_s + ".dat";
+        file_exists(g3_file);
+
+        std::string M0_file      =  base_path + "/M0_" + nt_s + ".dat";
+        file_exists(M0_file);
+        std::string M1_file      =  base_path + "/M1_" + nt_s + ".dat";
+        file_exists(M1_file);
+        std::string M2_file      =  base_path + "/M2_" + nt_s + ".dat";
+        file_exists(M2_file);  
+
+        // check projection matrix for A.st
+        std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
+        file_exists(Ax_file);
+
+        // read in matrices
+        c0 = read_sym_CSC(c0_file);
+        g1 = read_sym_CSC(g1_file);
+        g2 = read_sym_CSC(g2_file);
+        g3 = read_sym_CSC(g3_file);
+
+        M0 = read_sym_CSC(M0_file);
+        //arma::mat(M0).submat(0,0,nt-1,nt-1).print();
+        M1 = read_sym_CSC(M1_file);
+        //arma::mat(M1).submat(0,0,nt-1,nt-1).print();
+        M2 = read_sym_CSC(M2_file);
+        //arma::mat(M2).submat(0,0,nt-1,nt-1).print();
+ 
+        Ax = readCSC(Ax_file);
+
+    } else {
+        std::cout << "invalid parameters : ns nt !!" << std::endl;
+        exit(1);
     }
 
-    #endif
+
+    // data y
+    std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
+    file_exists(y_file);
+    y = read_matrix(y_file, no, 1);
+
+
+    /* ----------------------- initialise random theta -------------------------------- */
 
     Vector theta(dim_th);
     // initialise theta
-    if(ns == 0){
+    if(ns == 0 && nt == 0){
         // Initial guess
         theta[0] = 3;
-    } else {
-        theta << 1, -1, 1;
-        //theta << 0.5, -1, 2;
-        std::cout << "theta : \n"  << theta.transpose() << std::endl;    
+        std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
+    } else if(ns > 0 && nt == 1){
+        //theta << 1, -1, 1;
+        theta << 1, -2, 2;
+        std::cout << "initial theta : "  << theta.transpose() << std::endl;    
+
+    } else {
+        theta << 1, -1, 1, 1;
+        //theta << 0.5, -1, 2, 2;
+        std::cout << "initial theta : "  << theta.transpose() << std::endl; 
     }
 
     //exit(1);
@@ -291,7 +364,7 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 30;
+    param.max_iterations = 10;
 
 
     // Create solver and function object
@@ -300,42 +373,48 @@ int main(int argc, char* argv[])
     std::cout << "g1 size : " << g1.rows() << " " << g1.cols() << std::endl;
     std::cout << "Ax size : " << Ax.rows() << " " << Ax.cols() << std::endl;
 
+    std::cout << "g3 size : " << g3.rows() << " " << g3.cols() << std::endl;
+    std::cout << "M1 size : " << M1.rows() << " " << M1.cols() << std::endl;
+
     //std::optional<PostTheta> fun;
     PostTheta * fun;
 
     if(ns == 0){
         // fun.emplace(nb, no, B, y);
-        fun = new PostTheta(nb, no, B, y);
-    } else {
+        fun = new PostTheta(ns, nt, nb, no, B, y);
+    } else if(ns > 0 && nt == 1) {
+        std::cout << "call spatial constructor." << std::endl;
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nb, no, Ax, y, c0, g1, g2);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2);
+    } else {
+        std::cout << "call spatial-temporal constructor." << std::endl;
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2);
     }
        
-    //exit(1);
     double fx;
 
-    // Vector grad(1);
-    // fx = fun(theta, grad);
-    // std::cout <<  "f(x) = " << fx << std::endl;
+    //Vector grad_test(dim_th);
+    //fx = fun(theta, grad_test);
+    //std::cout <<  "f(x) = " << fx << std::endl;
 
     std::cout << "Call BFGS solver now. " << std::endl;
 
     int niter = solver.minimize(*fun, theta, fx);
 
     std::cout << niter << " iterations" << std::endl;
-    std::cout << "f(x)                    : " << fx << std::endl;
+    std::cout << "\nf(x)                    : " << fx << std::endl;
 
     Vector grad = fun->get_grad();
     std::cout << "grad                    : " << grad.transpose() << std::endl;
 
     // std::cout << "original theta             : " << tau << std::endl;
-    std::cout << "estimated theta         : " << theta.transpose() << std::endl;
+    std::cout << "\nestimated theta         : " << theta.transpose() << std::endl;
 
     Vector fixed_eff = fun->get_mu();
     std::cout << "estimated fixed effects : " << fixed_eff[ns] << " " << fixed_eff[ns+1] << std::endl;
 
-    //MatrixXd cov = fun.get_Covariance(theta);
-    //std::cout << "estimated covariance theta : " << cov << std::endl;
+    MatrixXd cov = fun->get_Covariance(theta);
+    std::cout << "\nestimated covariance theta : \n" << cov << std::endl;
 
     //std::cout << "original fixed effects     : " << b.transpose() << std::endl;
     //Vector mu = fun->get_mu();    
@@ -346,4 +425,5 @@ int main(int argc, char* argv[])
 
 
     return 0;
+    
 }
