@@ -190,10 +190,10 @@ public:
 
 	Vector get_marginals_f(Vector& theta){
 		
-		SpMat Q(nb, nb);
+		SpMat Q(n, n);
 		construct_Q(theta, &Q);
 
-		Vector vars(nb);
+		Vector vars(n);
 		extract_inv_diag(Q, vars);
 
 		return(vars);
@@ -258,9 +258,9 @@ public:
 			std::cout << "nt : " << nt << std::endl;
 		#endif		
 
-		if(nt > 1){
+		if(nt > 1 && ns > 0){
 			// spatial model dim theta : 4
-		    theta_original << 0, 0, 0, 0;  
+		    theta_original << 1.4, -5.9,  1,  3.7; 
 		} else if(ns > 0) {
 			// spatial model dim theta : 3
 		    theta_original << 3, -3, 1.5, 0;  
@@ -425,25 +425,27 @@ public:
 		double exp_theta3 = exp(theta[3]);
 
 		// g^2 * fem$c0 + fem$g1
-		SpMat q1s = pow(exp_theta3, 2) * c0 + g1;
+		SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
 
 		 // g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
-  		SpMat q2s = pow(exp_theta3, 4) * c0 + 2 * pow(exp_theta3,2) * g1 + g2;
+  		SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
 
   		// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
-  		SpMat q3s = pow(exp_theta3, 6) * c0 + 3 * pow(exp_theta3,4) * g1 + 3 * pow(exp_theta3,2) * g2 + g3;
+  		SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
   		#ifdef PRINT_MSG
+  			/*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+
 			std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
 			std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
 
 			std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
 	        std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
-	        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;
+	        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
   		#endif
 
   		// assemble overall precision matrix Q.st
-  		*Qst = exp_theta1*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + KroneckerProductSparse<SpMat, SpMat>(M1 * 2 * exp_theta2, q2s) +  KroneckerProductSparse<SpMat, SpMat>(M2 * pow(exp_theta2, 2), q1s));
+  		*Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 
   		#ifdef PRINT_MSG
   			std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
@@ -452,7 +454,7 @@ public:
 	}
 
 	void construct_Q(Vector& theta, SpMat *Q){
-		double exp_theta = exp(theta[0]);
+		double exp_theta0 = exp(theta[0]);
 		//double exp_theta = exp(3);
 
 
@@ -489,17 +491,22 @@ public:
 			//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
             //                   Qs.innerIndexPtr(),Qs.valuePtr());
 
-			for(int i=ns; i<(ns+nb); i++){
+			for(int i=nu; i<(n); i++){
 				Qx.coeffRef(i,i) = 1e-5;
 			}
 
 			Qx.makeCompressed();
 
-			//std::cout << "Qx  " << Qx << std::endl;
+			#ifdef PRINT_MSG
+				//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
+				//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
 
-			*Q =  Qx + exp_theta * Ax.transpose() * Ax;
+			#endif
+
+			*Q =  Qx + exp_theta0 * Ax.transpose() * Ax;
 
 			#ifdef PRINT_MSG
+				std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
 				std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
 			#endif
 
@@ -509,7 +516,7 @@ public:
 		if(ns == 0){
 			// Q.e <- Diagonal(no, exp(theta))
 			// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
-			*Q = Q_b + exp_theta*B.transpose()*B;
+			*Q = Q_b + exp_theta0*B.transpose()*B;
 		}
 
 		/*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
@@ -517,6 +524,7 @@ public:
 
 		#ifdef PRINT_MSG
 			std::cout << "Q  dim : " << Q->rows() << " "  << Q->cols() << std::endl;
+			std::cout << "Q : \n" << Q->block(0,0,10,10) << std::endl;
 		#endif 
 
 	}
@@ -556,6 +564,10 @@ public:
 		solve_cholmod(Q, rhs, mu, log_det);
 
 		*log_det = 0.5 * (*log_det);
+		
+		#ifdef PRINT_MSG
+			std::cout << "log det d : " << *log_det << std::endl;
+		#endif
 
 		// compute value
 		*val = -0.5 * mu.transpose()*(*Q)*(mu); 

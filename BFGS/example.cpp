@@ -345,9 +345,12 @@ int main(int argc, char* argv[])
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else {
-        theta << 1, -1, 1, 1;
+        Vector theta_original(4); theta_original << 1.4, -5.9,  1,  3.7; 
+        std::cout << "theta original : " << theta_original.transpose() << std::endl;
+        //theta << 1.4, -5.9,  1,  3.7; 
+        theta << 1, -5, 1, 3;
         //theta << 0.5, -1, 2, 2;
-        std::cout << "initial theta : "  << theta.transpose() << std::endl; 
+        std::cout << "initial theta  : "  << theta.transpose() << std::endl; 
     }
 
     //exit(1);
@@ -360,11 +363,11 @@ int main(int argc, char* argv[])
     // stop if norm of gradient smaller than :
     param.epsilon = 1e-3;
     // or if objective function has not decreased by more than  
-    param.epsilon_rel = 1e-3;
+    param.epsilon_rel = 1e-1;
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 10;
+    param.max_iterations = 20;
 
 
     // Create solver and function object
@@ -397,31 +400,36 @@ int main(int argc, char* argv[])
     //fx = fun(theta, grad_test);
     //std::cout <<  "f(x) = " << fx << std::endl;
 
-    std::cout << "Call BFGS solver now. " << std::endl;
+    std::cout << "\nCall BFGS solver now. " << std::endl;
 
     int niter = solver.minimize(*fun, theta, fx);
 
     std::cout << niter << " iterations" << std::endl;
-    std::cout << "\nf(x)                    : " << fx << std::endl;
+    std::cout << "\nf(x)                         : " << fx << std::endl;
 
     Vector grad = fun->get_grad();
-    std::cout << "grad                    : " << grad.transpose() << std::endl;
+    std::cout << "grad                         : " << grad.transpose() << std::endl;
 
     // std::cout << "original theta             : " << tau << std::endl;
-    std::cout << "\nestimated theta         : " << theta.transpose() << std::endl;
+    std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
+
+    Vector theta_max(dim_th);
+    //theta_max << 2.675054, -2.970111, 1.537331;    // theta
+    theta_max = theta;
+
+    MatrixXd cov = fun->get_Covariance(theta_max);
+    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+
+    std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
+    //std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
+
+
 
     Vector fixed_eff = fun->get_mu();
-    std::cout << "estimated fixed effects : " << fixed_eff[ns] << " " << fixed_eff[ns+1] << std::endl;
+    std::cout << "\nestimated mean fixed effects : " << fixed_eff[ns] << " " << fixed_eff[ns+1] << std::endl;
 
-    MatrixXd cov = fun->get_Covariance(theta);
-    std::cout << "\nestimated covariance theta : \n" << cov << std::endl;
-
-    //std::cout << "original fixed effects     : " << b.transpose() << std::endl;
-    //Vector mu = fun->get_mu();    
-    //std::cout << "estimated fixed & random effects    : " << mu.transpose() << std::endl;
-
-    //Vector marg = fun.get_marginals_f(theta);
-    //std::cout << "est. marginals fixed eff.  : " << marg.transpose() << std::endl;
+    //Vector marg = fun->get_marginals_f(theta);
+    //std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
 
 
     return 0;
