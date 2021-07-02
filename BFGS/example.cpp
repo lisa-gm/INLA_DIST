@@ -367,7 +367,7 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 20;
+    param.max_iterations = 1;
 
 
     // Create solver and function object
@@ -417,17 +417,15 @@ int main(int argc, char* argv[])
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     theta_max = theta;
 
-    MatrixXd cov = fun->get_Covariance(theta_max);
+    /*MatrixXd cov = fun->get_Covariance(theta_max);
     std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
 
     std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
     //std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
 
-
-
     Vector fixed_eff = fun->get_mu();
     std::cout << "\nestimated mean fixed effects : " << fixed_eff[ns] << " " << fixed_eff[ns+1] << std::endl;
-
+    */
     //Vector marg = fun->get_marginals_f(theta);
     //std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
 

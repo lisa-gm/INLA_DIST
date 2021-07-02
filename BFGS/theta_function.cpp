@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <omp.h>
+
 // std::setwd print out
 #include <iomanip>
 
@@ -17,7 +19,8 @@
 #include <unsupported/Eigen/KroneckerProduct>
 
 
-#include "solver.cpp"
+#include "solver_cholmod.cpp"
+#include "solver_pardiso.cpp"
 // #include "theta_function.hpp"
 
 //#define PRINT_MSG
@@ -124,9 +127,14 @@ public:
     		//std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
     	}
 
+    	double timespent_grad = -omp_get_wtime();
+
     	Vector mu_dummy;
 		eval_gradient(theta, f_theta, mu_dummy, grad);
 		// std::cout << "grad : " << grad.transpose() << std::endl;
+
+		timespent_grad += omp_get_wtime();
+		std::cout << "time spent gradient call : " << timespent_grad << std::endl;
 
 
     	return f_theta;
@@ -360,7 +368,7 @@ public:
 			construct_Q_spatial(theta, &Qu);
 		}
 
-		log_det_cholmod(&Qu, log_det);
+		log_det_pardiso(&Qu, log_det);
 		#ifdef PRINT_MSG
 			std::cout << "log det Qu : " << *log_det << std::endl;
 		#endif
@@ -592,25 +600,46 @@ public:
 		epsId_mat = eps*epsId_mat.setIdentity();
 		//std::cout << "epsId_mat : " << epsId_mat << std::endl;
 
-		// temp vector
-		Vector theta_forw(dim_th);
-		Vector theta_backw(dim_th);
-
 		Vector f_forw(dim_th);
 		Vector f_backw(dim_th);
 
-		Vector mu_dummy;
+		int threads = omp_get_max_threads();
 
-		// parallelise loop later
-		for(int i=0; i<dim_th; i++){
-			theta_forw = theta + epsId_mat.col(i);
-			theta_backw = theta - epsId_mat.col(i);
+		// naively parallelise using OpenMP, more later
+		#pragma omp parallel for
+		for(int i=0; i<2*dim_th; i++){
 
-			f_forw[i] = eval_post_theta(theta_forw, mu_dummy);
-			f_backw[i] = eval_post_theta(theta_backw, mu_dummy);
+			if(i % 2 == 0){
+				int k = i/2;
 
+				#ifdef PRINT_MSG
+					printf("forward loop thread rank: %d out of %d\n", omp_get_thread_num(), threads);
+					std::cout << "i : " << i << " and k : " << k << std::endl;
+				#endif
+
+				// temp vector
+				Vector theta_forw(dim_th);
+				Vector mu_dummy;
+
+				theta_forw = theta + epsId_mat.col(k);
+				f_forw[k] = eval_post_theta(theta_forw, mu_dummy);
+
+			} else {
+				int k = (i-1)/2;
+
+				#ifdef PRINT_MSG
+					printf("backward loop thread rank: %d out of %d\n", omp_get_thread_num(), threads);
+					std::cout << "i : " << i << " and k : " << k << std::endl;
+				#endif
+
+				// temp vector
+				Vector theta_backw(dim_th);
+				Vector mu_dummy;
+
+				theta_backw = theta - epsId_mat.col(k);
+				f_backw[k] = eval_post_theta(theta_backw, mu_dummy);
+			}
 		}
-
 
 		// compute finite difference in each direction
 		grad = 1.0/(2.0*eps)*(f_forw - f_backw);
