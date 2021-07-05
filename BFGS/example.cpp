@@ -333,6 +333,8 @@ int main(int argc, char* argv[])
     /* ----------------------- initialise random theta -------------------------------- */
 
     Vector theta(dim_th);
+    Vector theta_original(dim_th);
+
     // initialise theta
     if(ns == 0 && nt == 0){
         // Initial guess
@@ -345,12 +347,12 @@ int main(int argc, char* argv[])
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else {
-        Vector theta_original(4); theta_original << 1.4, -5.9,  1,  3.7; 
-        std::cout << "theta original : " << theta_original.transpose() << std::endl;
+        theta_original << 1.4, -5.9,  1,  3.7; 
+        std::cout << "theta original : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         //theta << 1.4, -5.9,  1,  3.7; 
-        theta << 1, -5, 1, 3;
+        theta << 1, -3, 1, 3;
         //theta << 0.5, -1, 2, 2;
-        std::cout << "initial theta  : "  << theta.transpose() << std::endl; 
+        std::cout << "initial theta  : "  << std::right << std::fixed << theta.transpose() << std::endl;
     }
 
     //exit(1);
@@ -367,17 +369,16 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 1;
+    param.max_iterations = 30;
 
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
 
-    std::cout << "g1 size : " << g1.rows() << " " << g1.cols() << std::endl;
-    std::cout << "Ax size : " << Ax.rows() << " " << Ax.cols() << std::endl;
+    std::cout << "spatial grid size  : " << std::right << std::fixed << g1.rows() << " " << g1.cols() << std::endl;
+    std::cout << "temporal grid size : " << M1.rows() << " " << M1.cols() << std::endl;
 
-    std::cout << "g3 size : " << g3.rows() << " " << g3.cols() << std::endl;
-    std::cout << "M1 size : " << M1.rows() << " " << M1.cols() << std::endl;
+    std::cout << "Ax size            : " << Ax.rows() << " " << Ax.cols() << std::endl;
 
     //std::optional<PostTheta> fun;
     PostTheta * fun;
@@ -410,8 +411,9 @@ int main(int argc, char* argv[])
     Vector grad = fun->get_grad();
     std::cout << "grad                         : " << grad.transpose() << std::endl;
 
-    // std::cout << "original theta             : " << tau << std::endl;
     std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
+    std::cout << "original theta               : " << theta_original.transpose() << std::endl;
+
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta

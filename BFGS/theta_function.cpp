@@ -115,8 +115,10 @@ public:
     	// initialise min_f_theta, min_theta, store current minimum 
 
     	// Vector mu;
-    	double f_theta = eval_post_theta(theta, mu);
+		//better way to set up mu?
+		mu.setZero(n);
 
+    	double f_theta = eval_post_theta(theta, mu);
 
     	if(f_theta < min_f_theta){
     		min_f_theta = f_theta;
@@ -129,7 +131,7 @@ public:
 
     	double timespent_grad = -omp_get_wtime();
 
-    	Vector mu_dummy;
+    	Vector mu_dummy(n);
 		eval_gradient(theta, f_theta, mu_dummy, grad);
 		// std::cout << "grad : " << grad.transpose() << std::endl;
 
@@ -569,7 +571,8 @@ public:
 
 		// solve linear system
 		// returns vector mu, which is of the same size as rhs
-		solve_cholmod(Q, rhs, mu, log_det);
+		//solve_cholmod(Q, rhs, mu, log_det);
+		solve_pardiso(Q, rhs, mu, log_det);
 
 		*log_det = 0.5 * (*log_det);
 		
@@ -603,11 +606,13 @@ public:
 		Vector f_forw(dim_th);
 		Vector f_backw(dim_th);
 
-		int threads = omp_get_max_threads();
+		int threads;
 
 		// naively parallelise using OpenMP, more later
-		#pragma omp parallel for
+		//#pragma omp parallel for
 		for(int i=0; i<2*dim_th; i++){
+
+			threads = omp_get_num_threads();
 
 			if(i % 2 == 0){
 				int k = i/2;
@@ -619,7 +624,7 @@ public:
 
 				// temp vector
 				Vector theta_forw(dim_th);
-				Vector mu_dummy;
+				Vector mu_dummy(n);
 
 				theta_forw = theta + epsId_mat.col(k);
 				f_forw[k] = eval_post_theta(theta_forw, mu_dummy);
@@ -634,7 +639,7 @@ public:
 
 				// temp vector
 				Vector theta_backw(dim_th);
-				Vector mu_dummy;
+				Vector mu_dummy(n);
 
 				theta_backw = theta - epsId_mat.col(k);
 				f_backw[k] = eval_post_theta(theta_backw, mu_dummy);
