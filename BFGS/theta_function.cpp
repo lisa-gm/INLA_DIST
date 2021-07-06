@@ -136,7 +136,10 @@ public:
 		// std::cout << "grad : " << grad.transpose() << std::endl;
 
 		timespent_grad += omp_get_wtime();
-		std::cout << "time spent gradient call : " << timespent_grad << std::endl;
+
+		#ifdef PRINT_MSG
+			std::cout << "time spent gradient call : " << timespent_grad << std::endl;
+		#endif
 
 
     	return f_theta;
@@ -609,7 +612,7 @@ public:
 		int threads;
 
 		// naively parallelise using OpenMP, more later
-		//#pragma omp parallel for
+		#pragma omp parallel for
 		for(int i=0; i<2*dim_th; i++){
 
 			threads = omp_get_num_threads();
@@ -618,7 +621,7 @@ public:
 				int k = i/2;
 
 				#ifdef PRINT_MSG
-					printf("forward loop thread rank: %d out of %d\n", omp_get_thread_num(), threads);
+					std::cout << "forward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
 					std::cout << "i : " << i << " and k : " << k << std::endl;
 				#endif
 
@@ -633,7 +636,7 @@ public:
 				int k = (i-1)/2;
 
 				#ifdef PRINT_MSG
-					printf("backward loop thread rank: %d out of %d\n", omp_get_thread_num(), threads);
+					std::cout << "backward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
 					std::cout << "i : " << i << " and k : " << k << std::endl;
 				#endif
 
