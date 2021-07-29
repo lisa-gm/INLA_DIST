@@ -37,7 +37,7 @@ extern "C" void pardiso_printstats (int *, int *, double *, int *, int *, int *,
                            double *, int *);
 
 // COMPUTES LOG DETERMINANT OF A USING PARDISO
-void log_det_pardiso(SpMat *A, double *log_det_A){
+void log_det_pardiso(SpMat *A, double &log_det_A){
 
 	// get everything into the right format
 	int nrhs = 0;          /* Number of right hand sides. */
@@ -140,10 +140,10 @@ void log_det_pardiso(SpMat *A, double *log_det_A){
 	    exit(1);
 	}
 
-	// MANUALLY SET THREADS
+	// MANUALLY SET THREADS for now
 	// nested omp 
 	//iparm[2]  = num_procs;
-	iparm[2] = 8;
+	iparm[2] = 16;
 
 	maxfct = 1;     /* Maximum number of numerical factorizations.  */
 	mnum   = 1;         /* Which factorization to use. */
@@ -231,10 +231,10 @@ void log_det_pardiso(SpMat *A, double *log_det_A){
 		printf("\nFactorization completed .. \n");
 	#endif
 
-	*log_det_A = dparm[32];
+	log_det_A = dparm[32];
 
 	#ifdef PRINT_PAR
-		printf("\nPardiso   log(det) = %f ", *log_det_A);	
+		printf("\nPardiso   log(det) = %f ", log_det_A);	
 	#endif
 
 	int gflops_fact = iparm[19-1];
@@ -281,7 +281,7 @@ void log_det_pardiso(SpMat *A, double *log_det_A){
 } 
 
 // COMPUTES LOG DETERMINANT OF A & SOLVES Au = f for u USING PARDISO
-void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
+void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 
 	// get everything into the right format
 
@@ -291,10 +291,14 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 	// this time require CSR format
 
 	int n = f->size();
-	//std::cout << "dim n : " << n << std::endl;
+	#ifdef PRINT_PAR
+		std::cout << "dim n : " << n << std::endl;
+	#endif
 
 	unsigned int nnz = A_lower.nonZeros();
-	//std::cout << "number of non zeros : " << nnz << std::endl;
+	#ifdef PRINT_PAR
+		std::cout << "number of non zeros : " << nnz << std::endl;
+	#endif
 
 	int* ia; 
 	int* ja;
@@ -394,8 +398,8 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 
 	// MANUALLY SET THREADS
 	// nested omp 
-	iparm[2]  = num_procs;
-	//iparm[2] = 8;
+	//iparm[2]  = num_procs;
+	iparm[2] = 8;
 
 	//std::cout << "in pardiso, OMP_NUM_THREADS : " << var << std::endl;
 
@@ -448,11 +452,15 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 	/*    Use this functionality only for debugging purposes                */
 	/* -------------------------------------------------------------------- */
 
-	pardiso_printstats (&mtype, &n, a, ia, ja, &nrhs, b, &error);
+	/*pardiso_printstats (&mtype, &n, a, ia, ja, &nrhs, b, &error);
 	if (error != 0) {
 	    printf("\nERROR right hand side: %d", error);
 	    exit(1);
-	}
+	}*/
+
+	#ifdef PRINT_PAR
+		std::cout << "Passed all initial PARDISO checks." << std::endl;
+	#endif
 
 	/* -------------------------------------------------------------------- */
 	/* ..  Reordering and Symbolic Factorization.  This step also allocates */
@@ -460,9 +468,6 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 	/* -------------------------------------------------------------------- */
 
 	iparm[19-1] = -1; // in order to compute Gflops
-	#ifdef PRINT_PAR
-		printf("\nGFlops factorisation : %i", iparm[19-1]);
-	#endif
 
 	// start timer phase 1
 	double timespent_p11 = -omp_get_wtime();
@@ -472,6 +477,10 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 	pardiso (pt, &maxfct, &mnum, &mtype, &phase,
 	     &n, a, ia, ja, &idum, &nrhs,
 	         iparm, &msglvl, &ddum, &ddum, &error, dparm);
+
+	#ifdef PRINT_PAR
+		printf("after symbolic factorization.\n");
+	#endif
 
 	if (error != 0) {
 	    printf("\nERROR during symbolic factorization: %d", error);
@@ -492,9 +501,20 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 	phase = 22;
 	iparm[32] = 1; /* compute determinant */
 
+	#ifdef PRINT_PAR
+		std::cout << "a, ia, ja : " << std::endl;
+		for(int i = 0; i < 5; i ++){
+			std::cout << a[i] << " " << ia[i] << " " << ja[i] << std::endl;
+		}
+	#endif
+
 	pardiso (pt, &maxfct, &mnum, &mtype, &phase,
 	         &n, a, ia, ja, &idum, &nrhs,
 	         iparm, &msglvl, &ddum, &ddum, &error,  dparm);
+
+	#ifdef PRINT_PAR
+		printf("after factorization.\n");
+	#endif
 
 	if (error != 0) {
 	    printf("\nERROR during numerical factorization: %d", error);
@@ -504,14 +524,13 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double *log_det_A){
 	// get time phase 2
 	timespent_p22 += omp_get_wtime();
 
-	// printf("\nFactorization completed ...\n ");
 	#ifdef PRINT_PAR
 		printf("\nFactorization completed .. \n");
 	#endif
 
-	*log_det_A = dparm[32];
+	log_det_A = dparm[32];
 	#ifdef PRINT_PAR
-		printf("\nPardiso   log(det) = %f ", *log_det_A);	
+		printf("\nPardiso   log(det) = %f ", log_det_A);	
 	#endif
 
 	int gflops_fact = iparm[19-1];
@@ -701,7 +720,7 @@ void inv_diagonal_pardiso(SpMat *A, Vector& inv_diag){
 	// MANUALLY SET THREADS
 	// nested omp 
 	//iparm[2]  = num_procs;
-	iparm[2] = 8;
+	iparm[2] = 16;
 
 	maxfct = 1;     /* Maximum number of numerical factorizations.  */
 	mnum   = 1;         /* Which factorization to use. */
@@ -727,11 +746,11 @@ void inv_diagonal_pardiso(SpMat *A, Vector& inv_diag){
 	/*     Use this functionality only for debugging purposes               */
 	/* -------------------------------------------------------------------- */
 
-	pardiso_chkmatrix  (&mtype, &n, a, ia, ja, &error);
+	/*pardiso_chkmatrix  (&mtype, &n, a, ia, ja, &error);
 	if (error != 0) {
 	    printf("\nERROR in consistency of matrix: %d", error);
 	    exit(1);
-	}
+	}*/
 
 	/* -------------------------------------------------------------------- */
 	/* ..  Reordering and Symbolic Factorization.  This step also allocates */

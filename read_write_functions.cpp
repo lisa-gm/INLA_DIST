@@ -20,26 +20,37 @@ using namespace std;
 typedef Eigen::SparseMatrix<double> SpMat; // declares a column-major sparse matrix type of double
 
 // attention expects complete matrix (not just lower triangular part)
-SpMat readCSC(std::string filename)
-{
-
-  int n;
+SpMat readCSC(std::string filename){
+  int n_rows; int n_cols;
   int nnz;
 
   fstream fin(filename, ios::in);
-  fin >> n;
-  fin >> n;
+  fin >> n_rows;
+  fin >> n_cols;
   fin >> nnz;
 
+  int* innerIndices;
+  int* outerIndexPtr;
+  double* values; 
+
+  // allocate memory
+  innerIndices  = new int [nnz];
+  outerIndexPtr = new int [n_cols+1];
+  values        = new double [nnz];
+
    // allocate memory
-  int outerIndexPtr[n+1];
-  int innerIndices[nnz];
-  double values[nnz];
+  /*int innerIndices[nnz];
+   std::cout << "inner index ptr" << std::endl;
+  int outerIndexPtr[n_cols+1];
+  double val[nnz];
+     std::cout << "inner index ptr" << std::endl;
+  double values[nnz];*/
 
   for (int i = 0; i < nnz; i++){
-    fin >> innerIndices[i];}
+    fin >> innerIndices[i];
+  }
 
-  for (int i = 0; i < n+1; i++){
+  for (int i = 0; i < n_cols+1; i++){
     fin >> outerIndexPtr[i];}
 
   for (int i = 0; i < nnz; i++){
@@ -47,7 +58,8 @@ SpMat readCSC(std::string filename)
 
   fin.close();
 
-  Eigen::Map<Eigen::SparseMatrix<double> > A(n,n,nnz,outerIndexPtr, // read-write
+  // 
+  SpMat A = Eigen::Map<Eigen::SparseMatrix<double> >(n_rows,n_cols,nnz,outerIndexPtr, // read-write
                                innerIndices,values);
 
   return A;
@@ -81,13 +93,14 @@ SpMat read_sym_CSC(std::string filename)
 
   fin.close();
 
-  Eigen::Map<Eigen::SparseMatrix<double> > A_lower(n,n,nnz,outerIndexPtr, // read-write
+  //
+  SpMat A_lower =  Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,outerIndexPtr, // read-write
                                innerIndices,values);
 
   // TODO: more efficient way to do this?
   SpMat A = A_lower.selfadjointView<Lower>();
-  std::cout << "input A : " << std::endl;
-  std::cout << A << std::endl;
+  //std::cout << "input A : " << std::endl;
+  //std::cout << A << std::endl;
 
   return A;
 } 
@@ -128,7 +141,7 @@ MatrixXd read_matrix(const string filename,  int n_row, int n_col){
 
     arma::mat X(n_row, n_col);
     X.load(filename, arma::raw_ascii);
-    X.print();
+    //X.print();
 
     return Eigen::Map<MatrixXd>(X.memptr(), X.n_rows, X.n_cols);
 }
@@ -155,6 +168,7 @@ void read_sparse_CSC_binary(){
 }
 
 
+/*
 int main(int argc, char** argv)
 {
 
@@ -183,7 +197,6 @@ int main(int argc, char** argv)
 
   // SpMat A = read_sym_CSC(path_to_file);
 
-  return 0;
+  // return 0;
 
-}
-
+//

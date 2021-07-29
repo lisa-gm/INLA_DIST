@@ -41,9 +41,9 @@ void solve_cholmod(SpMat *A, Vector *f, Vector& u, double *log_det)
 
 }
 
-void extract_inv_diag(SpMat& Q, Vector& vars){
+void inv_diagonal_cholmod(SpMat* Q, Vector& vars){
 
-		MatrixXd Q_dense = MatrixXd(Q);
+		MatrixXd Q_dense = MatrixXd(*Q);
 		//std::cout << "Q dense :\n" << Q_dense << std::endl; 
 
 		MatrixXd Q_inv = Q_dense.inverse();		
@@ -54,7 +54,7 @@ void extract_inv_diag(SpMat& Q, Vector& vars){
 
 }
 
-void compute_inverse(MatrixXd& Q, MatrixXd& Q_inv){
+void compute_inverse_cholmod(MatrixXd& Q, MatrixXd& Q_inv){
 
 		Q_inv = Q.inverse();		
 		//std::cout << "Q inv :\n" << Q_inv << std::endl; 

@@ -315,7 +315,7 @@ int main(int argc, char* argv[])
         //arma::mat(M1).submat(0,0,nt-1,nt-1).print();
         M2 = read_sym_CSC(M2_file);
         //arma::mat(M2).submat(0,0,nt-1,nt-1).print();
- 
+
         Ax = readCSC(Ax_file);
 
     } else {
@@ -335,24 +335,41 @@ int main(int argc, char* argv[])
     Vector theta(dim_th);
     Vector theta_original(dim_th);
 
+    int n;
+
     // initialise theta
     if(ns == 0 && nt == 0){
+        n = nb;
         // Initial guess
         theta[0] = 3;
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else if(ns > 0 && nt == 1){
+        n = ns + nb;
         //theta << 1, -1, 1;
         theta << 1, -2, 2;
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else {
+        n = ns*nt + nb;
+
+        // =========== synthetic data set =============== //
+        std::cout << "using SYNTHETIC DATASET" << std::endl;        
         theta_original << 1.4, -5.9,  1,  3.7; 
-        std::cout << "theta original : " << std::right << std::fixed << theta_original.transpose() << std::endl;
+        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         //theta << 1.4, -5.9,  1,  3.7; 
         theta << 1, -3, 1, 3;
         //theta << 0.5, -1, 2, 2;
-        std::cout << "initial theta  : "  << std::right << std::fixed << theta.transpose() << std::endl;
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+
+        // =========== temperature data set =============== //
+        /*std::cout << "using TEMPERATURE DATASET" << std::endl;        
+        theta_original << 5, -10, 2.5, 1;
+        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
+        theta << 5, -10, 2.5, 1;
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
+
+
     }
 
     //exit(1);
@@ -369,13 +386,13 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 30;
+    param.max_iterations = 50;
 
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
 
-    std::cout << "spatial grid size  : " << std::right << std::fixed << g1.rows() << " " << g1.cols() << std::endl;
+    std::cout << "\nspatial grid size  : " << std::right << std::fixed << g1.rows() << " " << g1.cols() << std::endl;
     std::cout << "temporal grid size : " << M1.rows() << " " << M1.cols() << std::endl;
 
     std::cout << "Ax size            : " << Ax.rows() << " " << Ax.cols() << std::endl;
@@ -387,11 +404,11 @@ int main(int argc, char* argv[])
         // fun.emplace(nb, no, B, y);
         fun = new PostTheta(ns, nt, nb, no, B, y);
     } else if(ns > 0 && nt == 1) {
-        std::cout << "call spatial constructor." << std::endl;
+        std::cout << "\ncall spatial constructor." << std::endl;
         // PostTheta fun(nb, no, B, y);
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2);
     } else {
-        std::cout << "call spatial-temporal constructor." << std::endl;
+        std::cout << "\ncall spatial-temporal constructor." << std::endl;
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2);
     }
        
@@ -417,19 +434,19 @@ int main(int argc, char* argv[])
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
-    theta_max = theta;
+    theta_max = theta_original;
 
-    /*MatrixXd cov = fun->get_Covariance(theta_max);
+    MatrixXd cov = fun->get_Covariance(theta_max);
     std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
 
     std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
-    //std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
+    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
 
-    Vector fixed_eff = fun->get_mu();
-    std::cout << "\nestimated mean fixed effects : " << fixed_eff[ns] << " " << fixed_eff[ns+1] << std::endl;
-    */
-    //Vector marg = fun->get_marginals_f(theta);
-    //std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
+    /*Vector fixed_eff = fun->get_mu(theta_max);
+    std::cout << "\nestimated mean fixed effects : " << fixed_eff(n-1) << " " << fixed_eff(n) << std::endl;*/
+    
+    Vector marg = fun->get_marginals_f(theta);
+    std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
 
 
     return 0;

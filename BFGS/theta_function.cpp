@@ -39,9 +39,15 @@ orgianise class such that function call will return :
 - function value for given theta
 - update gradient for theta (using forward difference)
 
-
 */
 
+/** PostTheta class. 
+ * 
+ * Computes the posterior of theta for a given theta and its gradient using 
+ * a central finite difference approximation. 
+ * 
+ * Can additionally compute an approximation to the Hessian. 
+ * */
 class PostTheta{
 
 	private:
@@ -51,14 +57,18 @@ class PostTheta{
     int no;
     int nu;
     int n;
-    MatrixXd B;
+
     VectorXd y;
-    // next 4 potentially unused (then B unused)
+    // either Ax or B used
     SpMat Ax;
+    MatrixXd B;
+
+    // used in spatial and spatial-temporal case
     SpMat c0;
     SpMat g1;
     SpMat g2;
 
+    // only used in spatial-temporal case
     SpMat g3;
     SpMat M0;
     SpMat M1;
@@ -70,6 +80,7 @@ class PostTheta{
     double min_f_theta;
 
 public:
+	/** constructor for regression model */
 	PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_) {
 		ns = 0;
 		yTy = y.dot(y);
@@ -80,6 +91,7 @@ public:
 		// initialise min_f_theta, min_theta
 		min_f_theta = 1e10;
 	}
+	/** constructor for spatial model (order 2) */
 	PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_)  {
 		yTy = y.dot(y);
 
@@ -93,6 +105,7 @@ public:
 		// initialise min_f_theta, min_theta
 		min_f_theta = 1e10;
 	}
+	/** constructor for spatial temporal model */
 	PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_)  {
 		yTy = y.dot(y);
 
@@ -107,15 +120,18 @@ public:
 		min_f_theta = 1e10;
 	}
 
-
+	/** structure required by BFGS solver, requires : theta, gradient theta */
     double operator()(Vector& theta, Vector& grad){
+    	/* Gradient call is already parallelised using nested OpenMP. 
+    	--> there are l1 threads (usually 8, one for each function evaluation), that themselves
+    	then split into another e.g. 8 threads, when calling PARDISO to factorise the system.
+		--> somehow introduce additional parallelism to compute f(theta), possible to do in parallel
+    	*/
 
     	t_grad = grad;
 
     	// initialise min_f_theta, min_theta, store current minimum 
-
     	// Vector mu;
-		//better way to set up mu?
 		mu.setZero(n);
 
     	double f_theta = eval_post_theta(theta, mu);
@@ -124,8 +140,6 @@ public:
     		min_f_theta = f_theta;
 
     		std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-
-
     		//std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
     	}
 
@@ -141,11 +155,22 @@ public:
 			std::cout << "time spent gradient call : " << timespent_grad << std::endl;
 		#endif
 
-
     	return f_theta;
 	}
 
-	Vector get_mu(){
+	Vector get_mu(Vector& theta){
+
+		#ifdef PRINT_MSG
+			std::cout << "get_mu()" << std::endl;
+		#endif
+
+		Vector mu(n);
+		double f_theta = eval_post_theta(theta, mu);
+
+		#ifdef PRINT_MSG
+			std::cout << "mu(-10:end) :" << mu.tail(10) << std::endl;
+		#endif
+
 		return mu;
 	}
 
@@ -153,66 +178,62 @@ public:
 		return t_grad;
 	}
 
-	MatrixXd get_Covariance_hyperparam(Vector& theta){
-
-		// construct 2nd order cetnral difference
-		Vector eps(1);
-		eps[0] = 0.005;
-
-		Vector theta_forw(1);
-		theta_forw = theta + eps;
-
-		Vector theta_back(1);
-		theta_back = theta - eps;
-
-		Vector mu_dummy(1);
-
-		double f_theta = eval_post_theta(theta, mu);
-		double f_theta_forw = eval_post_theta(theta_forw, mu_dummy);
-		double f_theta_back = eval_post_theta(theta_back, mu_dummy);
-
-		MatrixXd hess(1,1);
-		// careful : require negative hessian (swapped signs in eval post theta) 
-		// but then precision negative hessian -> no swapping
-		hess << (1.0)/(eps[0]*eps[0]) * (f_theta_forw - 2*f_theta + f_theta_back);
-		// std::cout << "hess " << hess << std::endl;
-
-		MatrixXd cov(1,1);
-		cov << 1.0/hess(0,0);
-
-		return cov;
-
-	}
-
+	/** Compute Covariance matrix of hyperparameters theta, at theta*/
 	MatrixXd get_Covariance(Vector& theta){
 
 		int dim_th = theta.size();
 		MatrixXd hess(dim_th,dim_th);
 
+		// evaluate hessian
+    	double timespent_hess_eval = -omp_get_wtime();
 		hess = hess_eval(theta);
+
+		timespent_hess_eval += omp_get_wtime();
+		std::cout << "time spent hessian evaluation : " << timespent_hess_eval << std::endl; 
+
 		//std::cout << "hess : " << hess << std::endl; 
 
 		MatrixXd cov(dim_th,dim_th);
 
-		compute_inverse(hess, cov);
+		compute_inverse_cholmod(hess, cov);
+
 		//std::cout << "cov_new : " << cov << std::endl; 
 
 		return cov;
 	}
 
-
+	/** Compute the marginal variances of the latent parameters at theta. 
+	 * Using selected inversion procedure. */
 	Vector get_marginals_f(Vector& theta){
 		
 		SpMat Q(n, n);
 		construct_Q(theta, &Q);
 
+		#ifdef PRINT_MSG
+			std::cout << "after construct Q in get get_marginals_f" << std::endl;
+		#endif
+
 		Vector vars(n);
-		extract_inv_diag(Q, vars);
+
+		/*double timespent_sel_inv_cholmod = -omp_get_wtime();
+		inv_diagonal_cholmod(&Q, vars);
+		timespent_sel_inv_cholmod += omp_get_wtime();	
+
+		std::cout << "time spent selected inversion cholmod : " << timespent_sel_inv_cholmod << std::endl; */
+
+		double timespent_sel_inv_pardiso = -omp_get_wtime();
+		inv_diagonal_pardiso(&Q, vars);
+		timespent_sel_inv_pardiso += omp_get_wtime();	
+
+		std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
+	
+
 
 		return(vars);
 	}
 
-	// TODO: how can I compare this to INLA?
+	// TODO: how can I compare this to INLA? How to parallelise
+	/** Hessian evaluation of posterior of theta at theta. */
 	MatrixXd hess_eval(Vector& x){
 
 		double eps = 0.005;
@@ -222,10 +243,11 @@ public:
 		epsId = eps*epsId.setIdentity();
 
 		// dummy mu
-		Vector mu_tmp(dim_x);
+		Vector mu_tmp(n);
 
 		MatrixXd hessUpper = MatrixXd::Zero(dim_x, dim_x);
 
+		//#pragma omp parallel for private (mu_tmp)
 		for(int i=0; i < dim_x; i++){
 			for(int j=i; j < dim_x; j++){
 
@@ -234,26 +256,53 @@ public:
 					Vector x_back_i = x-epsId.col(i);
 
 					hessUpper(i,i) = (eval_post_theta(x_forw_i, mu_tmp) - 2 * eval_post_theta(x, mu_tmp) + eval_post_theta(x_back_i, mu_tmp))/(eps*eps);
+
 				} else {
 					Vector x_forw_i_j 		= x+epsId.col(i)+epsId.col(j);
 					Vector x_forw_i_back_j = x+epsId.col(i)-epsId.col(j);
 					Vector x_back_i_forw_j = x-epsId.col(i)+epsId.col(j);
 					Vector x_back_i_j 		= x-epsId.col(i)-epsId.col(j);
 
-	    		hessUpper(i,j) = (  eval_post_theta(x_forw_i_j, mu_tmp) \
+	    			hessUpper(i,j) = (  eval_post_theta(x_forw_i_j, mu_tmp) \
 	                       - eval_post_theta(x_forw_i_back_j, mu_tmp) - eval_post_theta(x_back_i_forw_j, mu_tmp) \
 	                       + eval_post_theta(x_back_i_j, mu_tmp)) / (4*eps*eps);
 	       		}
 			}
 		}
 
+	//	std::cout << "hess upper : " << hessUpper << std::endl;
+
 		MatrixXd hess = hessUpper.selfadjointView<Upper>();
+
+		// check that matrix positive definite otherwise use only diagonal
+		check_pos_def(hess); 
+
 		return hess;
 
 	}
 
+	/** check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small) */
+	void check_pos_def(MatrixXd &hess){
+
+    	// compute Eigenvalues of symmetric matrix
+		SelfAdjointEigenSolver<MatrixXd> es(hess);
+		/*cout << "The eigenvalues of g1 are:" << endl << es.eigenvalues() << endl;
+		cout << "The min eigenvalue of g1 is:" << endl << es.eigenvalues().minCoeff() << endl;*/
+
+		// check if there are eigenvalues smaller or equal to zero
+		if((es.eigenvalues().minCoeff()) <= 0){
+
+			std::cout << "Matrix not positive definite only considering diagonal values!! " << std::endl;
+			Vector diag_hess = hess.diagonal();
+			hess = diag_hess.asDiagonal();
+	    	std::cout << "new hessian :\n" << hess << std::endl;
+		}
+	}
+
+	/** Core function. Evaluate posterior of theta. mu are latent parameters. */
 	double eval_post_theta(Vector& theta, Vector& mu){
 
+		// =============== set up ================= //
 		#ifdef PRINT_MSG
 			std::cout << "in eval post theta function. " << std::endl;
 		#endif
@@ -263,7 +312,7 @@ public:
 			std::cout << "dim_th : " << dim_th << std::endl;
 		#endif
 
-		double log_prior_sum = 0;
+		// =============== for now: hardcoded solution : theta ================= //
 
 		VectorXd theta_original(4);
 
@@ -285,8 +334,13 @@ public:
 			std::cout << "theta original : " << theta_original.transpose() << std::endl;
 		#endif
 
+
+		// =============== evaluate theta prior based on original solution & variance = 1 ================= //
+
 		//VectorXd zero_vec(dim_th); zero_vec.setZero();
 		VectorXd zero_vec(theta_original.size()); zero_vec.setZero();
+
+		double log_prior_sum = 0;
 
 		if(theta_original == zero_vec){
 			std::cout << "all entries zero" << std::endl;
@@ -295,9 +349,10 @@ public:
 
 			// evaluate prior if available
 			for( int i=0; i<dim_th; i++ ){
-				eval_log_prior(&log_prior_vec[i], &theta[i], &theta_original[i]);
+				eval_log_prior(log_prior_vec[i], &theta[i], &theta_original[i]);
 			}
-
+		    
+		    //double log_prior_sum = 0;
 			log_prior_sum = log_prior_vec.sum();
 
 			#ifdef PRINT_MSG
@@ -306,30 +361,36 @@ public:
 
 		}
 
-		//Vector mu;
-		// numerator :
-		// log_det(Q.u) 
-		double log_det_Qs = 0;
+ 		// =============== evaluate prior of random effects : need log determinant ================= //
+
+		// requires factorisation of Q.u -> can this be done in parallel with the 
+		// factorisation of the denominator? 
+		// How long does the assembly of Qu take? Should this be passed on to the 
+		// denominator to be reused?
+
+		double log_det_Qu = 0;
 
 		if(ns > 0 ){
-			eval_log_det_Qs(theta, &log_det_Qs);
+			eval_log_det_Qu(theta, log_det_Qu);
 		}
 
 		#ifdef PRINT_MSG
-			std::cout << "log det Qs : "  << log_det_Qs << std::endl;
+			std::cout << "log det Qu : "  << log_det_Qu << std::endl;
 		#endif
 
+ 		// =============== evaluate likelihood ================= //
 
 		// eval_likelihood: log_det, -theta*yTy
 		double log_det_l;
 		double val_l; 
-		eval_likelihood(theta, &log_det_l, &val_l);
+		eval_likelihood(theta, log_det_l, val_l);
 
 		#ifdef PRINT_MSG
 			std::cout << "log det l : "  << log_det_l << std::endl;
 			std::cout << "val l     : " << val_l << std::endl;
 		#endif
 
+ 		// =============== evaluate denominator ================= //
 		// denominator :
 		// log_det(Q.x|y), mu, t(mu)*Q.x|y*mu
 		double log_det_d;
@@ -337,33 +398,37 @@ public:
 		SpMat Q(n, n);
 		Vector rhs(n);
 
-	 	eval_denominator(theta, &log_det_d, &val_d, &Q, &rhs, mu);
+	 	eval_denominator(theta, log_det_d, &val_d, &Q, &rhs, mu);
 		#ifdef PRINT_MSG
 			std::cout << "log det d : " << log_det_d << std::endl;
 			std::cout << "val d     : " <<  val_d << std::endl;
 		#endif
 
-	  	// add everything together
-	  	double val = -1 * (log_prior_sum + log_det_Qs + log_det_l + val_l - (log_det_d + val_d));
+ 		// =============== add everything together ================= //
+	  	double val = -1 * (log_prior_sum + log_det_Qu + log_det_l + val_l - (log_det_d + val_d));
+
+	  	#ifdef PRINT_MSG
+	  		std::cout << "f theta : " << val << std::endl;
+	  	#endif
 
 	  	return val;
 	}
 
 
-	// evaluate log prior using original theta value
-	void eval_log_prior(double* log_prior, double* thetai, double* thetai_original){
+	/** evaluate log prior using original theta value */
+	void eval_log_prior(double& log_prior, double* thetai, double* thetai_original){
 		// variance / precision of 1 : no normalising constant. 
 	    // -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
 
-		*log_prior = -0.5 * (*thetai - *thetai_original) * (*thetai - *thetai_original);
+		log_prior = -0.5 * (*thetai - *thetai_original) * (*thetai - *thetai_original);
 
 		#ifdef PRINT_MSG
-			std::cout << "log prior for theta_i " << (*thetai) << " : " << (*log_prior) << std::endl;
+			std::cout << "log prior for theta_i " << (*thetai) << " : " << (log_prior) << std::endl;
 		#endif
 	}
 
-	// construct spatial matrix (at the moment this is happening twice. FIX)
-	void eval_log_det_Qs(Vector& theta, double *log_det){
+	/** construct spatial matrix (at the moment this is happening twice. FIX) */
+	void eval_log_det_Qu(Vector& theta, double &log_det){
 
 		SpMat Qu(nu, nu);
 
@@ -375,39 +440,37 @@ public:
 
 		log_det_pardiso(&Qu, log_det);
 		#ifdef PRINT_MSG
-			std::cout << "log det Qu : " << *log_det << std::endl;
+			std::cout << "log det Qu : " << log_det << std::endl;
 		#endif
 
-		*log_det = 0.5 * (*log_det);
+		log_det = 0.5 * (log_det);
 
 
 	}
 
-
-	void eval_likelihood(Vector& theta, double *log_det, double *val){
+	/** compute log likelihood : log_det tau*no and value -theta*yTy */
+	void eval_likelihood(Vector& theta, double &log_det, double &val){
 		
-
 		// multiply log det by 0.5
-		*log_det = 0.5 * no*theta[0];
-		//*log_det = 0.5 * no*3;
+		log_det = 0.5 * no*theta[0];
+		//log_det = 0.5 * no*3;
 
 
 		// - 1/2 ...
-		*val = - 0.5 * exp(theta[0])*yTy;
+		val = - 0.5 * exp(theta[0])*yTy;
 		//*val = - 0.5 * exp(3)*yTy;
-
 
 		/*std::cout << "in eval eval_likelihood " << std::endl;
 		std::cout << "theta     : " << theta << std::endl;
 		std::cout << "yTy : " << yTy << ", exp(theta) : " << exp(theta) << std::endl;
 
-		std::cout << "log det l : " << *log_det << std::endl;
-		std::cout << "val l     : " << *val << std::endl; */
+		std::cout << "log det l : " << log_det << std::endl;
+		std::cout << "val l     : " << val << std::endl; */
 
 	}
 
 	
-	// SPDE discretisation -- matrix construction
+	/** spatial model : SPDE discretisation -- matrix construction */
 	void construct_Q_spatial(Vector& theta, SpMat* Qs){
 		// Qs <- g[1]^2*Qgk.fun(sfem, g[2], order)
 		// return(g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2)
@@ -432,6 +495,7 @@ public:
 
 	} 
 
+	/** spatial temporal model : SPDE discretisation. DEMF(1,2,1) model.*/
 	void construct_Q_spat_temp(Vector& theta, SpMat* Qst){
 		double exp_theta1 = exp(theta[1]);
 		double exp_theta2 = exp(theta[2]);
@@ -460,12 +524,11 @@ public:
   		// assemble overall precision matrix Q.st
   		*Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 
-  		#ifdef PRINT_MSG
-  			std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
-  		#endif
+  		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
 
 	}
 
+	/** construct precision matrix. Calls spatial, spatial-temporal, etc. appropriately. */
 	void construct_Q(Vector& theta, SpMat *Q){
 		double exp_theta0 = exp(theta[0]);
 		//double exp_theta = exp(3);
@@ -537,12 +600,12 @@ public:
 
 		#ifdef PRINT_MSG
 			std::cout << "Q  dim : " << Q->rows() << " "  << Q->cols() << std::endl;
-			std::cout << "Q : \n" << Q->block(0,0,10,10) << std::endl;
+			//std::cout << "Q : \n" << Q->block(0,0,10,10) << std::endl;
 		#endif 
 
 	}
 
-
+	/** Assemble right-handside. Could compute Ax^T*y once, and only multiply with appropriate exp_theta.*/
 	void construct_b(Vector& theta, Vector *rhs){
 		double exp_theta = exp(theta[0]);
 		//double exp_theta = exp(3);
@@ -552,19 +615,10 @@ public:
 		} else {
 			*rhs = exp_theta*Ax.transpose()*y;
 		}
-
-		// exp(theta)*yTy
-
-		// 1e-5*Id + exp(theta)*B'*B
-
-		// mu*Q*mu != exp(theta)*yTy
-		// mu*Q*mu = (Q^-1*(exp(theta)*B'*y*(exp(theta)*B'*y)
-		// exp(theta)*Q^-1*exp(theta)*B'*B*y'*y. now ignore Q_b part of Q. then Q = exp(theta)*B'*B, ie.
-		// exp(theta)*y'*y remains ... 
 	}
 
-
-	void eval_denominator(Vector& theta, double *log_det, double *val, SpMat *Q, Vector *rhs, Vector& mu){
+	/** Evaluate denominator: conditional probability of Qx|y of */
+	void eval_denominator(Vector& theta, double &log_det, double *val, SpMat *Q, Vector *rhs, Vector& mu){
 
 		// construct Q_x|y,
 		construct_Q(theta, Q);
@@ -577,10 +631,10 @@ public:
 		//solve_cholmod(Q, rhs, mu, log_det);
 		solve_pardiso(Q, rhs, mu, log_det);
 
-		*log_det = 0.5 * (*log_det);
+		log_det = 0.5 * (log_det);
 		
 		#ifdef PRINT_MSG
-			std::cout << "log det d : " << *log_det << std::endl;
+			std::cout << "log det d : " << log_det << std::endl;
 		#endif
 
 		// compute value
@@ -592,11 +646,11 @@ public:
 		std::cout << "mu " << std::endl; std::cout << *mu << std::endl;
 		std::cout << "Q " << std::endl; std::cout << Eigen::MatrixXd(*Q) << std::endl;
 
-		std::cout << "log det d : " << *log_det << std::endl;
-		std::cout << "val d     : " << *val << std::endl; */
+		std::cout << "log det d : " << log_det << std::endl;
+		std::cout << "val d     : " << val << std::endl; */
 	}
 
-
+	/** Compute gradient using central finite difference stencil. Parallelised with OpenMP */
 	void eval_gradient(Vector& theta, double f_theta, Vector& mu, Vector& grad){
 
 		int dim_th = theta.size();
