@@ -242,14 +242,14 @@ public:
 		MatrixXd epsId(dim_x, dim_x); 
 		epsId = eps*epsId.setIdentity();
 
-		// dummy mu
-		Vector mu_tmp(n);
-
 		MatrixXd hessUpper = MatrixXd::Zero(dim_x, dim_x);
 
-		//#pragma omp parallel for private (mu_tmp)
+		#pragma omp parallel for
 		for(int i=0; i < dim_x; i++){
 			for(int j=i; j < dim_x; j++){
+
+				// dummy mu
+				Vector mu_tmp(n);
 
 				if(i == j){
 					Vector x_forw_i = x+epsId.col(i);
@@ -259,8 +259,8 @@ public:
 
 				} else {
 					Vector x_forw_i_j 		= x+epsId.col(i)+epsId.col(j);
-					Vector x_forw_i_back_j = x+epsId.col(i)-epsId.col(j);
-					Vector x_back_i_forw_j = x-epsId.col(i)+epsId.col(j);
+					Vector x_forw_i_back_j  = x+epsId.col(i)-epsId.col(j);
+					Vector x_back_i_forw_j  = x-epsId.col(i)+epsId.col(j);
 					Vector x_back_i_j 		= x-epsId.col(i)-epsId.col(j);
 
 	    			hessUpper(i,j) = (  eval_post_theta(x_forw_i_j, mu_tmp) \
@@ -270,7 +270,7 @@ public:
 			}
 		}
 
-	//	std::cout << "hess upper : " << hessUpper << std::endl;
+		//	std::cout << "hess upper : " << hessUpper << std::endl;
 
 		MatrixXd hess = hessUpper.selfadjointView<Upper>();
 
@@ -296,6 +296,10 @@ public:
 			Vector diag_hess = hess.diagonal();
 			hess = diag_hess.asDiagonal();
 	    	std::cout << "new hessian :\n" << hess << std::endl;
+		} else {
+			#ifdef PRINT_MSG
+				std::cout << "Hessian is positive definite.";
+			#endif
 		}
 	}
 
@@ -398,7 +402,7 @@ public:
 		SpMat Q(n, n);
 		Vector rhs(n);
 
-	 	eval_denominator(theta, log_det_d, &val_d, &Q, &rhs, mu);
+	 	eval_denominator(theta, &log_det_d, &val_d, &Q, &rhs, mu);
 		#ifdef PRINT_MSG
 			std::cout << "log det d : " << log_det_d << std::endl;
 			std::cout << "val d     : " <<  val_d << std::endl;
@@ -600,7 +604,9 @@ public:
 
 		#ifdef PRINT_MSG
 			std::cout << "Q  dim : " << Q->rows() << " "  << Q->cols() << std::endl;
-			//std::cout << "Q : \n" << Q->block(0,0,10,10) << std::endl;
+			std::cout << "Q : \n" << Q->block(0,0,10,10) << std::endl;
+			std::cout << "theta : \n" << theta.transpose() << std::endl;
+
 		#endif 
 
 	}
@@ -618,23 +624,33 @@ public:
 	}
 
 	/** Evaluate denominator: conditional probability of Qx|y of */
-	void eval_denominator(Vector& theta, double &log_det, double *val, SpMat *Q, Vector *rhs, Vector& mu){
+	void eval_denominator(Vector& theta, double *log_det, double *val, SpMat *Q, Vector *rhs, Vector& mu){
 
 		// construct Q_x|y,
 		construct_Q(theta, Q);
+		//Q->setIdentity();
+
+		#ifdef PRINT_MSG
+			printf("\nin eval denominator after construct_Q call.");
+		#endif
 
 		//  construct b_xey
 		construct_b(theta, rhs);
 
+		#ifdef PRINT_MSG
+			printf("\nin eval denominator after construct_b call.");
+		#endif
+
 		// solve linear system
 		// returns vector mu, which is of the same size as rhs
 		//solve_cholmod(Q, rhs, mu, log_det);
+		std::cout << "\nin eval denom before pardiso call.\n" << std::endl;
 		solve_pardiso(Q, rhs, mu, log_det);
 
-		log_det = 0.5 * (log_det);
+		*log_det = 0.5 * (*log_det);
 		
 		#ifdef PRINT_MSG
-			std::cout << "log det d : " << log_det << std::endl;
+			std::cout << "log det d : " << *log_det << std::endl;
 		#endif
 
 		// compute value
@@ -653,6 +669,10 @@ public:
 	/** Compute gradient using central finite difference stencil. Parallelised with OpenMP */
 	void eval_gradient(Vector& theta, double f_theta, Vector& mu, Vector& grad){
 
+		#ifdef PRINT_MSG
+			std::cout << "\nin eval gradient function." << std::endl;
+		#endif
+
 		int dim_th = theta.size();
 
 		double eps = 0.005;
@@ -663,13 +683,11 @@ public:
 		Vector f_forw(dim_th);
 		Vector f_backw(dim_th);
 
-		int threads;
+		int threads = omp_get_max_threads();
 
 		// naively parallelise using OpenMP, more later
 		#pragma omp parallel for
 		for(int i=0; i<2*dim_th; i++){
-
-			threads = omp_get_num_threads();
 
 			if(i % 2 == 0){
 				int k = i/2;

@@ -445,8 +445,8 @@ int main(int argc, char* argv[])
     /*Vector fixed_eff = fun->get_mu(theta_max);
     std::cout << "\nestimated mean fixed effects : " << fixed_eff(n-1) << " " << fixed_eff(n) << std::endl;*/
     
-    Vector marg = fun->get_marginals_f(theta);
-    std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
+    /*Vector marg = fun->get_marginals_f(theta);
+    std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;*/
 
 
     return 0;
