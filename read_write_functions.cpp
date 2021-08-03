@@ -168,6 +168,50 @@ void read_sparse_CSC_binary(){
 }
 
 
+/* ==================================================================================== */
+// write functions
+
+
+void write_vector(std::string full_file_name, Eigen::VectorXd x, int n){
+
+  ofstream sol_file(full_file_name,    ios::out | ::ios::trunc);
+  
+  for (int i = 0; i < n; i++){
+    sol_file << x[i] << endl;
+  }
+  sol_file.close();
+
+  std::cout << "wrote to file : " << full_file_name << std::endl;
+}
+
+void write_log_file(std::string full_file_name, int ns, int nt, int nb, int no, int nnz, \
+                    std::string solver_type, double log_det, \
+                    double t_sym_fact, double t_factorise, double t_solve, double t_inv, \
+                    double flops_factorize, double flops_solve, double flops_inv){
+
+  int n = ns*nt + nb;
+
+  std::ofstream log_file(full_file_name);
+  log_file << ns << std::endl;
+  log_file << nt << std::endl;
+  log_file << nb << std::endl;
+  log_file << no << std::endl;
+  log_file << n << std::endl;
+  log_file << nnz << std::endl;
+  log_file << "RGF" << std::endl;
+  log_file << log_det << std::endl;
+  log_file << "0.0" << std::endl;
+  log_file << t_factorise << std::endl;
+  log_file << t_solve << std::endl;
+  log_file << t_inv << std::endl;
+  log_file << flops_factorize << std::endl;
+  log_file << flops_solve << std::endl;
+  log_file << flops_inv << std::endl;
+
+  log_file.close();
+}
+
+
 /*
 int main(int argc, char** argv)
 {

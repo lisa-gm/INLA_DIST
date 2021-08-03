@@ -24,6 +24,7 @@ using Eigen::VectorXd;
 using Eigen::MatrixXd;
 
 typedef Eigen::VectorXd Vector;
+typedef Eigen::SparseMatrix<double> SpMat;
 
 
 /* PARDISO prototype. */
@@ -43,10 +44,16 @@ private:
 
     /* matrix size */
     int n;
+    unsigned int nnz;
+
+    SpMat Q;
+
     int* ia;
     int* ja;
     double* a;
-    int nnz;
+
+    double* b;
+    double* x;
 
     /* Internal solver memory pointer pt,                  */
     void *pt[64];
@@ -70,16 +77,48 @@ private:
 
     int     nrhs;
 
-    // for now ... 
-    double  b[8], x[8];
 
 
 public:
     /** constructor pardiso init */
     /* do symbolic factorisation now or later? */
-    PardisoSolver(int n_, int* ia_, int* ja_, double* a_) : n(n_), ia(ia_), ja(ja_), a(a_) {
+    PardisoSolver(SpMat& Q_) : Q(Q_) {
+
+        n = Q.rows();
+
+        // only take lower triangular part of A
+        SpMat Q_lower = Q.triangularView<Lower>(); 
+
+        // this time require CSR format
+
+        nnz = Q_lower.nonZeros();
+        std::cout << "number of non zeros : " << nnz << std::endl;
+
+        int* ia; 
+        int* ja;
+        double* a; 
+
+        // allocate memory
+        ia = new int [n+1];
+        ja = new int [nnz];
+        a = new double [nnz];
+
+        Q_lower.makeCompressed();
+
+        for (int i = 0; i < n+1; ++i){
+            ia[i] = Q_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            ja[i] = Q_lower.innerIndexPtr()[i];
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            a[i] = Q_lower.valuePtr()[i];
+        } 
+
     
-        mtype = -2;
+        mtype = -2;             /* set to positive semi-definite */
 
         nrhs = 1;               /* Number of right hand sides. */
         nnz = ia[n];
@@ -119,7 +158,7 @@ public:
         maxfct = 1;         /* Maximum number of numerical factorizations.  */
         mnum   = 1;         /* Which factorization to use. */
 
-        msglvl = 1;         /* Print statistical information  */
+        msglvl = 0;         /* Print statistical information  */
         error  = 0;         /* Initialize error flag */
 
         /* -------------------------------------------------------------------- */
@@ -143,18 +182,6 @@ public:
         if (error != 0) {
             printf("\nERROR in consistency of matrix: %d", error);
         exit(1);
-        }
-
-        /* -------------------------------------------------------------------- */
-        /* .. pardiso_printstats(...)                                           */
-        /*    prints information on the matrix to STDOUT.                       */
-        /*    Use this functionality only for debugging purposes                */
-        /* -------------------------------------------------------------------- */
-
-        pardiso_printstats (&mtype, &n, a, ia, ja, &nrhs, b, &error);
-        if (error != 0) {
-            printf("\nERROR right hand side: %d", error);
-            exit(1);
         }
 
         /* -------------------------------------------------------------------- */
@@ -194,9 +221,46 @@ public:
     /* ======================================================================== */
 
     // numerical factorisation
-    void factorize(int* ia, int* ja, double* a, double& log_det){
+    void factorize(SpMat& Q, double& log_det){
 
-        // TODO: check that pardisoSolver was initialised!
+        // check if n and Q.size() match
+        if(n != Q.rows()){
+            printf("\nInitialised matrix size and current matrix size don't match!\n");
+            printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+            exit(1);
+        }
+
+        // only take lower triangular part of A
+        SpMat Q_lower = Q.triangularView<Lower>(); 
+
+        // check if nnz and Q_lower.nonZeros match
+        if(nnz != Q_lower.nonZeros()){
+            printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
+            printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        }
+
+        int* ia; 
+        int* ja;
+        double* a; 
+
+        // allocate memory
+        ia = new int [n+1];
+        ja = new int [nnz];
+        a = new double [nnz];
+
+        Q_lower.makeCompressed();
+
+        for (int i = 0; i < n+1; ++i){
+            ia[i] = Q_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            ja[i] = Q_lower.innerIndexPtr()[i];
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            a[i] = Q_lower.valuePtr()[i];
+        }
 
         // TODO: save work, some already 1-based ... make sure that this is bullet proof.
         /* -------------------------------------------------------------------- */
@@ -234,28 +298,67 @@ public:
             printf("\nERROR during numerical factorization: %d", error);
             exit(2);
         }
-        printf("\nFactorization completed ...\n");
+        //printf("\nFactorization completed ...\n");
 
         log_det = dparm[32];
 
-        /* -------------------------------------------------------------------- */    
-        /* ..  Convert matrix back to 0-based C-notation.                       */
-        /* -------------------------------------------------------------------- */ 
-        
-        for (i = 0; i < n+1; i++) {
-            ia[i] -= 1;
-        }
-        for (i = 0; i < nnz; i++) {
-            ja[i] -= 1;
-        }
+        // is this a good idea?
+        delete[] ia;
+        delete[] ja;
+        delete[] a;
 
     }
 
-
     // numerical factorisation & solve
-    void factorize_solve(int* ia, int* ja, double* a, double* b, double* x, double &log_det){
+    void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det){
 
-        // TODO: check that pardisoSolver was initialised!
+    // check if n and Q.size() match
+        if(n != Q.rows()){
+            printf("\nInitialised matrix size and current matrix size don't match!\n");
+            printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+            exit(1);
+        }
+
+        // only take lower triangular part of A
+        SpMat Q_lower = Q.triangularView<Lower>(); 
+
+        // check if nnz and Q_lower.nonZeros match
+        if(nnz != Q_lower.nonZeros()){
+            printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
+            printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        }
+
+        int* ia; 
+        int* ja;
+        double* a; 
+
+        // allocate memory
+        ia = new int [n+1];
+        ja = new int [nnz];
+        a = new double [nnz];
+
+        Q_lower.makeCompressed();
+
+        for (int i = 0; i < n+1; ++i){
+            ia[i] = Q_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            ja[i] = Q_lower.innerIndexPtr()[i];
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            a[i] = Q_lower.valuePtr()[i];
+        }
+
+        b = new double [n];
+        x = new double [n];
+
+        /* Set right hand side to i. */
+        for (int i = 0; i < n; i++) {
+            b[i] = rhs[i];
+        } 
+
 
         /* -------------------------------------------------------------------- */
         /* ..  pardiso_chkvec(...)                                              */
@@ -307,7 +410,7 @@ public:
             printf("\nERROR during numerical factorization: %d", error);
             exit(2);
         }
-        printf("\nFactorization completed ...\n");
+        //printf("\nFactorization completed ...\n");
 
         log_det = dparm[32];
 
@@ -327,33 +430,62 @@ public:
             exit(3);
         }
         
-        printf("\nSolve completed ... ");
-        printf("\nThe solution of the system is: ");
+        //printf("\nSolve completed ... ");
         for (i = 0; i < n; i++) {
-            printf("\n x [%d] = % f", i, x[i] );
+            //printf("\n x [%d] = % f", i, x[i] );
+            sol(i) = x[i];
         }
-        printf ("\n\n");
 
-        /* -------------------------------------------------------------------- */    
-        /* ..  Convert matrix back to 0-based C-notation.                       */
-        /* -------------------------------------------------------------------- */ 
-    
-        for (i = 0; i < n+1; i++) {
-            ia[i] -= 1;
-        }
-        for (i = 0; i < nnz; i++) {
-            ja[i] -= 1;
-        }
+        // is this a good idea?
+        delete[] ia;
+        delete[] ja;
+        delete[] a;
 
     } // end factorise solve function
 
 
-    void selected_inversion(int* ia, int* ja, double* a, double* inv_diag){
+    void selected_inversion(SpMat& Q, Vector& inv_diag){
 
-        // TODO: check that pardisoSolver was initialised!
+        // check if n and Q.size() match
+        if(n != Q.rows()){
+            printf("\nInitialised matrix size and current matrix size don't match!\n");
+            printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+            exit(1);
+        }
 
-        // can I somehow check if numerical factorisation was already done? For now just repeat.
-        // TODO: save work, some already 1-based ... make sure that this is bullet proof.
+        // only take lower triangular part of A
+        SpMat Q_lower = Q.triangularView<Lower>(); 
+
+        // check if nnz and Q_lower.nonZeros match
+        if(nnz != Q_lower.nonZeros()){
+            printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
+            printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        }
+
+        int* ia; 
+        int* ja;
+        double* a; 
+
+        // allocate memory
+        ia = new int [n+1];
+        ja = new int [nnz];
+        a = new double [nnz];
+
+        Q_lower.makeCompressed();
+
+        for (int i = 0; i < n+1; ++i){
+            ia[i] = Q_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            ja[i] = Q_lower.innerIndexPtr()[i];
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            a[i] = Q_lower.valuePtr()[i];
+        }
+
+        // TODO: make already one-based in the above loop
         /* -------------------------------------------------------------------- */
         /* ..  Convert matrix from 0-based C-notation to Fortran 1-based        */
         /*     notation.                                                        */
@@ -389,14 +521,17 @@ public:
             printf("\nERROR during numerical factorization: %d", error);
             exit(2);
         }
-        printf("\nFactorization completed ...\n");
+        //printf("\nFactorization completed ...\n");
 
         /* -------------------------------------------------------------------- */    
         /* ... Inverse factorization.                                           */                                       
         /* -------------------------------------------------------------------- */  
 
+        // what do we need both b & x for here?
+        b = new double [n];
+        x = new double [n];
 
-        printf("\nCompute Diagonal Elements of the inverse of A ... \n");
+        //printf("\nCompute Diagonal Elements of the inverse of A ... \n");
         phase = -22;
         iparm[35]  = 1; /*  no not overwrite internal factor L */ 
 
@@ -407,18 +542,14 @@ public:
         for (k = 0; k < n; k++)
         {
             int j = ia[k]-1;
-            printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
+            //printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
+            inv_diag(k) = a[j];
         }
 
-        /* -------------------------------------------------------------------- */    
-        /* ..  Convert matrix back to 0-based C-notation.                       */
-        /* -------------------------------------------------------------------- */ 
-        for (i = 0; i < n+1; i++) {
-            ia[i] -= 1;
-        }
-        for (i = 0; i < nnz; i++) {
-            ja[i] -= 1;
-        }
+        // is this a good idea?
+        delete[] ia;
+        delete[] ja;
+        delete[] a;
 
     } // end selected inversion function
 
@@ -431,6 +562,12 @@ public:
         pardiso (pt, &maxfct, &mnum, &mtype, &phase,
                  &n, &ddum, ia, ja, &idum, &nrhs,
                  iparm, &msglvl, &ddum, &ddum, &error,  dparm);
+
+        // TODO: causes segmentation fault. why?1
+        /*delete[] ia;
+        delete[] ja;
+        delete[] a;*/
+
     }
 
 }; // end class

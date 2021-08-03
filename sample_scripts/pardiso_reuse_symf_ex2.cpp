@@ -9,6 +9,7 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
 
+//#define PRINT_MSG
 
 #include "../read_write_functions.cpp"
 #include "PardisoSolver.cpp"
@@ -17,6 +18,8 @@ using Eigen::VectorXd;
 using Eigen::MatrixXd;
 
 typedef Eigen::VectorXd Vector;
+typedef Eigen::SparseMatrix<double> SpMat;
+
 
 /* ===================================================================== */
 
@@ -36,10 +39,10 @@ void construct_Q_spat_temp(Vector& theta, SpMat c0, SpMat g1, SpMat g2, SpMat g3
     SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
     #ifdef PRINT_MSG
-        /*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+        std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
 
-        std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
-        std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
+        /*std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
+        std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl; 
 
         std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
         std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
@@ -340,87 +343,61 @@ int main(int argc, char* argv[])
     }
 
     SpMat Q(n,n);
-
     construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax, &Q);
-    std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
 
     Vector rhs(n);
     construct_b(theta, Ax, y, &rhs);
-    std::cout << "b : \n" << rhs.head(10) << std::endl;
+    //std::cout << "b : \n" << rhs.head(10) << std::endl;
+
+    SpMat Qst(ns*nt, ns*nt);
+    construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, &Qst);
 
     /* ====================================================================== */
 
-    // only take lower triangular part of A
-    SpMat Q_lower = Q.triangularView<Lower>(); 
-
-    // this time require CSR format
-
-    unsigned int nnz = Q_lower.nonZeros();
-    //std::cout << "number of non zeros : " << nnz << std::endl;
-
-    int* ia; 
-    int* ja;
-    double* a; 
-
-    // allocate memory
-    ia = new int [n+1];
-    ja = new int [nnz];
-    a = new double [nnz];
-
-    Q_lower.makeCompressed();
-
-    for (int i = 0; i < n+1; ++i){
-        ia[i] = Q_lower.outerIndexPtr()[i]; 
-    }  
-
-    for (int i = 0; i < nnz; ++i){
-        ja[i] = Q_lower.innerIndexPtr()[i];
-    }  
-
-    for (int i = 0; i < nnz; ++i){
-        a[i] = Q_lower.valuePtr()[i];
-    } 
-
-    double* b;
-    double* x;
-    double* inv_diag;
-
-    b        = new double [n];
-    x        = new double [n]; 
-    inv_diag = new double [n];
-
-
-    /* Set right hand side to i. */
-    for (int i = 0; i < n; i++) {
-        b[i] = rhs[i];
-    } 
+    Vector x(n);
+    Vector inv_diag(n);
 
     //exit(1);
 
-    double log_det;
+    double log_det_Q;
+    double log_det_Qst;
 
-    PardisoSolver* solver;
-    solver = new PardisoSolver(n, ia, ja, a);
+    SpMat IdMat(n,n); IdMat.setIdentity();
+    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+    SpMat W = Q + IdMat;
+    //std::cout << "W : \n" << W.block(0,0,10,10) << std::endl;
+
+    // initialise solver
+    PardisoSolver* solverQ;
+    solverQ = new PardisoSolver(W);
+
+    PardisoSolver* solverQst;
+    solverQst = new PardisoSolver(Qst);
+
    
-    solver->factorize(ia, ja, a, log_det); 
-    std::cout << "\nlog det factorise       : " << log_det << std::endl;
+    // factorise matrix
+    solverQ->factorize(Q, log_det_Q); 
+    std::cout << "\nlog det factorise       : " << log_det_Q << std::endl;
 
-    #if 1
+    // factorise matrix
+    solverQst->factorize(Qst, log_det_Qst); 
+    std::cout << "\nlog det factorise       : " << log_det_Qst << std::endl;
 
-    solver->factorize_solve(ia, ja, a, b, x, log_det);  
+    // factorise & solve
+    solverQ->factorize_solve(W, rhs, x, log_det_Q); 
 
-    std::cout << "\nlog det factorise solve : " << log_det << std::endl;
-    std::cout << "x : ";
-    for(int i=0; i<10; i++){
-        std::cout << x[i] << " ";
-    } 
-    std::cout << "" << std::endl;
+    string sol_x_file_name = base_path +"/pardiso_sol_x_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+    write_vector(sol_x_file_name, x, n); 
 
-    solver->selected_inversion(ia, ja, a, inv_diag);
+    // selected inversion
+    solverQ->selected_inversion(Q, inv_diag);
 
-    solver->release_memory();
+    // write to file
+    string sel_inv_file_name = base_path +"/pardiso_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+    write_vector(sel_inv_file_name, inv_diag, n);
 
-    #endif
+    solverQ->release_memory();
 
     return 0;
 }
