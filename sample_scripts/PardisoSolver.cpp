@@ -1,15 +1,3 @@
-/* -------------------------------------------------------------------- */
-/*      Example program to show the use of the "PARDISO" routine        */
-/*      on symmetric linear systems                                     */
-/* -------------------------------------------------------------------- */
-/*      This program can be downloaded from the following site:         */
-/*      http://www.pardiso-project.org                                  */
-/*                                                                      */
-/*  (C) Olaf Schenk, Institute of Computational Science                 */
-/*      Universita della Svizzera italiana, Lugano, Switzerland.        */
-/*      Email: olaf.schenk@usi.ch                                       */
-/* -------------------------------------------------------------------- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -74,54 +62,19 @@ private:
     int      idum;              /* Integer dummy. */
 
     int     mtype;              /* matrix type */
-
     int     nrhs;
+    int     init;
 
 
 
 public:
     /** constructor pardiso init */
     /* do symbolic factorisation now or later? */
-    PardisoSolver(SpMat& Q_) : Q(Q_) {
+    PardisoSolver(){
 
-        n = Q.rows();
-
-        // only take lower triangular part of A
-        SpMat Q_lower = Q.triangularView<Lower>(); 
-
-        // this time require CSR format
-
-        nnz = Q_lower.nonZeros();
-        std::cout << "number of non zeros : " << nnz << std::endl;
-
-        int* ia; 
-        int* ja;
-        double* a; 
-
-        // allocate memory
-        ia = new int [n+1];
-        ja = new int [nnz];
-        a = new double [nnz];
-
-        Q_lower.makeCompressed();
-
-        for (int i = 0; i < n+1; ++i){
-            ia[i] = Q_lower.outerIndexPtr()[i]; 
-        }  
-
-        for (int i = 0; i < nnz; ++i){
-            ja[i] = Q_lower.innerIndexPtr()[i];
-        }  
-
-        for (int i = 0; i < nnz; ++i){
-            a[i] = Q_lower.valuePtr()[i];
-        } 
-
-    
         mtype = -2;             /* set to positive semi-definite */
 
         nrhs = 1;               /* Number of right hand sides. */
-        nnz = ia[n];
 
         /* -------------------------------------------------------------------- */
         /* ..  Setup Pardiso control parameters.                                */
@@ -160,6 +113,51 @@ public:
 
         msglvl = 0;         /* Print statistical information  */
         error  = 0;         /* Initialize error flag */
+
+        init = 0;           /* switch that determines if symbolic factorisation already happened */
+
+    } // end constructor
+
+
+    /* ======================================================================== */
+    void symbolic_factorization(SpMat& Q, int& init){
+
+        std::cout << "in symbolic factorization." << std::endl;
+
+        n = Q.rows();
+
+        // only take lower triangular part of A
+        SpMat Q_lower = Q.triangularView<Lower>(); 
+
+        // this time require CSR format
+
+        nnz = Q_lower.nonZeros();
+        std::cout << "number of non zeros : " << nnz << std::endl;
+
+        int* ia; 
+        int* ja;
+        double* a; 
+
+        // allocate memory
+        ia = new int [n+1];
+        ja = new int [nnz];
+        a = new double [nnz];
+
+        Q_lower.makeCompressed();
+
+        for (int i = 0; i < n+1; ++i){
+            ia[i] = Q_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            ja[i] = Q_lower.innerIndexPtr()[i];
+        }  
+
+        for (int i = 0; i < nnz; ++i){
+            a[i] = Q_lower.valuePtr()[i];
+        } 
+
+        nnz = ia[n];
 
         /* -------------------------------------------------------------------- */
         /* ..  Convert matrix from 0-based C-notation to Fortran 1-based        */
@@ -203,25 +201,23 @@ public:
         printf("\nNumber of nonzeros in factors  = %d", iparm[17]);
         printf("\nNumber of factorization GFLOPS = %d\n", iparm[18]);
 
-        /* -------------------------------------------------------------------- */    
-        /* ..  Convert matrix back to 0-based C-notation.                       */
-        /* -------------------------------------------------------------------- */ 
-        
-        for (i = 0; i < n+1; i++) {
-            ia[i] -= 1;
-        }
-        for (i = 0; i < nnz; i++) {
-            ja[i] -= 1;
-        }
+        // set init to 1 to indicate that symbolic factorisation happened
+        init = 1;
 
+        delete[] ia;
+        delete[] ja;
+        delete[] a;
 
-    } // end constructor
-
-
-    /* ======================================================================== */
+    }
 
     // numerical factorisation
     void factorize(SpMat& Q, double& log_det){
+
+        std::cout << "init = " << init << std::endl;
+
+        if(init == 0){
+            symbolic_factorization(Q, init);
+        }
 
         // check if n and Q.size() match
         if(n != Q.rows()){
@@ -302,7 +298,6 @@ public:
 
         log_det = dparm[32];
 
-        // is this a good idea?
         delete[] ia;
         delete[] ja;
         delete[] a;
@@ -311,6 +306,12 @@ public:
 
     // numerical factorisation & solve
     void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det){
+
+        std::cout << "init = " << init << std::endl;
+
+        if(init == 0){
+            symbolic_factorization(Q, init);
+        }
 
     // check if n and Q.size() match
         if(n != Q.rows()){
@@ -441,10 +442,19 @@ public:
         delete[] ja;
         delete[] a;
 
+        delete[] x;
+        delete[] b;
+
     } // end factorise solve function
 
 
     void selected_inversion(SpMat& Q, Vector& inv_diag){
+
+        std::cout << "init = " << init << std::endl;
+
+        if(init == 0){
+            symbolic_factorization(Q, init);
+        }
 
         // check if n and Q.size() match
         if(n != Q.rows()){
@@ -551,9 +561,13 @@ public:
         delete[] ja;
         delete[] a;
 
+        delete[] x;
+        delete[] b;
+
     } // end selected inversion function
 
-    void release_memory(){
+    // class destructor
+    ~PardisoSolver(){
         /* -------------------------------------------------------------------- */    
         /* ..  Termination and release of memory.                               */
         /* -------------------------------------------------------------------- */    
@@ -562,11 +576,6 @@ public:
         pardiso (pt, &maxfct, &mnum, &mtype, &phase,
                  &n, &ddum, ia, ja, &idum, &nrhs,
                  iparm, &msglvl, &ddum, &ddum, &error,  dparm);
-
-        // TODO: causes segmentation fault. why?1
-        /*delete[] ia;
-        delete[] ja;
-        delete[] a;*/
 
     }
 

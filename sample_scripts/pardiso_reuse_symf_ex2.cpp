@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iostream>
 
+#include <time.h>
+
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
@@ -342,62 +344,97 @@ int main(int argc, char* argv[])
 
     }
 
-    SpMat Q(n,n);
-    construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax, &Q);
-    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-
-    Vector rhs(n);
-    construct_b(theta, Ax, y, &rhs);
-    //std::cout << "b : \n" << rhs.head(10) << std::endl;
-
-    SpMat Qst(ns*nt, ns*nt);
-    construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, &Qst);
-
     /* ====================================================================== */
-
-    Vector x(n);
-    Vector inv_diag(n);
 
     //exit(1);
 
-    double log_det_Q;
-    double log_det_Qst;
+    double overall_time = -omp_get_wtime();
 
-    SpMat IdMat(n,n); IdMat.setIdentity();
-    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-    SpMat W = Q + IdMat;
-    //std::cout << "W : \n" << W.block(0,0,10,10) << std::endl;
+    int threads = 8;
+    int num_par = 4;
 
-    // initialise solver
-    PardisoSolver* solverQ;
-    solverQ = new PardisoSolver(W);
+    PardisoSolver* solverQ[num_par];
+    PardisoSolver* solverQst[num_par];
 
-    PardisoSolver* solverQst;
-    solverQst = new PardisoSolver(Qst);
+    // create as many Solvers as there are threads
+    for(int i=0; i<num_par; i++){
+        solverQ[i] = new PardisoSolver();
+        solverQst[i] = new PardisoSolver();
+    }
 
-   
-    // factorise matrix
-    solverQ->factorize(Q, log_det_Q); 
-    std::cout << "\nlog det factorise       : " << log_det_Q << std::endl;
 
-    // factorise matrix
-    solverQst->factorize(Qst, log_det_Qst); 
-    std::cout << "\nlog det factorise       : " << log_det_Qst << std::endl;
+    for(int bfgs_iter = 0; bfgs_iter < 2; bfgs_iter++)
+    {
+        std::cout << "=============== bfgs iter = " << bfgs_iter << " ================= " << std::endl;
 
-    // factorise & solve
-    solverQ->factorize_solve(W, rhs, x, log_det_Q); 
+        #pragma omp parallel for   
+        for(int i=0; i<num_par; i++){
 
-    string sol_x_file_name = base_path +"/pardiso_sol_x_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
-    write_vector(sol_x_file_name, x, n); 
+            std::cout << "==== i = " << i << std::endl;
 
-    // selected inversion
-    solverQ->selected_inversion(Q, inv_diag);
+            int tid = omp_get_thread_num();
+            std::cout << "tid = " << tid << std::endl;
 
-    // write to file
-    string sel_inv_file_name = base_path +"/pardiso_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
-    write_vector(sel_inv_file_name, inv_diag, n);
+            // ------------------ initialise & construct matrices & rhs --------------------- //
+            SpMat Q(n,n);
+            construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax, &Q);
+            //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
 
-    solverQ->release_memory();
+            Vector rhs(n);
+            construct_b(theta, Ax, y, &rhs);
+            //std::cout << "b : \n" << rhs.head(10) << std::endl;
+
+            SpMat Qst(ns*nt, ns*nt);
+            construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, &Qst);
+
+            SpMat IdMat(n,n); IdMat.setIdentity();
+            //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+            SpMat W = Q + i*IdMat;
+            //std::cout << "W : \n" << W.block(0,0,10,10) << std::endl;
+
+            Vector x(n);
+            Vector inv_diag(n);
+
+            double log_det_Q;
+            double log_det_Qst;
+
+            // --------------------- call solvers --------------------- //
+
+            // factorise matrix
+            solverQst[i]->factorize(Qst, log_det_Qst); 
+            std::cout << "log det factorise Qst      : " << log_det_Qst << std::endl;
+
+            // factorise & solve
+            //W = Q + i*IdMat;
+            solverQ[i]->factorize_solve(W, rhs, x, log_det_Q);
+            std::cout << "log det factorise Q        : " << log_det_Q << std::endl;
+     
+
+            /*string sol_x_file_name = base_path +"/pardiso_sol_x_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+            write_vector(sol_x_file_name, x, n); */
+
+            // selected inversion
+            solverQ[i]->selected_inversion(Q, inv_diag);
+
+            // write to file
+            /*string sel_inv_file_name = base_path +"/pardiso_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+            write_vector(sel_inv_file_name, inv_diag, n);*/
+
+        }
+    } // end bfgs iter
+
+    overall_time += omp_get_wtime();
+    std::cout << "run time : " << overall_time << std::endl;
+
+    for(int i=0; i<num_par; i++){
+        delete solverQ[i];
+        delete solverQst[i];
+    
+
+    }
+
+
+
 
     return 0;
 }

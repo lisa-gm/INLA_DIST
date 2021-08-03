@@ -62,6 +62,11 @@ SpMat readCSC(std::string filename){
   SpMat A = Eigen::Map<Eigen::SparseMatrix<double> >(n_rows,n_cols,nnz,outerIndexPtr, // read-write
                                innerIndices,values);
 
+  delete[] innerIndices;
+  delete[] outerIndexPtr;
+  delete[] values;
+
+
   return A;
 } 
 
