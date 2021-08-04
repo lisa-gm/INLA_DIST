@@ -105,49 +105,6 @@ void generate_ex_regression( int nb,  int no, double tau, Eigen::MatrixXd *B, Ve
 }
 
 
-class my_function
-{
-private:
-    int no;
-    int nb;
-    MatrixXd B;
-    VectorXd y;
-
-public:
-    my_function(int no_, int nb_, MatrixXd B_, VectorXd y_) : no(no_), nb(nb_), B(B_), y(y_) {}
-    double operator()(const VectorXd& x, VectorXd& grad)
-    {
-
-        // double fx = 0.0;
-
-        // double t1 = 1.0 - x[0];
-        // double t1 = (1.0 - x[0])*(1 - x[0]);
-        // double t2 = 10 * (x[0 + 1] - x[0] * x[0]);
-        // grad[1] = 20 * t2;
-        // grad[0]     = -2.0 * (x[0] * grad[0 + 1] + t1);
-        // fx += t1 * t1 + t2 * t2;
-
-        double fx = 0.0;
-        double t1 = (1.0 - x[0])*(1 - x[0]);
-        double t2 = 100*(x[1] - x[0]*x[0])*(x[1] - x[0]*x[0]);
-        fx = t1 + t2;
-
-        gradient(x,grad);
-        // grad[0] = -2.0*(1.0 - x[0]) - 4*100.0*x[0]*(x[1] - x[0]*x[0]);
-        // grad[1] = 2.0*100.0*(x[1] - x[0]*x[0]);
-        
-
-        return fx;
-    }
-
-    void gradient(const VectorXd& x, VectorXd& grad){
-        grad[0] = -2.0*(1.0 - x[0]) - 4*100.0*x[0]*(x[1] - x[0]*x[0]);
-        grad[1] = 2.0*100.0*(x[1] - x[0]*x[0]);
-    }
-    
-};
-
-
 int main(int argc, char* argv[])
 {
 
