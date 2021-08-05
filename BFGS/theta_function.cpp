@@ -47,7 +47,7 @@ class PostTheta{
     int nu;			/**<  number of random effects, that ns*nu */
     int n;			/**<  total number of unknowns, i.e. ns*nt + nb */
 
-    VectorXd y; /**<  vector of observations y. has length no. */
+    VectorXd y; 	/**<  vector of observations y. has length no. */
 
     // either Ax or B used
     SpMat Ax;		/**< sparse matrix of size no x (nu+nb). Projects observation locations onto FEM mesh and includes covariates at the end. */
@@ -64,9 +64,9 @@ class PostTheta{
     SpMat M1;
     SpMat M2;
 
-    double yTy;		/**< compute t(y)*y once. */
-    Vector mu;		/**< conditional mean */
-    Vector t_grad;	/**< gradient of theta */
+    double yTy;			/**< compute t(y)*y once. */
+    Vector mu;			/**< conditional mean */
+    Vector t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
 
 public:
@@ -78,6 +78,7 @@ public:
      * @param[in] no_ number of observations.
      * @param[in] B_  covariate matrix.
      * @param[in] y_  vector with observations.
+     * \note B = B_ or is its own copy?
      */	
 	PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_) {
 		ns = 0;
@@ -141,7 +142,7 @@ public:
 			std::cout << "yTy : " << yTy << std::endl;
 		#endif
 
-		n = nb + ns*nt;
+		n  = nb + ns*nt;
 		nu = ns*nt;
 
 		// initialise min_f_theta, min_theta
