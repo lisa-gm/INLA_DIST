@@ -7,6 +7,9 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
+#include <Eigen/SparseCore>
+
+#define PRINT_PAR
 
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
@@ -14,6 +17,7 @@ using Eigen::MatrixXd;
 typedef Eigen::VectorXd Vector;
 typedef Eigen::SparseMatrix<double> SpMat;
 
+using namespace Eigen;
 
 /* PARDISO prototype. */
 extern "C" void pardisoinit (void   *, int    *,   int *, int *, double *, int *);
@@ -25,55 +29,57 @@ extern "C" void pardiso_chkvec     (int *, int *, double *, int *);
 extern "C" void pardiso_printstats (int *, int *, double *, int *, int *, int *,
                             double *, int *);
 
-
+ /**
+ * @brief creates solver class using pardiso for factorising, solving and selectively inverting linear system.
+ * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
+ * and selected inversion (of the diagonal elements)
+ */
 class PardisoSolver{
 
 private:
 
     /* matrix size */
-    int n;
-    unsigned int nnz;
+    int n;                  /**< size of the matrix */
+    unsigned int nnz;       /**< number of nonzeros */
 
-    SpMat Q;
+    SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
 
-    int* ia;
-    int* ja;
-    double* a;
+    int* ia;                /**< CSR format. row indices. */
+    int* ja;                /**< CSR format. col pointers. */
+    double* a;              /**< CSR format. values. */
 
-    double* b;
-    double* x;
+    double* b;              /**< right-hand side. */
+    double* x;              /**< placeholder for solution. */
 
-    /* Internal solver memory pointer pt,                  */
-    void *pt[64];
+    void *pt[64];           /**< Internal solver memory pointer pt */
 
     /* Pardiso control parameters. */
     int      iparm[64];
     double   dparm[64];
     int      maxfct, mnum, phase, error, msglvl, solver;
 
-    /* Number of processors. */
-    int      num_procs;
+    int      num_procs;     /**< Number of processors. */
 
     /* Auxiliary variables. */
     char    *var;
     int      i, k;
 
-    double   ddum;              /* Double dummy */
-    int      idum;              /* Integer dummy. */
+    double   ddum;              /**< Double dummy */
+    int      idum;              /**< Integer dummy. */
 
-    int     mtype;              /* matrix type */
-    int     nrhs;
-    int     init;
+    int     mtype;              /**< matrix type */
+    int     nrhs;               /**< number of rhs. */
+    int     init;               /**< flag that indicates if symbolic factorisation already performed. */
 
 
 
 public:
-    /** constructor pardiso init */
-    /* do symbolic factorisation now or later? */
+     /**
+     * @brief constructor. initialises parameters, check pardiso license.
+     */
     PardisoSolver(){
 
         mtype = -2;             /* set to positive semi-definite */
-
         nrhs = 1;               /* Number of right hand sides. */
 
         /* -------------------------------------------------------------------- */
@@ -120,6 +126,13 @@ public:
 
 
     /* ======================================================================== */
+    /**
+     * @brief performs the symbolic factorisation.
+     * @param[in]       Q precision matrix to be factorised. 
+     * @param[inout]    init integer value indicating status of symbolic factorisation. Changed to one at the end of the function.
+     * @details For each PardisoSolver object symbolic factorisation only needs to be performed once as sparsity patters if
+     * assumed to remain the same. 
+     */
     void symbolic_factorization(SpMat& Q, int& init){
 
         std::cout << "in symbolic factorization." << std::endl;
@@ -132,7 +145,10 @@ public:
         // this time require CSR format
 
         nnz = Q_lower.nonZeros();
-        std::cout << "number of non zeros : " << nnz << std::endl;
+
+        #ifdef PRINT_PAR
+            std::cout << "number of non zeros : " << nnz << std::endl;
+        #endif
 
         int* ia; 
         int* ja;
@@ -197,9 +213,11 @@ public:
             exit(1);
         }
 
-        printf("\nReordering completed ... ");
-        printf("\nNumber of nonzeros in factors  = %d", iparm[17]);
-        printf("\nNumber of factorization GFLOPS = %d\n", iparm[18]);
+        #ifdef PRINT_PAR
+            printf("\nReordering completed ... ");
+            printf("\nNumber of nonzeros in factors  = %d", iparm[17]);
+            printf("\nNumber of factorization GFLOPS = %d\n", iparm[18]);
+        #endif
 
         // set init to 1 to indicate that symbolic factorisation happened
         init = 1;
@@ -210,10 +228,16 @@ public:
 
     }
 
-    // numerical factorisation
+    /**
+     * @brief numerical factorisation. 
+     * @param[in]       Q precision matrix to be factorised.
+     * @param[inout]    log_det computes log determinant of Q.
+     */
     void factorize(SpMat& Q, double& log_det){
 
-        std::cout << "init = " << init << std::endl;
+        #ifdef PRINT_PAR
+            std::cout << "init = " << init << std::endl;
+        #endif
 
         if(init == 0){
             symbolic_factorization(Q, init);
@@ -304,7 +328,13 @@ public:
 
     }
 
-    // numerical factorisation & solve
+    /**
+     * @brief factorises and solves matrix in one call (to reuse pardiso objects)
+     * @param[in]       Q precision matrix.
+     * @param[in]       rhs right-hand side of the system.
+     * @param[inout]    sol solution of the system.
+     * @param[inout]    log_det log determinant of Q.
+     */    
     void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det){
 
         std::cout << "init = " << init << std::endl;
@@ -437,7 +467,6 @@ public:
             sol(i) = x[i];
         }
 
-        // is this a good idea?
         delete[] ia;
         delete[] ja;
         delete[] a;
@@ -447,7 +476,11 @@ public:
 
     } // end factorise solve function
 
-
+    /**
+     * @brief selected inversion of the diagonal elements of Q.
+     * @param[in]       Q precision matrix.
+     * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
+     */
     void selected_inversion(SpMat& Q, Vector& inv_diag){
 
         std::cout << "init = " << init << std::endl;
@@ -556,7 +589,6 @@ public:
             inv_diag(k) = a[j];
         }
 
-        // is this a good idea?
         delete[] ia;
         delete[] ja;
         delete[] a;
@@ -566,7 +598,9 @@ public:
 
     } // end selected inversion function
 
-    // class destructor
+     /**
+     * @brief class destructor. Frees memory allocated by pardiso.
+     */
     ~PardisoSolver(){
         /* -------------------------------------------------------------------- */    
         /* ..  Termination and release of memory.                               */
