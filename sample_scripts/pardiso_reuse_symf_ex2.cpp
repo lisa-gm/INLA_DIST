@@ -22,7 +22,6 @@ using Eigen::MatrixXd;
 typedef Eigen::VectorXd Vector;
 typedef Eigen::SparseMatrix<double> SpMat;
 
-
 /* ===================================================================== */
 
 /** spatial temporal model : SPDE discretisation. DEMF(1,2,1) model.*/
@@ -30,6 +29,8 @@ void construct_Q_spat_temp(Vector& theta, SpMat c0, SpMat g1, SpMat g2, SpMat g3
     double exp_theta1 = exp(theta[1]);
     double exp_theta2 = exp(theta[2]);
     double exp_theta3 = exp(theta[3]);
+
+    int nu = g1.rows()*M0.rows();
 
     // g^2 * fem$c0 + fem$g1
     SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
@@ -57,9 +58,117 @@ void construct_Q_spat_temp(Vector& theta, SpMat c0, SpMat g1, SpMat g2, SpMat g3
     //std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
 
 }
-  
+
+
+void addFixedEffPrecision(int n, int nb, SpMat& Q, double val){
+
+    /*int* outerIdxPtr;
+
+
+    outerIdxPtr = new int[]
+
+    Q.outerIndexPtr();
+    int* innerIdxPtr = Q.innerIndexPtr();
+
+    double* valuePtr = Q.valuePtr();*/
+
+
+
+
+}
+
 /** construct precision matrix. Calls spatial, spatial-temporal, etc. appropriately. */
 void construct_Q(int ns, int nt, int nb, Vector& theta, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, SpMat Ax, SpMat *Q){
+    double exp_theta0 = exp(theta[0]);
+    //double exp_theta = exp(3);
+
+    int nu = ns*nt;
+    int n = nu + nb;
+
+    SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+    /*std::cout << "Q_b " << std::endl;
+    std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
+    //Q_b = 1e-5*Q_b.setIdentity();
+
+    if(ns > 0){
+        SpMat Qu(nu, nu);
+        // TODO: find good way to assemble Qx
+
+        if(nt > 1){
+            construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, &Qu);
+
+        } else {    
+            std::cout << "nt must be greater 1!" << std::endl;
+            exit(1);
+        }   
+
+        int nnz_Qu = Qu.nonZeros();
+
+        int* innerIndices;
+        int* outerIndexPtr;
+        double* values; 
+
+        // allocate memory for overall matrix
+        innerIndices  = new int [nnz_Qu+nb];
+        outerIndexPtr = new int [nu+1+nb];
+        values        = new double [nnz_Qu+nb];
+
+        // copy csc structure of tridiagonal matrix into arrays
+        memcpy(innerIndices,  Qu.innerIndexPtr(),  nnz_Qu*sizeof(int));
+        memcpy(outerIndexPtr, Qu.outerIndexPtr(),  (nu+1)*sizeof(int));
+        memcpy(values,        Qu.valuePtr(),       nnz_Qu*sizeof(double));
+
+        // ------------- fill up precision matrix fixed effects ---------------- //
+
+        double prec_val = 1e-5;
+
+        int count = 0;
+        for(int i = nnz_Qu; i<(nnz_Qu+nb); i++){
+            innerIndices[i] = nu + count;
+            values[i] = prec_val;
+            count++;
+        }
+
+        for (int i = (nu+1); i < (nu+nb+1); i++){
+            outerIndexPtr[i] = outerIndexPtr[i-1]+1;
+        }
+
+        int nnz    = nnz_Qu  + nb;
+        SpMat Qx = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,outerIndexPtr, // read-write
+                               innerIndices,values);
+
+        #ifdef PRINT_MSG
+            //std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
+            //std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
+
+        #endif
+
+        *Q =  Qx + exp_theta0 * Ax.transpose() * Ax;
+
+        #ifdef PRINT_MSG
+            std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
+            std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
+        #endif
+
+    } else {
+            std::cout << "ns must be greater than zero!" << std::endl;
+            exit(1);
+    }
+
+    /*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
+    std::cout << Eigen::MatrixXd(*Q) - exp_theta*B.transpose()*B << std::endl;*/
+
+    #ifdef PRINT_MSG
+        std::cout << "Q  dim : " << Q->rows() << " "  << Q->cols() << std::endl;
+        std::cout << "Q : \n" << Q->block(0,0,10,10) << std::endl;
+        std::cout << "theta : \n" << theta.transpose() << std::endl;
+
+    #endif 
+
+}
+  
+/** construct precision matrix. Calls spatial, spatial-temporal, etc. appropriately. */
+void construct_Q_old(int ns, int nt, int nb, Vector& theta, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, SpMat Ax, SpMat *Q){
     double exp_theta0 = exp(theta[0]);
     //double exp_theta = exp(3);
 
@@ -326,32 +435,227 @@ int main(int argc, char* argv[])
         n = ns*nt + nb;
 
         // =========== synthetic data set =============== //
-        std::cout << "using SYNTHETIC DATASET" << std::endl;        
+        /*std::cout << "using SYNTHETIC DATASET" << std::endl;        
         theta_original << 1.4, -5.9,  1,  3.7; 
         std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
-        //theta << 1.4, -5.9,  1,  3.7; 
-        theta << 1, -3, 1, 3;
+        theta << 1.4, -5.9,  1,  3.7; 
+        //theta << 1, -3, 1, 3;
         //theta << 0.5, -1, 2, 2;
-        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
 
         // =========== temperature data set =============== //
-        /*std::cout << "using TEMPERATURE DATASET" << std::endl;        
+        std::cout << "using TEMPERATURE DATASET" << std::endl;        
         theta_original << 5, -10, 2.5, 1;
         std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         theta << 5, -10, 2.5, 1;
-        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
 
 
     }
 
     /* ====================================================================== */
 
+
+    Eigen::MatrixXd M_dense(4,4);
+
+    M_dense << 1,0,0,3.5,
+               4,2,1,0,
+               3,0,1,0,
+               0,1,0,1;
+
+
+    std::cout << "M_dense : \n" << M_dense << std::endl; 
+
+    SpMat M = M_dense.sparseView();
+
+    double val = 0.5;
+    //int nb  = 2;
+
+    std::cout << "M : \n" << M << std::endl; 
+
+    int rows_M = M.rows();
+    int cols_M = M.cols();
+    int nnz_M    = M.nonZeros();
+
+    int* innerIndices;
+    int* outerIndexPtr;
+    double* values; 
+
+    // allocate memory
+    innerIndices  = new int [nnz_M+nb];
+    outerIndexPtr = new int [cols_M+1+nb];
+    values        = new double [nnz_M+nb];
+
+    // copy csc structure of tridiagonal matrix into arrays
+    memcpy(innerIndices, M.innerIndexPtr(), nnz_M*sizeof(int));
+    memcpy(outerIndexPtr, M.outerIndexPtr(), (cols_M+1)*sizeof(int));
+    memcpy(values, M.valuePtr(), nnz_M*sizeof(double));
+
+    #if 0
+
+    std::cout << "inner index ptr" << std::endl;
+    for(int i=0; i<nnz_M; i++){
+        std::cout << M.innerIndexPtr()[i] << std::endl;
+    }
+
+    std::cout << "new inner index ptr" << std::endl;
+    for(int i=0; i<nnz_M; i++){
+        std::cout << innerIndices[i] << std::endl;
+    }
+
+
+    std::cout << "sizeof(int)               = " << sizeof(int) << std::endl;
+
+    std::cout << "outer index ptr" << std::endl;
+    for(int i=0; i<cols_M+1; i++){
+        std::cout << M.outerIndexPtr()[i] << std::endl;
+    }
+
+    std::cout << "new outer index ptr" << std::endl;
+    for(int i=0; i<cols_M+1; i++){
+        std::cout << outerIndexPtr[i] << std::endl;
+    }
+
+
+
+    // allocate memory
+    /*int innerIndices[nnz];
+    std::cout << "inner index ptr" << std::endl;
+    int outerIndexPtr[n_cols+1];
+    double val[nnz];
+    std::cout << "inner index ptr" << std::endl;
+    double values[nnz];*/
+
+    std::cout << "inner index ptr" << std::endl;
+    for (int i = 0; i < nnz_M; i++){
+        innerIndices[i] = M.innerIndexPtr()[i];
+        values[i] = M.valuePtr()[i];
+        std::cout << innerIndices[i] << std::endl;
+    }
+
+
+    std::cout << "outerIndexPtr : " << std::endl;
+    for (int i = 0; i < cols_M+1; i++){
+        outerIndexPtr[i] = M.outerIndexPtr()[i];
+        std::cout << outerIndexPtr[i] << std::endl;
+    }
+
+
+    #endif
+
+    // ------------- fill up precision matrix fixed effects ---------------- //
+
+    std::cout << "added values : " << std::endl;
+
+    int count = 0;
+    for(int i = nnz_M; i<(nnz_M+nb); i++){
+        innerIndices[i] = cols_M + count;
+        values[i] = val;
+        count++;
+    }
+
+    std::cout << "outerIndexPtr : " << std::endl;
+    for (int i = (cols_M+1); i < (cols_M+nb+1); i++){
+        outerIndexPtr[i] = outerIndexPtr[i-1]+1;
+        std::cout << outerIndexPtr[i] << std::endl;
+
+    }
+
+    int n_rows = rows_M + nb;
+    int n_cols = cols_M + nb; 
+    int nnz    = nnz_M  + nb;
+
+    std::cout << "inner index ptr" << std::endl;
+    for(int i=0; i<nnz; i++){
+        std::cout << innerIndices[i] << std::endl;
+    }
+
+   std::cout << "outer index ptr" << std::endl;
+    for(int i=0; i<n_cols+1; i++){
+        std::cout << outerIndexPtr[i] << std::endl;
+    }
+
+    std::cout << "values" << std::endl;
+    for(int i=0; i<nnz; i++){
+        std::cout << values[i] << std::endl;
+    }
+
+
+
+    // 
+    SpMat A = Eigen::Map<Eigen::SparseMatrix<double> >(n_rows,n_cols,nnz,outerIndexPtr, // read-write
+                               innerIndices,values);
+
+
+    std::cout << "A = \n" << MatrixXd(A) << std::endl;
+
+
+    int* a;
+    int* b;
+    //int* c;
+
+    a = new int [5];
+    b = new int [5];
+    //c = new int [10];
+
+    for(int i=0; i < 5; i++){
+        a[i] = i+1;
+        b[i] = i+6;
+        //cout << a[i] << endl;
+        //cout << b[i] << endl;
+
+    }
+
+    /*int a[] = {1,2,3,4,5};
+    int b[] = {6,7,8,9,10};
+    int c[10];
+
+    memcpy( c[0], a, sizeof(int) * sizeof(a) );
+    memcpy( c[5], b, sizeof(int) * sizeof(b) );*/
+
+
+    int * c = new int[5 + 5];
+    std::copy(a, a + 5, c);
+    std::copy(b, b + 5, c + 5);
+
+
+
+    /*for(int i=0; i<10; i++)
+    {
+       cout << c[i] << endl;  
+    }*/
+
+    // construct precision matrix Q
+    #if 0
+
+    double construct_Q_time = -omp_get_wtime();
+    SpMat Q(n,n);
+    construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax, &Q);
+    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+    construct_Q_time += omp_get_wtime();
+
+    std::cout << "construct_Q_time = " << construct_Q_time << std::endl;
+
+    double construct_Qst_time = -omp_get_wtime();
+    SpMat Qst(ns*nt, ns*nt);
+    std::cout << "dim Qst : " << ns*nt << ", actual " << Qst.block(0,0,ns*nt, ns*nt).rows() << std::endl;
+    construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, &Qst);
+    construct_Qst_time += omp_get_wtime();
+
+    std::cout << "construct_Qst_time = " << construct_Qst_time << std::endl;
+
+    #endif
+
+
+    #if 0 
     //exit(1);
 
     double overall_time = -omp_get_wtime();
 
-    int threads = 8;
     int num_par = 4;
+
+    int threads = std::atoi(getenv("OMP_NUM_THREADS"));
+    std::cout << "OMP NUM THREADS = " << threads << std::endl;
 
     PardisoSolver* solverQ[num_par];
     PardisoSolver* solverQst[num_par];
@@ -362,8 +666,7 @@ int main(int argc, char* argv[])
         solverQst[i] = new PardisoSolver();
     }
 
-
-    for(int bfgs_iter = 0; bfgs_iter < 2; bfgs_iter++)
+    for(int bfgs_iter = 0; bfgs_iter < 1; bfgs_iter++)
     {
         std::cout << "=============== bfgs iter = " << bfgs_iter << " ================= " << std::endl;
 
@@ -376,16 +679,25 @@ int main(int argc, char* argv[])
             std::cout << "tid = " << tid << std::endl;
 
             // ------------------ initialise & construct matrices & rhs --------------------- //
+            double construct_Q_time = -omp_get_wtime();
             SpMat Q(n,n);
             construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax, &Q);
             //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+            construct_Q_time += omp_get_wtime();
+
 
             Vector rhs(n);
             construct_b(theta, Ax, y, &rhs);
             //std::cout << "b : \n" << rhs.head(10) << std::endl;
 
+            double construct_Qst_time = -omp_get_wtime();
             SpMat Qst(ns*nt, ns*nt);
             construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, &Qst);
+            construct_Qst_time += omp_get_wtime();
+
+            std::cout << "construct_Q_time = " << construct_Q_time << std::endl;
+            std::cout << "construct_Qst_time = " << construct_Qst_time << std::endl;
+
 
             SpMat IdMat(n,n); IdMat.setIdentity();
             //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
@@ -409,16 +721,19 @@ int main(int argc, char* argv[])
             solverQ[i]->factorize_solve(W, rhs, x, log_det_Q);
             std::cout << "log det factorise Q        : " << log_det_Q << std::endl;
      
-
-            /*string sol_x_file_name = base_path +"/pardiso_sol_x_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
-            write_vector(sol_x_file_name, x, n); */
+            if(i == 0 && bfgs_iter == 1){
+                string sol_x_file_name = base_path +"/pardiso_sol_x_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+                write_vector(sol_x_file_name, x, n); 
+            }
 
             // selected inversion
             solverQ[i]->selected_inversion(Q, inv_diag);
 
             // write to file
-            /*string sel_inv_file_name = base_path +"/pardiso_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
-            write_vector(sel_inv_file_name, inv_diag, n);*/
+            if(i == 0 && bfgs_iter == 2){
+                string sel_inv_file_name = base_path +"/pardiso_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+                write_vector(sel_inv_file_name, inv_diag, n);
+            }
 
         }
     } // end bfgs iter
@@ -432,6 +747,8 @@ int main(int argc, char* argv[])
     
 
     }
+
+    #endif
 
 
 
