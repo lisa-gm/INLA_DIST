@@ -9,7 +9,8 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
-#define PRINT_PAR
+//#define PRINT_PAR
+//#define PRINT_OMP
 
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
@@ -61,7 +62,6 @@ private:
     int      num_procs;     /**< Number of processors. */
 
     /* Auxiliary variables. */
-    char    *var;
     int      i, k;
 
     double   ddum;              /**< Double dummy */
@@ -100,19 +100,25 @@ public:
            printf("Wrong username or hostname \n");
            exit(1); 
         } else {
-            printf("[PARDISO]: License check was successful ... \n");
+            #ifdef PRINT_PAR
+                printf("[PARDISO]: License check was successful ... \n");
+            #endif
         }
 
-        /* Numbers of processors, value of OMP_NUM_THREADS */
-        var = getenv("OMP_NUM_THREADS");
-        if(var != NULL)
-            sscanf( var, "%d", &num_procs );
-        else {
-            printf("Set environment OMP_NUM_THREADS to 1");
-            exit(1);
-        }
+        #ifdef PRINT_OMP
+            if(omp_get_thread_num() == 0){
+                //char* var = getenv("OMP_NUM_THREADS");
+                //std::cout << "OMP_NUM_THREADS = " << var << std::endl;
+                std::cout << "Pardiso will be called with " << omp_get_max_threads() << " threads per solver. " << std::endl;
+            }
+            // printf("Thread rank: %d out of %d threads.\n", omp_get_thread_num(), omp_get_num_threads());
+        #endif
 
-        iparm[2]  = num_procs;
+        //iparm[2]  = num_procs;
+
+        // make sure that this is called inside upper level parallel region 
+        // to get number of threads on the second level 
+        iparm[2] = omp_get_max_threads();
 
         maxfct = 1;         /* Maximum number of numerical factorizations.  */
         mnum   = 1;         /* Which factorization to use. */
@@ -135,7 +141,9 @@ public:
      */
     void symbolic_factorization(SpMat& Q, int& init){
 
-        std::cout << "in symbolic factorization." << std::endl;
+        #ifdef PRINT_PAR
+            std::cout << "in symbolic factorization." << std::endl;
+        #endif
 
         n = Q.rows();
 
@@ -337,7 +345,9 @@ public:
      */    
     void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det){
 
-        std::cout << "init = " << init << std::endl;
+        #ifdef PRINT_PAR
+            std::cout << "init = " << init << std::endl;
+        #endif
 
         if(init == 0){
             symbolic_factorization(Q, init);

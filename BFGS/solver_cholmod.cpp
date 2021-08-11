@@ -1,3 +1,6 @@
+#ifndef __solver_cholmod
+#define __solver_cholmod
+
 
 #include <math.h>
 
@@ -62,4 +65,4 @@ void compute_inverse_cholmod(MatrixXd& Q, MatrixXd& Q_inv){
 
 }
 
-
+#endif

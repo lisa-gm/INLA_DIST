@@ -1,10 +1,12 @@
+#ifndef __solver_pardiso
+#define __solver_pardiso
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-
 #include <fstream>
 #include <iostream>
+#include <string>
 
 #include <omp.h>
 #include <time.h>
@@ -15,6 +17,7 @@
 using namespace std;
 
 //#define PRINT_PAR
+//#define PRINT_OMP
 
 using namespace Eigen;
 
@@ -22,8 +25,6 @@ using namespace Eigen;
 typedef Eigen::SparseMatrix<double> SpMat;
 typedef Eigen::CholmodSimplicialLDLT  <SpMat > Solver;
 typedef Eigen::VectorXd Vector;
-
-
 
 
 /* PARDISO prototype. */
@@ -37,18 +38,18 @@ extern "C" void pardiso_printstats (int *, int *, double *, int *, int *, int *,
                            double *, int *);
 
 // COMPUTES LOG DETERMINANT OF A USING PARDISO
-void log_det_pardiso(SpMat *A, double &log_det_A){
+void log_det_pardiso(SpMat& A, double &log_det_A){
 
 	// get everything into the right format
 	int nrhs = 0;          /* Number of right hand sides. */
 
 
 	// only take lower triangular part of A
-	SpMat A_lower = A->triangularView<Lower>(); 
+	SpMat A_lower = A.triangularView<Lower>(); 
 
 	// this time require CSR format
 
-	int n = A->rows();
+	int n = A.rows();
 
 	unsigned int nnz = A_lower.nonZeros();
 	//std::cout << "number of non zeros : " << nnz << std::endl;
@@ -93,7 +94,7 @@ void log_det_pardiso(SpMat *A, double &log_det_A){
 	int      num_procs;
 
 	/* Auxiliary variables. */
-	char    *var;
+	char* 	var;
 	int      i, k;
 
 	double   ddum;              /* Double dummy */
@@ -132,18 +133,35 @@ void log_det_pardiso(SpMat *A, double &log_det_A){
 
 	/* Numbers of processors, value of OMP_NUM_THREADS */
 	// replace this to get second thread number
-	var = getenv("OMP_NUM_THREADS");
-	if(var != NULL)
-	    sscanf( var, "%d", &num_procs );
-	else {
-	    printf("Set environment OMP_NUM_THREADS to 1");
-	    exit(1);
-	}
+  
+   var = getenv("OMP_NUM_THREADS");
 
-	// MANUALLY SET THREADS for now
+   #ifdef PRINT_OMP
+	   if(omp_get_thread_num() == 0){
+	   	std::cout << "OMP_NUM_THREADS : " << var << std::endl;
+	   }
+	   printf("Thread rank: %d out of %d threads.\n", omp_get_thread_num(), omp_get_num_threads());
+	#endif
+
+    //int l1; int l2;
+
+	/*if(var != NULL){
+   	l1 = atoi(strtok(var, ","));
+   	std::cout << "num threads level 1 : " << l1 << std::endl;
+
+   	l2 = atoi(strtok(NULL, ","));
+   	std::cout << "num threads level 2 : "<< l2 << std::endl;	
+
+   } else {
+	    printf("Set (nested) OpenMP threads.");
+	    exit(1);
+	}*/
+
+
 	// nested omp 
 	//iparm[2]  = num_procs;
-	iparm[2] = 16;
+	//iparm[2] = l2;
+    iparm[2] = 8;
 
 	maxfct = 1;     /* Maximum number of numerical factorizations.  */
 	mnum   = 1;         /* Which factorization to use. */
@@ -182,9 +200,6 @@ void log_det_pardiso(SpMat *A, double &log_det_A){
 	/* -------------------------------------------------------------------- */
 
 	iparm[19-1] = -1; // in order to compute Gflops
-	#ifdef PRINT_PAR
-		printf("\nGFlops factorisation : %i", iparm[19-1]);
-	#endif
 
 	// start timer phase 1
 	double timespent_p11 = -omp_get_wtime();
@@ -281,16 +296,16 @@ void log_det_pardiso(SpMat *A, double &log_det_A){
 } 
 
 // COMPUTES LOG DETERMINANT OF A & SOLVES Au = f for u USING PARDISO
-void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
+void solve_pardiso(SpMat& A, Vector& f, Vector& u, double& log_det_A){
 
 	// get everything into the right format
 
 	// only take lower triangular part of A
-	SpMat A_lower = A->triangularView<Lower>(); 
+	SpMat A_lower = A.triangularView<Lower>(); 
 
 	// this time require CSR format
 
-	int n = f->size();
+	int n = f.size();
 	#ifdef PRINT_PAR
 		std::cout << "dim n : " << n << std::endl;
 	#endif
@@ -326,7 +341,7 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 	double* b = new double [n];
 
 	for (int i = 0; i < n; ++i){
-		b[i] = (*f)(i);
+		b[i] = (f)(i);
 	}  
 
 	// empty solution vector
@@ -387,16 +402,6 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 	    #endif
 	}
 
-	/* Numbers of processors, value of OMP_NUM_THREADS */
-	var = getenv("OMP_NUM_THREADS");
-	if(var != NULL)
-	    sscanf( var, "%d", &num_procs );
-	else {
-	    printf("Set environment OMP_NUM_THREADS to 1");
-	    exit(1);
-	}
-
-	// MANUALLY SET THREADS
 	// nested omp 
 	//iparm[2]  = num_procs;
 	iparm[2] = 8;
@@ -530,7 +535,7 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 
 	log_det_A = dparm[32];
 	#ifdef PRINT_PAR
-		printf("\nPardiso   log(det) = %f ", log_det_A);	
+		printf("\nPardiso   log(det) = %f ", *log_det_A);	
 	#endif
 
 	int gflops_fact = iparm[19-1];
@@ -553,6 +558,10 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 
 	iparm[7] = 0;       /* Max numbers of iterative refinement steps. */
 
+	#ifdef PRINT_PAR
+		std::cout << "\nbefore back substitution." << std::endl;
+	#endif 
+
 	pardiso (pt, &maxfct, &mnum, &mtype, &phase,
 	         &n, a, ia, ja, &idum, &nrhs,
 	         iparm, &msglvl, b, x, &error,  dparm);
@@ -568,6 +577,7 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 	#ifdef PRINT_PAR
 		printf("\nSolve completed ... "); 
 	#endif
+
 
 	for (i = 0; i < n; i++) {
 	   u(i) = x[i];
@@ -614,16 +624,16 @@ void solve_pardiso(SpMat *A, Vector *f, Vector& u, double &log_det_A){
 } 
 
 // COMPUTES INVERSE DIAGONAL ELEMENTS OF A, stores them in inv_diag
-void inv_diagonal_pardiso(SpMat *A, Vector& inv_diag){
+void inv_diagonal_pardiso(SpMat& A, Vector& inv_diag){
 
 	// get everything into the right format
 
 	// only take lower triangular part of A
-	SpMat A_lower = A->triangularView<Lower>(); 
+	SpMat A_lower = A.triangularView<Lower>(); 
 
 	// this time require CSR format
 
-	int n = A->rows();
+	int n = A.rows();
 	//std::cout << "dim n : " << n << std::endl;
 
 	unsigned int nnz = A_lower.nonZeros();
@@ -708,19 +718,9 @@ void inv_diagonal_pardiso(SpMat *A, Vector& inv_diag){
 	    #endif
 	}
 
-	/* Numbers of processors, value of OMP_NUM_THREADS */
-	var = getenv("OMP_NUM_THREADS");
-	if(var != NULL)
-	    sscanf( var, "%d", &num_procs );
-	else {
-	    printf("Set environment OMP_NUM_THREADS to 1");
-	    exit(1);
-	}
-
-	// MANUALLY SET THREADS
 	// nested omp 
 	//iparm[2]  = num_procs;
-	iparm[2] = 16;
+	iparm[2] = 8;
 
 	maxfct = 1;     /* Maximum number of numerical factorizations.  */
 	mnum   = 1;         /* Which factorization to use. */
@@ -758,9 +758,6 @@ void inv_diagonal_pardiso(SpMat *A, Vector& inv_diag){
 	/* -------------------------------------------------------------------- */
 
 	iparm[19-1] = -1; // in order to compute Gflops
-	#ifdef PRINT_PAR
-		printf("\nGFlops factorisation : %i", iparm[19-1]);
-	#endif
 
 	// start timer phase 1
 	double timespent_p11 = -omp_get_wtime();
@@ -877,6 +874,8 @@ void inv_diagonal_pardiso(SpMat *A, Vector& inv_diag){
 
 } 
 
+
+#endif
 
 
 
