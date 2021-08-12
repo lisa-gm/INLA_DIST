@@ -105,11 +105,18 @@ public:
             #endif
         }
 
+        int threads_level2;
+
+        #pragma omp parallel
+        {
+            threads_level2 = omp_get_max_threads();
+        }
+
         #ifdef PRINT_OMP
             if(omp_get_thread_num() == 0){
                 //char* var = getenv("OMP_NUM_THREADS");
                 //std::cout << "OMP_NUM_THREADS = " << var << std::endl;
-                std::cout << "Pardiso will be called with " << omp_get_max_threads() << " threads per solver. " << std::endl;
+                std::cout << "Pardiso will be called with " << threads_level2 << " threads per solver. " << std::endl;
             }
             // printf("Thread rank: %d out of %d threads.\n", omp_get_thread_num(), omp_get_num_threads());
         #endif
@@ -118,7 +125,7 @@ public:
 
         // make sure that this is called inside upper level parallel region 
         // to get number of threads on the second level 
-        iparm[2] = omp_get_max_threads();
+        iparm[2] = threads_level2;
 
         maxfct = 1;         /* Maximum number of numerical factorizations.  */
         mnum   = 1;         /* Which factorization to use. */
@@ -493,7 +500,9 @@ public:
      */
     void selected_inversion(SpMat& Q, Vector& inv_diag){
 
-        std::cout << "init = " << init << std::endl;
+        #ifdef PRINT_PAR
+            std::cout << "init = " << init << std::endl;
+        #endif
 
         if(init == 0){
             symbolic_factorization(Q, init);
