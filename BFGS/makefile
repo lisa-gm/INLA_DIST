@@ -14,18 +14,21 @@ MKLROOT?=$(shell echo $$MKLROOT)
 #example: $(SRC_FILES)
 #	$(CXX_COMPILER) $(SRC_FILES) -o example $(INCLUDES) $(MKL_LIB) $(PARDISO_LIB) $(CXX_FLAGS)
 
-#example: example.cpp
-#	rm -f example || true
-#	g++ $< -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
+# -O0 -g -fsanitize=address -Wall 
+# -pg
+call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
+	g++ call_INLA.cpp PostTheta.cpp PardisoSolver.cpp -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
 	-fopenmp \
 	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L/opt/intel/oneapi/mkl/latest/lib/intel64 -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
 
 
-example: example.cpp
-	rm -f example || true
-	g++ $< -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
-	-fopenmp \
-	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
+# -O0 -g -fsanitize=address 
+#call_INLA: call_INLA.cpp
+#	rm -f example || true
+#	g++ $< -o $@ -O0 -g -fsanitize=address -lgfortran -lpthread -lm -lgomp -fPIC -fopenmp -fPIC -lm -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
+#	-fopenmp \
+#	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core \
+	
 
 #example: example.cpp
 #	rm -f test_file || true
@@ -37,13 +40,46 @@ example: example.cpp
 # -std=c++17
 #g++ -I/path/to/eigen -I/path/to/lbfgspp/include -O2 example.cpp
 
-test_file: test_file.cpp
-	g++ $< -o $@ -fopenmp -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
-	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L/opt/intel/oneapi/mkl/latest/lib/intel64 -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
+#test_file: test_file.cpp
+#	g++ $< -o $@ -fopenmp -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
+#	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L/opt/intel/oneapi/mkl/latest/lib/intel64 -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
 
-test_omp: test_omp.cpp
-	g++ $< -o $@ -fopenmp
+#test_omp: test_omp.cpp
+#	g++ $< -o $@ -fopenmp
 
-clean: 
-	rm -f example
-	rm -f test_file
+#clean: 
+#	rm -f call_INLA
+#	rm -f test_file
+
+
+#############################################################################################################
+
+#CXX=g++
+#CXXFLAGS=-I/usr/include/eigen3 -lm \
+		 -I/home/x_gaedkelb/applications/LBFGSpp/include \
+		 -I/usr/include/suitesparse -lcholmod -lm \
+		 -fopenmp \
+		  /home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so \
+		  -L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core \
+		  -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
+
+#SOURCES = PostTheta.cpp PardisoSolver.cpp #../read_write_functions.cpp 
+#HEADERS = PostTheta.h
+#OBJ     = PostTheta.o PardisoSolver.o  #../read_write_functions.o
+
+#all: call_INLA
+
+#PardisoSolver.o : PardisoSolver.cpp
+#	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+#PostTheta.o: PostTheta.cpp #PostTheta.h
+#	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+#call_INLA: $(OBJ) call_INLA.cpp #$(HEADERS)
+#	$(CXX) $(CXXFLAGS) *.o call_INLA.cpp -o call_INLA
+
+clean:
+	rm -f call_INLA
+#	rm -f *.o
+
+
