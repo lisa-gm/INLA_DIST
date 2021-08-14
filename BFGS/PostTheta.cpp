@@ -246,8 +246,53 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);
 
 	// compute upper tridiagonal structure
+	// map 2D structure to 1D to be using omp parallel more efficiently
+	int loop_dim = dim_th*dim_th;
 
-	#pragma omp parallel for 
+	// at the moment 8 threads for k = 16 but only 10 entries need to be filled in matrix. We have 
+	// 4 times 3 evaluations and 6 times 4 evaluations. So probably 2 threads do 2*3 = 6 evaluations 
+	// and 6 threads each do 4. Also note that f(theta) is being computed 4 times. Should be reduced.
+
+	#pragma omp parallel for
+	for(int k = 0; k < loop_dim; k++){			
+
+		// dummy mu
+		Vector mu_tmp(n);
+
+		// row index is integer division k / dim_th
+		int i = k/dim_th;
+		// col index is k mod dim_th
+		int j = k % dim_th;
+
+		// diagonal elements
+		if(i == j){
+			Vector theta_forw_i = theta+epsId.col(i);
+			Vector theta_back_i = theta-epsId.col(i);
+
+			double f_theta_forw_i = eval_post_theta(theta_forw_i, mu_tmp);
+			double f_theta 		  = eval_post_theta(theta, mu_tmp);
+			double f_theta_back_i = eval_post_theta(theta_back_i, mu_tmp);
+
+			hessUpper(i,i) = (f_theta_forw_i - 2 * f_theta + f_theta_back_i)/(eps*eps);
+		
+		// symmetric only compute upper triangular part
+		} else if(j > i) {
+				Vector theta_forw_i_j 		= theta+epsId.col(i)+epsId.col(j);
+				Vector theta_forw_i_back_j  = theta+epsId.col(i)-epsId.col(j);
+				Vector theta_back_i_forw_j  = theta-epsId.col(i)+epsId.col(j);
+				Vector theta_back_i_j 		= theta-epsId.col(i)-epsId.col(j);
+
+    			hessUpper(i,j) = (  eval_post_theta(theta_forw_i_j, mu_tmp) \
+                       - eval_post_theta(theta_forw_i_back_j, mu_tmp) - eval_post_theta(theta_back_i_forw_j, mu_tmp) \
+                       + eval_post_theta(theta_back_i_j, mu_tmp)) / (4*eps*eps);
+		}
+
+	}
+
+	//double time_double_loop = -omp_get_wtime();
+
+	//MatrixXd hessUpper_old = MatrixXd::Zero(dim_th, dim_th);
+	/*#pragma omp parallel for 
 	for(int i=0; i < dim_th; i++){
 		for(int j=i; j < dim_th; j++){
 
@@ -258,7 +303,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 				Vector theta_forw_i = theta+epsId.col(i);
 				Vector theta_back_i = theta-epsId.col(i);
 
-				hessUpper(i,i) = (eval_post_theta(theta_forw_i, mu_tmp) - 2 * eval_post_theta(theta, mu_tmp) + eval_post_theta(theta_back_i, mu_tmp))/(eps*eps);
+				hessUpper_old(i,i) = (eval_post_theta(theta_forw_i, mu_tmp) - 2 * eval_post_theta(theta, mu_tmp) + eval_post_theta(theta_back_i, mu_tmp))/(eps*eps);
 
 			} else {
 				Vector theta_forw_i_j 		= theta+epsId.col(i)+epsId.col(j);
@@ -266,16 +311,19 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 				Vector theta_back_i_forw_j  = theta-epsId.col(i)+epsId.col(j);
 				Vector theta_back_i_j 		= theta-epsId.col(i)-epsId.col(j);
 
-    			hessUpper(i,j) = (  eval_post_theta(theta_forw_i_j, mu_tmp) \
+    			hessUpper_old(i,j) = (  eval_post_theta(theta_forw_i_j, mu_tmp) \
                        - eval_post_theta(theta_forw_i_back_j, mu_tmp) - eval_post_theta(theta_back_i_forw_j, mu_tmp) \
                        + eval_post_theta(theta_back_i_j, mu_tmp)) / (4*eps*eps);
        		}
 		}
 	}
 
+	time_double_loop += omp_get_wtime();
+	std::cout << "time double loop : " << time_double_loop << std::endl;*/
+
 	//	std::cout << "hess upper : " << hessUpper << std::endl;
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
-	std::cout << "hessian       : \n" << hess << std::endl;
+	//std::cout << "hessian       : \n" << hess << std::endl;
 
 	// check that matrix positive definite otherwise use only diagonal
 	check_pos_def(hess); 
