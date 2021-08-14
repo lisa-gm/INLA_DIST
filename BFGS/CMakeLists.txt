@@ -16,7 +16,7 @@ set(MKL_DIR $ENV{MKLROOT})
 
 set(PARDISO_LIB "/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so")
 
-set(CMAKE_CXX_FLAGS "-lm -fopenmp -lpthread -lm -lgomp -lgfortran -fopenmp -fPIC -lm")
+set(CMAKE_CXX_FLAGS "-ldl -lm -fopenmp -lpthread -lm -lgomp -lgfortran -fopenmp -fPIC -lm -ldl")
 
 # compiler flags
 #set(CMAKE_CXX_FLAGS     "${CMAKE_CXX_FLAGS}-w -O3 -fPIC -D_LONG_INTEGER_ -std=c++11")
@@ -52,6 +52,7 @@ find_library(cholmod ${CHOLMOD_DIR}/lib/libcholmod.a)
 
 add_executable(call_INLA call_INLA.cpp theta_function_test.cpp PardisoSolver.cpp ) # solver_cholmod.cpp
 
+
 # CHOLMOD
 target_link_libraries(call_INLA cholmod)
 
@@ -76,8 +77,8 @@ find_library(libmkl_core
 #target_link_libraries(call_INLA ${EIGEN_DIR})
 target_include_directories(call_INLA BEFORE PRIVATE "$<1:/usr/include/eigen3>")
 
-
-target_link_libraries(call_INLA -Wl,--start-group ${libmkl_gf_lp64} ${libmkl_gnu_thread} ${libmkl_core} -Wl,--end-group)
+#  -Wl,--end-group ${CMAKE_DL_LIBS}
+target_link_libraries(call_INLA ${libmkl_gf_lp64} ${libmkl_gnu_thread} ${libmkl_core})
 
 # PARDISO
 target_link_libraries(call_INLA ${PARDISO_LIB})
