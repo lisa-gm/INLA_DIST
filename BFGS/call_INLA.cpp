@@ -16,7 +16,7 @@
 
 #include <armadillo>
 
-#include "theta_function.cpp"
+#include "PostTheta.h"
 #include "../read_write_functions.cpp"
 
 
@@ -300,22 +300,6 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior);
     }
 
-    // convert between different theta parametrisations
-    double lgamE = theta_prior[1];
-    double lgamS = theta_prior[2];
-    double lgamT = theta_prior[3];
-    double sigU; double ranS; double ranT;
-    fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
-
-    std::cout << "model parametrisation.         lgamE : " << lgamE << ", lgamS :  " << lgamS << ", lgamT : " << lgamT << std::endl;
-    std::cout << "interpretable parametrisation. sigU  : " << sigU  << ", ranS  :  " << ranS  << ", ranT  : " << ranT  << std::endl;
-    
-    fun->convert_interpret2theta(sigU, ranS, ranT, lgamE, lgamS, lgamT);
-    std::cout << "model parametrisation. 2x.     lgamE : " << lgamE << ", lgamS :  " << lgamS << ", lgamT : " << lgamT << std::endl;
-
-
-    exit(1);
-
     double fx;
 
     //Vector grad_test(dim_th);
@@ -334,6 +318,9 @@ int main(int argc, char* argv[])
 
     std::cout << "\nf(x)                         : " << fx << std::endl;
 
+    int fct_count = fun->get_fct_count();
+    std::cout << "function counts thread zero  : " << fct_count << std::endl;
+
 
     Vector grad = fun->get_grad();
     std::cout << "grad                         : " << grad.transpose() << std::endl;
@@ -341,19 +328,30 @@ int main(int argc, char* argv[])
     std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
     std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;
 
-    #if 1
+    // convert between different theta parametrisations
+    double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
+    double sigU; double ranS; double ranT;
+    fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
+    std::cout << "est. mean interpret. param.  : " << theta[0] << " " << sigU << " " << ranS << " " << ranT << std::endl;
+    
+    double prior_sigU; double prior_ranS; double prior_ranT;
+    fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
+    std::cout << "org. mean interpret. param.  : " << theta_prior[0] << " " << prior_sigU << " " << prior_ranS << " " << prior_ranT << std::endl;
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
-    //theta_max = theta_prior;
-    theta_max = theta;
+    theta_max = theta_prior;
+    //theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
     MatrixXd cov = fun->get_Covariance(theta_max);
     std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
 
-    std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
-    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
+    /*std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
+    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;*/
+
+    #if 0
+
 
     Vector mu(n);
     fun->get_mu(theta_max, mu);

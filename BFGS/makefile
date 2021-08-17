@@ -16,6 +16,7 @@ MKLROOT?=$(shell echo $$MKLROOT)
 
 # -O0 -g -fsanitize=address -Wall 
 # -pg
+# call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
 call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
 	g++ call_INLA.cpp PostTheta.cpp PardisoSolver.cpp -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
 	-fopenmp \
@@ -63,23 +64,35 @@ call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
 		  -L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core \
 		  -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
 
+#CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm
+
+#LIBPARDISO=-L/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so
+#LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
+#LIBCHOLMOD=-lcholmod
+
+#LIBS=${LIBPARDISO} ${LIBMKL} ${LIBCHOLMOD}
+
+#INCEIGEN=-I/usr/include/eigen3
+#INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
+#INCCHOLMOD= -I/usr/include/suitesparse
+
 #SOURCES = PostTheta.cpp PardisoSolver.cpp #../read_write_functions.cpp 
-#HEADERS = PostTheta.h
+#HEADERS = PostTheta.h PardisoSolver.h
 #OBJ     = PostTheta.o PardisoSolver.o  #../read_write_functions.o
 
 #all: call_INLA
 
-#PardisoSolver.o : PardisoSolver.cpp
+#*.o : *.cpp
 #	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 #PostTheta.o: PostTheta.cpp #PostTheta.h
 #	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 #call_INLA: $(OBJ) call_INLA.cpp #$(HEADERS)
-#	$(CXX) $(CXXFLAGS) *.o call_INLA.cpp -o call_INLA
+#	$(CXX) $(CXXFLAGS) $? -o $@
 
-clean:
-	rm -f call_INLA
+#clean:
+#	rm -f call_INLA
 #	rm -f *.o
 
 

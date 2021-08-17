@@ -19,7 +19,7 @@
 #include <Eigen/CholmodSupport>
 #include <unsupported/Eigen/KroneckerProduct>
 
-//include "solver_cholmod.cpp"
+//#include "solver_cholmod.cpp"
 //#include "solver_pardiso.cpp"
 #include "PardisoSolver.h"
 
@@ -29,7 +29,6 @@ using namespace Eigen;
 
 // typedef Eigen::Matrix<double, Dynamic, Dynamic> Mat;
 typedef Eigen::SparseMatrix<double> SpMat;
-typedef Eigen::CholmodSimplicialLDLT  <SpMat > Solver;
 typedef Eigen::VectorXd Vector;
 
 
@@ -138,6 +137,8 @@ class PostTheta{
 	 * --> somehow introduce additional parallelism to compute f(theta), possible to do in parallel
 	 */
     double operator()(Vector& theta, Vector& grad);
+
+    int get_fct_count();
 
 	// ============================================================================================ //
 	// CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA

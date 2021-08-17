@@ -15,9 +15,6 @@
 //#define PRINT_PAR
 //#define PRINT_OMP
 
-using Eigen::VectorXd;
-using Eigen::MatrixXd;
-
 typedef Eigen::VectorXd Vector;
 typedef Eigen::SparseMatrix<double> SpMat;
 
