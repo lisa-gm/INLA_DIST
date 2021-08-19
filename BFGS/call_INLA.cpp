@@ -232,6 +232,7 @@ int main(int argc, char* argv[])
         n = ns + nb;
         //theta << 1, -1, 1;
         theta << 1, -2, 2;
+        theta_prior << 0, 0, 0;
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else {
@@ -268,13 +269,16 @@ int main(int argc, char* argv[])
     LBFGSParam<double> param;    
     // set convergence criteria
     // stop if norm of gradient smaller than :
-    param.epsilon = 1e-3;
+    // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
+    param.epsilon = 1e-1;
     // or if objective function has not decreased by more than  
+    // cant find epsilon_rel in documentation ...
     param.epsilon_rel = 1e-1;
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
     param.max_iterations = 30;
+    // TODO: stepsize too small? seems like it almost always accepts step first step.
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -318,8 +322,8 @@ int main(int argc, char* argv[])
 
     std::cout << "\nf(x)                         : " << fx << std::endl;
 
-    int fct_count = fun->get_fct_count();
-    std::cout << "function counts thread zero  : " << fct_count << std::endl;
+    /*int fct_count = fun->get_fct_count();
+    std::cout << "function counts thread zero  : " << fct_count << std::endl;*/
 
 
     Vector grad = fun->get_grad();
@@ -329,19 +333,24 @@ int main(int argc, char* argv[])
     std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;
 
     // convert between different theta parametrisations
-    double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
-    double sigU; double ranS; double ranT;
-    fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
-    std::cout << "est. mean interpret. param.  : " << theta[0] << " " << sigU << " " << ranS << " " << ranT << std::endl;
-    
-    double prior_sigU; double prior_ranS; double prior_ranT;
-    fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
-    std::cout << "org. mean interpret. param.  : " << theta_prior[0] << " " << prior_sigU << " " << prior_ranS << " " << prior_ranT << std::endl;
+    if(dim_th == 4){
+        double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
+        double sigU; double ranS; double ranT;
+        fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
+        std::cout << "est. mean interpret. param.  : " << theta[0] << " " << sigU << " " << ranS << " " << ranT << std::endl;
+        
+        double prior_sigU; double prior_ranS; double prior_ranT;
+        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
+        std::cout << "org. mean interpret. param.  : " << theta_prior[0] << " " << prior_sigU << " " << prior_ranS << " " << prior_ranT << std::endl;
+    }
+
+    #if 0
+
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
-    theta_max = theta_prior;
-    //theta_max = theta;
+    //theta_max = theta_prior;
+    theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
     MatrixXd cov = fun->get_Covariance(theta_max);
@@ -349,9 +358,6 @@ int main(int argc, char* argv[])
 
     /*std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
     std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;*/
-
-    #if 0
-
 
     Vector mu(n);
     fun->get_mu(theta_max, mu);

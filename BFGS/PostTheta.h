@@ -19,11 +19,11 @@
 #include <Eigen/CholmodSupport>
 #include <unsupported/Eigen/KroneckerProduct>
 
-//#include "solver_cholmod.cpp"
-//#include "solver_pardiso.cpp"
+//#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
 
 //#define PRINT_MSG
+//#define PRINT_TIMES
 
 using namespace Eigen;
 

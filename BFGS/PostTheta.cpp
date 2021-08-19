@@ -21,7 +21,11 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vec
 	dim_grad_loop      = 2*dim_th;
 
 	// one solver per thread, but not more than required
-	num_solvers        = std::min(threads_level1, dim_grad_loop);
+	//num_solvers        = std::min(threads_level1, dim_grad_loop);
+	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
+	// if num_solver < threads_level1 hess_eval will fail!
+	num_solvers        = threads_level1;
+
 	printf("num solvers     : %d\n", num_solvers);
 
 	solverQst          = new PardisoSolver[num_solvers];
@@ -32,7 +36,7 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vec
 }
 
 
-PostTheta::PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, Vector theta_prior){
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_) {
 
 	dim_th      = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
 	nu          = ns;
@@ -52,7 +56,11 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat
 	dim_grad_loop      = 2*dim_th;
 
 	// one solver per thread, but not more than required
-	num_solvers        = std::min(threads_level1, dim_grad_loop);
+	//num_solvers        = std::min(threads_level1, dim_grad_loop);
+	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
+	// if num_solver < threads_level1 hess_eval will fail!
+	num_solvers        = threads_level1;
+
 	printf("num solvers     : %d\n", num_solvers);
 
 	solverQst          = new PardisoSolver[num_solvers];
@@ -63,7 +71,7 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector _theta_prior) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(_theta_prior)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(theta_prior_)  {
 
 	dim_th      = 4;    	 	// 4 hyperparameters, precision for the observations, 3 for the spatial-temporal model
 	nu          = ns*nt;
@@ -83,7 +91,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	dim_grad_loop      = 2*dim_th;
 
 	// one solver per thread, but not more than required
-	num_solvers        = std::min(threads_level1, dim_grad_loop);
+	//num_solvers        = std::min(threads_level1, dim_grad_loop);
+	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
+	// if num_solver < threads_level1 hess_eval will fail!
+	num_solvers        = threads_level1;
+
 	printf("num solvers     : %d\n", num_solvers);
 
 	solverQst          = new PardisoSolver[num_solvers];
@@ -96,15 +108,45 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 /* operator() does exactly two things. 
 1) evaluate f(theta) 
 2) approx gradient of f(theta) */
+/*
+Restructure operator() : 
+
+call all eval_post_theta() evaluations from here. This way all 9 can run in parallel. then compute gradient from these values.
+
+
+*/
 double PostTheta::operator()(Vector& theta, Vector& grad){
 
+	double f_theta;
 	t_grad = grad;
 
-	// initialise min_f_theta, min_theta, store current minimum 
-	// Vector mu;
-	mu.setZero(n);
+	#ifdef PRINT_MSG
+		std::cout << "\nin eval gradient function." << std::endl;
+	#endif
 
-	double f_theta = eval_post_theta(theta, mu);
+	int dim_th = theta.size();
+
+	double eps = 0.005;
+	MatrixXd epsId_mat(dim_th, dim_th); 
+	epsId_mat = eps*epsId_mat.setIdentity();
+	//std::cout << "epsId_mat : " << epsId_mat << std::endl;
+
+	Vector f_forw(dim_th);
+	Vector f_backw(dim_th);
+
+	int threads = omp_get_max_threads();
+	double timespent_fct_eval = -omp_get_wtime();
+
+	// do all function evaluations in parallel if enough threads are available
+	#pragma omp parallel
+	#pragma omp single
+	{
+
+	// ===================================== compute f(theta) ===================================== //
+	#pragma omp task
+	{ 
+	mu.setZero(n);
+	f_theta = eval_post_theta(theta, mu);
 
 	// print all theta's who result in a new minimum value for f(theta)
 	if(f_theta < min_f_theta){
@@ -112,12 +154,60 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 		std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
 		//std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
 	}
+	} // end pragma omp task
 
-	double timespent_grad = -omp_get_wtime();
-	Vector mu_dummy(n);
-	eval_gradient(theta, f_theta, mu_dummy, grad);
-	// std::cout << "grad : " << grad.transpose() << std::endl;
-	timespent_grad += omp_get_wtime();
+	// ===================================== compute grad f(theta) ============================== //
+	for(int i=0; i<2*dim_th; i++){
+
+		if(i % 2 == 0){
+			#pragma omp task
+			{
+			int k = i/2;
+
+			#ifdef PRINT_MSG
+				std::cout << "forward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
+				std::cout << "i : " << i << " and k : " << k << std::endl;
+			#endif
+
+			Vector theta_forw(dim_th);
+			Vector mu_dummy(n);
+
+			theta_forw = theta + epsId_mat.col(k);
+			f_forw[k] = eval_post_theta(theta_forw, mu_dummy);
+			} // end pragma omp task
+
+		} else if (i% 2 == 1){
+			#pragma omp task
+			{				
+			int k = (i-1)/2;
+
+			#ifdef PRINT_MSG
+				std::cout << "backward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
+				std::cout << "i : " << i << " and k : " << k << std::endl;
+			#endif
+
+			Vector theta_backw(dim_th);
+			Vector mu_dummy(n);
+
+			theta_backw = theta - epsId_mat.col(k);
+			f_backw[k] = eval_post_theta(theta_backw, mu_dummy);
+			}
+		}
+
+	} // end for loop
+
+	} // end pragma omp single
+
+	timespent_fct_eval += omp_get_wtime();
+
+	#ifdef PRINT_TIMES
+		std::cout << "time spend for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
+	#endif 
+
+
+	// compute finite difference in each direction
+	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
+	// std::cout << "grad  : " << grad << std::endl;
 
 	#ifdef PRINT_MSG
 		std::cout << "time spent gradient call : " << timespent_grad << std::endl;
@@ -199,17 +289,22 @@ MatrixXd PostTheta::get_Covariance(Vector& theta){
 	double timespent_hess_eval = -omp_get_wtime();
 	hess = hess_eval(theta);
 
+
 	timespent_hess_eval += omp_get_wtime();
-	std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl; 
+
+	#ifdef PRINT_TIMES
+		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
+	#endif 
 
 	//std::cout << "hess : " << hess << std::endl; 
 
 	MatrixXd cov(dim_th,dim_th);
+	// pardiso call with identity as rhs & solve.
+	PardisoSolver* hessInv;
+	hessInv = new PardisoSolver;
+	hessInv->compute_inverse_pardiso(hess, cov); 
 
-	std::cout << "cholmod excluded for now! " << std::endl;
-	//compute_inverse_cholmod(hess, cov);
-
-	//std::cout << "cov_new : " << cov << std::endl; 
+	//std::cout << "cov  : \n" << cov << std::endl; 
 
 	return cov;
 }
@@ -227,7 +322,10 @@ void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 	int tid = omp_get_thread_num();
 	solverQ[tid].selected_inversion(Q, vars);
-	timespent_sel_inv_pardiso += omp_get_wtime();	
+
+	#ifdef PRINT_TIMES
+		timespent_sel_inv_pardiso += omp_get_wtime();
+	#endif	
 
 	std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
 }
@@ -330,6 +428,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 
     }
 
+    // potentially use task dependencies
     #pragma omp taskwait
 
     for(int k = 0; k < loop_dim; k++){          
@@ -351,10 +450,13 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
     } // end omp
 
     time_omp_task_hess += omp_get_wtime();
-    #ifdef PRINT_MSG
-    	std::cout << "time omp task = " << time_omp_task_hess << std::endl;
+    #ifdef PRINT_TIMES
+    	std::cout << "time hess = " << time_omp_task_hess << std::endl;
     	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
     #endif
+
+    std::cout << "time omp task = " << time_omp_task_hess << std::endl;
+
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
 	//std::cout << "hessian       : \n" << hess << std::endl;
@@ -713,70 +815,6 @@ void PostTheta::eval_denominator(Vector& theta, double& log_det, double& val, Sp
 
 	std::cout << "log det d : " << log_det << std::endl;
 	std::cout << "val d     : " << val << std::endl; */
-}
-
-// ============================================================================================ //
-// FINITE DIFFERENCE GRADIENT EVALUATION
-
-
-void PostTheta::eval_gradient(Vector& theta, double f_theta, Vector& mu, Vector& grad){
-
-	#ifdef PRINT_MSG
-		std::cout << "\nin eval gradient function." << std::endl;
-	#endif
-
-	int dim_th = theta.size();
-
-	double eps = 0.005;
-	MatrixXd epsId_mat(dim_th, dim_th); 
-	epsId_mat = eps*epsId_mat.setIdentity();
-	//std::cout << "epsId_mat : " << epsId_mat << std::endl;
-
-	Vector f_forw(dim_th);
-	Vector f_backw(dim_th);
-
-	int threads = omp_get_max_threads();
-
-	// naively parallelise using OpenMP, more later
-	#pragma omp parallel for
-	for(int i=0; i<2*dim_th; i++){
-
-			if(i % 2 == 0){
-				int k = i/2;
-
-				#ifdef PRINT_MSG
-					std::cout << "forward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
-					std::cout << "i : " << i << " and k : " << k << std::endl;
-				#endif
-
-				// temp vector
-				Vector theta_forw(dim_th);
-				Vector mu_dummy(n);
-
-				theta_forw = theta + epsId_mat.col(k);
-				f_forw[k] = eval_post_theta(theta_forw, mu_dummy);
-
-			} else {
-				int k = (i-1)/2;
-
-				#ifdef PRINT_MSG
-					std::cout << "backward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
-					std::cout << "i : " << i << " and k : " << k << std::endl;
-				#endif
-
-				// temp vector
-				Vector theta_backw(dim_th);
-				Vector mu_dummy(n);
-
-				theta_backw = theta - epsId_mat.col(k);
-				f_backw[k] = eval_post_theta(theta_backw, mu_dummy);
-			}
-	}
-
-	// compute finite difference in each direction
-	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
-	// std::cout << "grad  : " << grad << std::endl;
-
 }
 
 

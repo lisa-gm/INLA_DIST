@@ -20,6 +20,7 @@ typedef Eigen::SparseMatrix<double> SpMat;
 
 using namespace Eigen;
 
+
 /* PARDISO prototype. */
 extern "C" void pardisoinit (void   *, int    *,   int *, int *, double *, int *);
 extern "C" void pardiso     (void   *, int    *,   int *, int *,    int *, int *, 
@@ -29,6 +30,7 @@ extern "C" void pardiso_chkmatrix  (int *, int *, double *, int *, int *, int *)
 extern "C" void pardiso_chkvec     (int *, int *, double *, int *);
 extern "C" void pardiso_printstats (int *, int *, double *, int *, int *, int *,
                             double *, int *);
+
 
  /**
  * @brief creates solver class using pardiso for factorising, solving and selectively inverting linear system.
@@ -115,6 +117,14 @@ public:
      * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
      */
     void selected_inversion(SpMat& Q, Vector& inv_diag);
+
+    /**
+     * @brief inversion of the entire matrix (only meant for small matrices) by means of using identity 
+     * right-hand side.
+     * @param[in]       H dense matrix. 
+     * @param[inout]    C inverse of H.
+     */
+    void compute_inverse_pardiso(MatrixXd& H, MatrixXd& C);
 
 
      /**

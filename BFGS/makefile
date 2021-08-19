@@ -17,8 +17,8 @@ MKLROOT?=$(shell echo $$MKLROOT)
 # -O0 -g -fsanitize=address -Wall 
 # -pg
 # call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
-call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
-	g++ call_INLA.cpp PostTheta.cpp PardisoSolver.cpp -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
+#call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
+#	g++ call_INLA.cpp PostTheta.cpp PardisoSolver.cpp -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
 	-fopenmp \
 	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L/opt/intel/oneapi/mkl/latest/lib/intel64 -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
 
@@ -55,44 +55,33 @@ call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
 
 #############################################################################################################
 
-#CXX=g++
-#CXXFLAGS=-I/usr/include/eigen3 -lm \
-		 -I/home/x_gaedkelb/applications/LBFGSpp/include \
-		 -I/usr/include/suitesparse -lcholmod -lm \
-		 -fopenmp \
-		  /home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so \
-		  -L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core \
-		  -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
+CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm
 
-#CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm
+# LIBRARIES
+LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
+LIBCHOLMOD=-lcholmod
 
-#LIBPARDISO=-L/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so
-#LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
-#LIBCHOLMOD=-lcholmod
+LIBS=$(LIBPARDISO) $(LIBMKL) $(LIBCHOLMOD)
 
-#LIBS=${LIBPARDISO} ${LIBMKL} ${LIBCHOLMOD}
+# INCLUDES
+INCEIGEN=-I/usr/include/eigen3
+INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
+INCCHOLMOD= -I/usr/include/suitesparse
 
-#INCEIGEN=-I/usr/include/eigen3
-#INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
-#INCCHOLMOD= -I/usr/include/suitesparse
+INCLUDES=$(INCEIGEN) $(INCBFGS) $(INCCHOLMOD)
 
-#SOURCES = PostTheta.cpp PardisoSolver.cpp #../read_write_functions.cpp 
-#HEADERS = PostTheta.h PardisoSolver.h
-#OBJ     = PostTheta.o PardisoSolver.o  #../read_write_functions.o
+all: call_INLA
 
-#all: call_INLA
+call_INLA: call_INLA.cpp PostTheta.o PardisoSolver.o #solver_cholmod.o 
+	$(CXX) $^ -o $@  $(INCLUDES) $(LIBS) $(CXXFLAGS) 
 
-#*.o : *.cpp
-#	$(CXX) $(CXXFLAGS) -c $< -o $@
+%.o : %.cpp %.h
+	$(CXX) $(LIBS) -c $< -o $@ $(INCLUDES) $(CXXFLAGS)
 
-#PostTheta.o: PostTheta.cpp #PostTheta.h
-#	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-#call_INLA: $(OBJ) call_INLA.cpp #$(HEADERS)
-#	$(CXX) $(CXXFLAGS) $? -o $@
-
-#clean:
-#	rm -f call_INLA
-#	rm -f *.o
+clean:
+	rm -f call_INLA
+	rm -f *.o
 
 
