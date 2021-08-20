@@ -367,46 +367,57 @@ int main(int argc, char* argv[])
 
 
     // ================================ initialise SOLVER ======================================= //
-	Solver* solver;
+	int threads_level1 = omp_get_max_threads();
+	cout << "number of available threads = " << threads_level1 << endl;
 
-	int threads = omp_get_max_threads();
-	cout << "number of available threads = " << threads << endl;
+	auto solverQ = new Solver*[threads_level1];
 
 	if(solver_type == "PARDISO"){
-		solver = new PardisoSolver;
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i] = new PardisoSolver();
+		}
 	} else if(solver_type == "RGF"){
-		solver = new RGFSolver(ns);
-	} else {
-		cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << endl;
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i] = new RGFSolver();
+		}
+	} 
+
+	#pragma omp parallel for
+    for(int i=0; i<threads_level1; i++){
+
+	    // ============================= construct Q & initialise =============================== //
+
+		double log_det;
+
+		SpMat Q(n,n);
+	    construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, AxTAx, Q);
+	    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+
+	    Vector rhs(n);
+	    construct_b(theta, Ax, y, &rhs);
+	    //std::cout << "b : \n" << rhs.head(10) << std::endl;
+
+	    Vector sol(n);
+	    Vector inv_diag(n);
+
+	    // to have different Q matrices
+        SpMat IdMat(n,n); IdMat.setIdentity();
+        Q = Q + i*IdMat;
+
+        std::cout << "call solver functions." << std::endl;
+
+    	// ============================= call SOLVER =============================== //
+
+		solverQ[i]->factorize(Q, log_det);
+		std::cout << "log det : " << log_det << std::endl;
+
+		solverQ[i]->factorize_solve(Q, rhs, sol, log_det);
+	   	std::cout << "log det : " << log_det << std::endl;
+
+	   	solverQ[i]->selected_inversion(Q, inv_diag);
+	    std::cout << "inv diag : " << inv_diag.head(10).transpose() << std::endl;
 	}
 
-    // ============================= construct Q & initialise =============================== //
-
-	double log_det;
-
-	SpMat Q(n,n);
-    construct_Q(ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, AxTAx, Q);
-    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-
-    Vector rhs(n);
-    construct_b(theta, Ax, y, &rhs);
-    //std::cout << "b : \n" << rhs.head(10) << std::endl;
-
-    Vector sol(n);
-    Vector inv_diag(n);
-
-    // ============================= call SOLVER =============================== //
-
-	solver->factorize(Q, log_det);
-	std::cout << "log det : " << log_det << std::endl;
-
-	solver->factorize_solve(Q, rhs, sol, log_det);
-   	std::cout << "log det : " << log_det << std::endl;
-
-   	solver->selected_inversion(Q, inv_diag);
-    std::cout << "inv diag : " << inv_diag.head(10).transpose() << std::endl;
-
-
-
+	delete[] solverQ;
 
 } // end main
