@@ -1,6 +1,6 @@
 #include "PostTheta.h"
 
-PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior){
+PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type){
 	
 	dim_th = 1;  			// only hyperparameter is the precision of the observations
 	ns     = 0;
@@ -28,15 +28,27 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vec
 
 	printf("num solvers     : %d\n", num_solvers);
 
-	solverQst          = new PardisoSolver[num_solvers];
-	solverQ            = new PardisoSolver[num_solvers];
+	solverQ   = new Solver*[threads_level1];
+	solverQst = new Solver*[threads_level1];
+
+	if(solver_type == "PARDISO"){
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i]   = new PardisoSolver();
+			solverQst[i] = new PardisoSolver();
+		}
+	} else if(solver_type == "RGF"){
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i]   = new RGFSolver();
+			solverQst[i] = new RGFSolver();
+		}
+	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_), solver_type(solver_type_) {
 
 	dim_th      = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
 	nu          = ns;
@@ -63,15 +75,27 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 
 	printf("num solvers     : %d\n", num_solvers);
 
-	solverQst          = new PardisoSolver[num_solvers];
-	solverQ            = new PardisoSolver[num_solvers];
+	solverQ   = new Solver*[threads_level1];
+	solverQst = new Solver*[threads_level1];
+
+	if(solver_type == "PARDISO"){
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i]   = new PardisoSolver();
+			solverQst[i] = new PardisoSolver();
+		}
+	} else if(solver_type == "RGF"){
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i]   = new RGFSolver();
+			solverQst[i] = new RGFSolver();
+		}
+	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(theta_prior_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(theta_prior_), solver_type(solver_type_)  {
 
 	dim_th      = 4;    	 	// 4 hyperparameters, precision for the observations, 3 for the spatial-temporal model
 	nu          = ns*nt;
@@ -98,8 +122,20 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 
 	printf("num solvers     : %d\n", num_solvers);
 
-	solverQst          = new PardisoSolver[num_solvers];
-	solverQ            = new PardisoSolver[num_solvers];
+	solverQ   = new Solver*[threads_level1];
+	solverQst = new Solver*[threads_level1];
+
+	if(solver_type == "PARDISO"){
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i]   = new PardisoSolver();
+			solverQst[i] = new PardisoSolver();
+		}
+	} else if(solver_type == "RGF"){
+		for(int i = 0; i < threads_level1; i++){
+			solverQ[i]   = new RGFSolver();
+			solverQst[i] = new RGFSolver();
+		}
+	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
@@ -209,7 +245,7 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
 	// std::cout << "grad  : " << grad << std::endl;
 
-	#ifdef PRINT_MSG
+	#ifdef PRINT_TIMES
 		std::cout << "time spent gradient call : " << timespent_grad << std::endl;
 	#endif
 	
@@ -321,7 +357,7 @@ void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 	int tid = omp_get_thread_num();
-	solverQ[tid].selected_inversion(Q, vars);
+	solverQ[tid]->selected_inversion(Q, vars);
 
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
@@ -602,7 +638,7 @@ void PostTheta::eval_log_det_Qu(Vector& theta, double &log_det){
 	}
 
 	int tid = omp_get_thread_num();
-	solverQst[tid].factorize(Qu, log_det);
+	solverQst[tid]->factorize(Qu, log_det);
 
 	#ifdef PRINT_MSG
 		std::cout << "log det Qu : " << log_det << std::endl;
@@ -796,7 +832,7 @@ void PostTheta::eval_denominator(Vector& theta, double& log_det, double& val, Sp
 	//solve_cholmod(Q, rhs, mu, log_det);
 
 	int tid = omp_get_thread_num();
-	solverQ[tid].factorize_solve(Q, rhs, mu, log_det);
+	solverQ[tid]->factorize_solve(Q, rhs, mu, log_det);
 
 	log_det = 0.5 * (log_det);
 	

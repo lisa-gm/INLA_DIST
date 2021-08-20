@@ -12,6 +12,8 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
+#include "Solver.h"
+
 //#define PRINT_PAR
 //#define PRINT_OMP
 
@@ -37,7 +39,7 @@ extern "C" void pardiso_printstats (int *, int *, double *, int *, int *, int *,
  * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
  * and selected inversion (of the diagonal elements)
  */
-class PardisoSolver{
+class PardisoSolver : public Solver{
 
 private:
 

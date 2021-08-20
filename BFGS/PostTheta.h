@@ -21,11 +21,13 @@
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
+#include "RGFSolver.h"
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
 
 using namespace Eigen;
+using namespace std;
 
 // typedef Eigen::Matrix<double, Dynamic, Dynamic> Mat;
 typedef Eigen::SparseMatrix<double> SpMat;
@@ -51,8 +53,13 @@ class PostTheta{
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
-	PardisoSolver* solverQ;   /**<  list of Pardiso solvers, for denom.		*/
-	PardisoSolver* solverQst; /**<  list of Pardiso solvers, for Qu         */
+	Solver** solverQ;
+	Solver** solverQst;
+
+	string solver_type;
+
+	//PardisoSolver* solverQ;   /**<  list of Pardiso solvers, for denom.		*/
+	//PardisoSolver* solverQst; /**<  list of Pardiso solvers, for Qu         */
 
 	int fct_count;      /**< count total number of function evaluations 	*/
 
@@ -95,7 +102,7 @@ class PostTheta{
      * @param[in] y_  vector with observations.
      * \note B = B_ or is its own copy?
      */	
-	PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior);
+	PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type);
 	/**
      * @brief constructor for spatial model (order 2).
      * @param[in] ns_ number of spatial grid points per time step.
@@ -108,7 +115,7 @@ class PostTheta{
      * @param[in] g1_ stiffness matrix.
      * @param[in] g2_ defined as : g1 * c0^-1 * g1
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, Vector theta_prior);
+	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, Vector theta_prior, string solver_type);
 
 	/**
      * @brief constructor for spatial temporal model.
@@ -127,7 +134,7 @@ class PostTheta{
      * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
      * @param[in] M2_ stiffness matrix time.
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vector theta_prior); 
+	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vector theta_prior, string solver_type); 
 
 	/**
      * @brief structure required by BFGS solver, requires : theta, gradient theta

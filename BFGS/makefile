@@ -73,7 +73,7 @@ INCLUDES=$(INCEIGEN) $(INCBFGS) $(INCCHOLMOD)
 
 all: call_INLA
 
-call_INLA: call_INLA.cpp PostTheta.o PardisoSolver.o #solver_cholmod.o 
+call_INLA: call_INLA.cpp PostTheta.o PardisoSolver.o RGFSolver.o #solver_cholmod.o 
 	$(CXX) $^ -o $@  $(INCLUDES) $(LIBS) $(CXXFLAGS) 
 
 %.o : %.cpp %.h

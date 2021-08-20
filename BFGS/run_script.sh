@@ -15,12 +15,19 @@
 #nb=2
 #no=188242
 
+#ns=42
 ns=436
-#nt=16
-nt=52
+#nt=0
+nt=16
+#nt=52
 nb=2
-#no=4057
-no=12873
+#no=11646
+no=4057
+#no=12873
+
+#solver_type=$1
+solver_type=PARDISO
+
 
 	
 export PARDISOLICMESSAGE=1
@@ -33,9 +40,9 @@ export OMP_NESTED=TRUE
 
 # nested parallelism : 
 # 1st number : 8 because dim(theta)=4, forward & backward difference in gradient
-l1t=8
+l1t=9
 # 2nd number : Pardiso will be run with this many threads for each linear system
-l2t=8
+l2t=9
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 
 # significant increase in performance for pardiso until 16 threads, 32 only slightly faster
 export OMP_NUM_THREADS="${l1t},${l2t}"
@@ -45,7 +52,7 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 #echo "OMP_NUM_THREADS = ${omp_threads}"
 
 folder_path=/home/x_gaedkelb/b_INLA/data/temperature/ns${ns}_nt${nt}
-#folder_path=/home/x_gaedkelb/b_INLA/data/synthetic/ns${ns}_nt${nt}
+#folder_path=/home/x_gaedkelb/b_INLA/data/synthetic/ns${ns} #_nt${nt}
 
-echo "./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path}" 
-./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path}
+echo "./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
+./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
