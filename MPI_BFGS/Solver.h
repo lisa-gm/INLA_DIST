@@ -12,6 +12,8 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
+#include "mpi.h"
+
 typedef Eigen::VectorXd Vector;
 typedef Eigen::SparseMatrix<double> SpMat;
 

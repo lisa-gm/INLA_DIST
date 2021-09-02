@@ -55,7 +55,7 @@ MKLROOT?=$(shell echo $$MKLROOT)
 
 #############################################################################################################
 
-CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm
+CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
 LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)

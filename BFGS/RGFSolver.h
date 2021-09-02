@@ -21,6 +21,8 @@ class RGFSolver: public Solver {
 
       	void selected_inversion(SpMat& Q, Vector& inv_diag);
 
+      	// will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)
+
       	//~RGFSolver();
 
     private: 

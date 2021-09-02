@@ -60,8 +60,8 @@ class Model{
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
-	Solver** solverQ;
-	Solver** solverQst;
+	Solver* solverQ;
+	Solver* solverQst;
 
 	string solver_type;
 

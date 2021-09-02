@@ -62,6 +62,7 @@ class PostTheta{
 	//PardisoSolver* solverQst; /**<  list of Pardiso solvers, for Qu         */
 
 	int fct_count;      /**< count total number of function evaluations 	*/
+	int iter_count;		/**< count total number of operator() call        	*/
 
     VectorXd y; 		/**<  vector of observations y. has length no. 		*/
     Vector theta_prior; /**<  vector with prior values. Constructs normal

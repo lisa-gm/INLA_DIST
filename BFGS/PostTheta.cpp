@@ -1,5 +1,8 @@
 #include "PostTheta.h"
 
+//#include <likwid-marker.h>
+
+
 PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type){
 	
 	dim_th = 1;  			// only hyperparameter is the precision of the observations
@@ -45,6 +48,7 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vec
 
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
+	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 }
 
 
@@ -92,6 +96,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
+	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+
 }
 
 
@@ -139,6 +145,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
+	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 }
 
 /* operator() does exactly two things. 
@@ -153,12 +160,19 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 */
 double PostTheta::operator()(Vector& theta, Vector& grad){
 
-	double f_theta;
-	t_grad = grad;
 
 	#ifdef PRINT_MSG
-		std::cout << "\nin eval gradient function." << std::endl;
+		std::cout << "\niteration : " << iter_count << std::endl;
 	#endif
+
+	#ifdef PRINT_TIMES
+		std::cout << "\niteration : " << iter_count << std::endl;
+	#endif
+
+	iter_count += 1; 
+
+	double f_theta;
+	t_grad = grad;
 
 	int dim_th = theta.size();
 
@@ -171,6 +185,7 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	Vector f_backw(dim_th);
 
 	int threads = omp_get_max_threads();
+	double timespent_f_theta_eval;
 	double timespent_fct_eval = -omp_get_wtime();
 
 	// do all function evaluations in parallel if enough threads are available
@@ -182,8 +197,16 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	#pragma omp task
 	{ 
 	mu.setZero(n);
-	f_theta = eval_post_theta(theta, mu);
+	timespent_f_theta_eval = -omp_get_wtime();
 
+
+	//LIKWID_MARKER_START("fThetaComputation");
+	f_theta = eval_post_theta(theta, mu);
+	//LIKWID_MARKER_STOP("fThetaComputation");
+	
+
+	timespent_f_theta_eval += omp_get_wtime();
+	
 	// print all theta's who result in a new minimum value for f(theta)
 	if(f_theta < min_f_theta){
 		min_f_theta = f_theta;
@@ -237,17 +260,13 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	timespent_fct_eval += omp_get_wtime();
 
 	#ifdef PRINT_TIMES
-		std::cout << "time spend for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
+		std::cout << "time spent evaluation f(theta) : " << timespent_f_theta_eval << std::endl;
+		std::cout << "time spent for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
 	#endif 
-
 
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
-	// std::cout << "grad  : " << grad << std::endl;
-
-	#ifdef PRINT_TIMES
-		std::cout << "time spent gradient call : " << timespent_grad << std::endl;
-	#endif
+	//std::cout << "grad  : " << grad.transpose() << std::endl;
 	
 	return f_theta;
 }
@@ -491,8 +510,9 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
     	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
     #endif
 
-    std::cout << "time omp task = " << time_omp_task_hess << std::endl;
-
+    #ifdef PRINT_TIMES
+    	std::cout << "time omp task hessian = " << time_omp_task_hess << std::endl;
+    #endif
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
 	//std::cout << "hessian       : \n" << hess << std::endl;
@@ -504,7 +524,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 }
 
 
- void PostTheta::check_pos_def(MatrixXd &hess){
+void PostTheta::check_pos_def(MatrixXd &hess){
 
 	// compute Eigenvalues of symmetric matrix
 	SelfAdjointEigenSolver<MatrixXd> es(hess);
@@ -526,8 +546,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 }
 
 // ============================================================================================ //
-// ALL FOLLOWING FUNCTIONS CONTRIBUT TO THE EVALUATION OF F(THETA) & GRADIENT
-
+// ALL FOLLOWING FUNCTIONS CONTRIBUTE TO THE EVALUATION OF F(THETA) & GRADIENT
 
 double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 

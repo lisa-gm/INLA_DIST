@@ -19,6 +19,13 @@
 #include "PostTheta.h"
 #include "../read_write_functions.cpp"
 
+//#include "PardisoSolver.h"
+//#include "RGFSolver.h"
+#include <unsupported/Eigen/KroneckerProduct>
+
+//#include <likwid-marker.h>
+
+
 
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
@@ -28,6 +35,7 @@ typedef Eigen::VectorXd Vector;
 
 using namespace LBFGSpp;
 
+/* ===================================================================== */
 
 int main(int argc, char* argv[])
 {
@@ -62,7 +70,7 @@ int main(int argc, char* argv[])
     
     #endif
 
-    if(argc != 1 + 5){
+    if(argc != 1 + 6){
         std::cout << "wrong number of input parameters. " << std::endl;
 
         std::cerr << "INLA Call : ns nt nb no path/to/files" << std::endl;
@@ -96,12 +104,19 @@ int main(int argc, char* argv[])
     std::string no_s = std::to_string(no); 
     std::string n_s  = std::to_string(ns*nt + nb);
 
-    std::string base_path = argv[5];
+    std::string base_path = argv[5];    
 
-    // dimension hyperparamter initialised to 1
-    int dim_th = 1;
+    std::string solver_type = argv[6];
+    // check if solver type is neither PARDISO nor RGF :
+    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("RGF") != 0){
+        std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
+        exit(1);
+    }
 
     /* ---------------- read in matrices ---------------- */
+
+    // dimension hyperparamter vector
+    int dim_th;
 
     // spatial component
     SpMat c0; 
@@ -120,6 +135,9 @@ int main(int argc, char* argv[])
     Vector y;
 
     if(ns == 0 && nt == 0){
+
+        dim_th = 1;
+
         // read in design matrix 
         // files containing B
         std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
@@ -254,12 +272,7 @@ int main(int argc, char* argv[])
         std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         theta << -0.2, -2, -2, 3;
         std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-
-
     }
-
-
-    //exit(1);
 
     Vector b(nb);
 
@@ -294,15 +307,16 @@ int main(int argc, char* argv[])
 
     if(ns == 0){
         // fun.emplace(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior);
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior, solver_type);
     } else if(ns > 0 && nt == 1) {
         std::cout << "\ncall spatial constructor." << std::endl;
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior, solver_type);
     } else {
         std::cout << "\ncall spatial-temporal constructor." << std::endl;
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
     }
+
 
     double fx;
 
@@ -312,19 +326,26 @@ int main(int argc, char* argv[])
 
     std::cout << "\nCall BFGS solver now. " << std::endl;
 
+    //LIKWID_MARKER_INIT;
+    //LIKWID_MARKER_THREADINIT;
+
     double time_bfgs = -omp_get_wtime();
     int niter = solver.minimize(*fun, theta, fx);
+
+    //LIKWID_MARKER_CLOSE;
 
     time_bfgs += omp_get_wtime();
 
     std::cout << niter << " iterations" << std::endl;
     std::cout << "BFGS solver time             : " << time_bfgs << " sec" << std::endl;
 
+    #if 0
+
+
     std::cout << "\nf(x)                         : " << fx << std::endl;
 
     /*int fct_count = fun->get_fct_count();
     std::cout << "function counts thread zero  : " << fct_count << std::endl;*/
-
 
     Vector grad = fun->get_grad();
     std::cout << "grad                         : " << grad.transpose() << std::endl;
@@ -344,9 +365,6 @@ int main(int argc, char* argv[])
         std::cout << "org. mean interpret. param.  : " << theta_prior[0] << " " << prior_sigU << " " << prior_ranS << " " << prior_ranT << std::endl;
     }
 
-    #if 0
-
-
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -359,6 +377,12 @@ int main(int argc, char* argv[])
     /*std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
     std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;*/
 
+    #endif
+
+
+
+    #if 0
+
     Vector mu(n);
     fun->get_mu(theta_max, mu);
     std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
@@ -367,11 +391,9 @@ int main(int argc, char* argv[])
     Vector marg(n);
     fun->get_marginals_f(theta_max, marg);
     std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
-
     #endif
 
     delete fun;
-
     return 0;
     
 }

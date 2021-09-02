@@ -1,110 +1,8 @@
 #include "PostTheta.h"
 
-
-PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type){
-	
-	dim_th = 1;  			// only hyperparameter is the precision of the observations
-	ns     = 0;
-	n      = nb;
-	yTy    = y.dot(y);
-
-	#ifdef PRINT_MSG
-		printf("yTy : %f\n", yTy);
-	#endif
-
-	min_f_theta        = 1e10;			// initialise min_f_theta, min_theta
-
-	// set up PardisoSolver class in constructor 
-	// to be independent of BFGS loop
-	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
-
-	dim_grad_loop      = 2*dim_th;
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	printf("num solvers     : %d\n", num_solvers);
-
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
-	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
-	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
-		}
-	} 
-
-	// set global counter to count function evaluations
-	fct_count          = 0;	// initialise min_f_theta, min_theta
-	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
-}
-
-
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_), solver_type(solver_type_) {
-
-	dim_th      = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
-	nu          = ns;
-	n           = nb + ns;
-	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
-	yTy         = y.dot(y);
-
-	#ifdef PRINT_MSG
-		printf("yTy : %f\n", yTy);
-	#endif
-
-	// set up PardisoSolver class in constructor 
-	// to be independent of BFGS loop
-	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
-
-	dim_grad_loop      = 2*dim_th;
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	printf("num solvers     : %d\n", num_solvers);
-
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
-	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
-	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
-		}
-	} 
-
-	// set global counter to count function evaluations
-	fct_count          = 0;
-	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
-
-}
-
-
 PostTheta::PostTheta(int dim_th_) : dim_th(dim_th_)  {
 
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
-
-	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
 
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval		   = 2*dim_th + 1;
@@ -112,9 +10,6 @@ PostTheta::PostTheta(int dim_th_) : dim_th(dim_th_)  {
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
-
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
 
 }
 
@@ -130,7 +25,6 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 */
 double PostTheta::operator()(Vector& theta, Vector& grad){
 
-
 	#ifdef PRINT_MSG
 		std::cout << "\niteration : " << iter_count << std::endl;
 	#endif
@@ -141,10 +35,7 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 
 	iter_count += 1; 
 
-	double f_theta;
 	t_grad = grad;
-
-	int dim_th = theta.size();
 
 	double eps = 0.005;
 	MatrixXd epsId_mat(dim_th, dim_th); 
@@ -158,6 +49,10 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	double timespent_f_theta_eval;
 	double timespent_fct_eval = -omp_get_wtime();*/
 
+	//Vector theta_forw_loc[dim_th];
+
+	// make send Isend -> update wait, careful with theta_loc, theta_loc_array -> make them individual
+	// 
 	// MPI_send to evaluate f(theta, mu) -> this always goes to rank 1 !!
 	theta_array = theta.data();
 	MPI_Send(theta_array, dim_th, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
@@ -179,30 +74,31 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	}
 
 	// TODO: Irecv doesn't receive the right result. Why??
-	/*MPI_Status statuses[1];
-	MPI_Request requests[1];
-	int num_requests = 0;*/
-	// MPI_Irecv f_theta, deal with mu later. potentially get it from model
-	/*MPI_Irecv(&f_theta, 1, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, requests+num_requests);
-	num_requests++
-	MPI_Waitall(num_requests, requests, statuses);*/
-	MPI_Recv(&f_theta, 1, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+	MPI_Status statuses[no_f_eval];
+	MPI_Request requests[no_f_eval];
+	int num_requests = 0;
 
-	#ifdef PRINT_MSG
-		std::cout << "PostTheta received f_theta = " << f_theta << " from model." << std::endl;
-	#endif
+	// MPI_Irecv f_theta, deal with mu later. potentially get it from model
+	MPI_Irecv(&f_theta, 1, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, requests+num_requests);
+	num_requests++;
 
 	// MPI_Irecv f_theta_forw
 	for(int i=0; i<dim_th; i++){
-		MPI_Recv(&f_forw[i], 1, MPI_DOUBLE, i+2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		//std::cout << "f forw[" << i << "] = " << f_forw[i] << std::endl; 
+		MPI_Irecv(&f_forw[i], 1, MPI_DOUBLE, i+2, 0, MPI_COMM_WORLD, requests+num_requests);
+		num_requests++;
 	}
 
 	// MPI_Irecv f_theta_back
 	for(int i=0; i<dim_th; i++){
-		MPI_Recv(&f_backw[i], 1, MPI_DOUBLE, i+dim_th+2, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-		//std::cout << "f backw[" << i << "] = " << f_backw[i] << std::endl; 
+		MPI_Irecv(&f_backw[i], 1, MPI_DOUBLE, i+dim_th+2, 0, MPI_COMM_WORLD, requests+num_requests);
+		num_requests++;
 	}
+
+	MPI_Waitall(num_requests, requests, statuses);
+
+	#ifdef PRINT_MSG
+		std::cout << "PostTheta received f_theta = " << f_theta << " from model." << std::endl;
+	#endif
 
 	// print all theta's who result in a new minimum value for f(theta)
 	if(f_theta < min_f_theta){
@@ -213,11 +109,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
-	
-	#ifdef PRINT_MSG
-		std::cout << "grad  : " << grad.transpose() << std::endl;
-	#endif
-	
+	//std::cout << "grad  : " << grad.transpose() << std::endl;
+
 	return f_theta;
 }
 
@@ -499,8 +392,8 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 
 PostTheta::~PostTheta(){
 
-		delete[] solverQst;
-		delete[] solverQ;		
+		//delete[] solverQst;
+		//delete[] solverQ;		
 }
 
 

@@ -59,9 +59,6 @@ class PostTheta{
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
-	Solver** solverQst;
-	Solver** solverQ;
-
 	string solver_type;
 
 	//PardisoSolver* solverQ;   /**<  list of Pardiso solvers, for denom.		*/
@@ -97,54 +94,21 @@ class PostTheta{
     Vector mu;			/**< conditional mean */
     Vector t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
+	double f_theta;
+
 
     double* theta_array;
     int no_f_eval;
 
 	public:
-	 /**
-     * @brief constructor for regression model (no random effects). 
-     * @param[in] ns_ number of spatial grid points per time step.
-     * @param[in] nt_ number of temporal time steps.
-     * @param[in] nb_ number of fixed effects.
-     * @param[in] no_ number of observations.
-     * @param[in] B_  covariate matrix.
-     * @param[in] y_  vector with observations.
-     * \note B = B_ or is its own copy?
-     */	
-	PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type);
 	/**
-     * @brief constructor for spatial model (order 2).
-     * @param[in] ns_ number of spatial grid points per time step.
-     * @param[in] nt_ number of temporal time steps.
-     * @param[in] nb_ number of fixed effects.
-     * @param[in] no_ number of observations.
-     * @param[in] Ax_  covariate matrix.
-     * @param[in] y_  vector with observations.
-     * @param[in] c0_ diagonalised mass matrix.
-     * @param[in] g1_ stiffness matrix.
-     * @param[in] g2_ defined as : g1 * c0^-1 * g1
+     * @brief constructor for PostTheta class using MPI.
+     * @description determines the gradient and function value at theta using a central finite difference approximation.
+     * Individual function evaluations are sent via MPI_Send/Recv to workers (MPI processes with rank > 0), where the models
+     * are constructed individually using the appropriate theta. 
+     * @param[in] dim_th_ dimension of hyperparameter vector theta.
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, Vector theta_prior, string solver_type);
-
-	/**
-     * @brief constructor for spatial temporal model.
-     * @brief constructor for spatial model (order 2).
-     * @param[in] ns_ number of spatial grid points per time step.
-     * @param[in] nt_ number of temporal time steps.
-     * @param[in] nb_ number of fixed effects.
-     * @param[in] no_ number of observations.
-     * @param[in] Ax_  covariate matrix.
-     * @param[in] y_  vector with observations.
-     * @param[in] c0_ diagonalised mass matrix space.
-     * @param[in] g1_ stiffness matrix space.
-     * @param[in] g2_ defined as : g1 * c0^-1 * g1
-     * @param[in] g3_ defined as : g1 * (c0^-1 * g1)^2
-     * @param[in] M0_ diagonalised mass matrix time.
-     * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
-     * @param[in] M2_ stiffness matrix time.
-     */	
-	PostTheta(int dim_th); 
+	PostTheta(int dim_th_); 
 
 	/**
      * @brief structure required by BFGS solver, requires : theta, gradient theta

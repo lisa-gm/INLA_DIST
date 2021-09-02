@@ -1,7 +1,6 @@
 #include "Model.h"
 
 
-
 Model::Model(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type){
 	
 	dim_th = 1;  			// only hyperparameter is the precision of the observations
@@ -17,37 +16,24 @@ Model::Model(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector thet
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
-
-	dim_grad_loop      = 2*dim_th;
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	printf("num solvers     : %d\n", num_solvers);
-
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
 	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
+		solverQ   = new PardisoSolver();
+		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
-		}
+		solverQ   = new RGFSolver();
+		solverQst = new RGFSolver();
 	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+
+	// allocate memory for incoming array from master process
+	theta_array = (double*)malloc(dim_th * sizeof(double));
+
+	// TODO: better way to allocate correct size to mu??
+	mu = Vector::Ones(n);
+
 
 }
 
@@ -66,37 +52,23 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
-
-	dim_grad_loop      = 2*dim_th;
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	printf("num solvers     : %d\n", num_solvers);
-
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
 	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
+		solverQ   = new PardisoSolver();
+		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
-		}
+		solverQ   = new RGFSolver();
+		solverQst = new RGFSolver();
 	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
-	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls	
+
+	// allocate memory for incoming array from master process
+	theta_array = (double*)malloc(dim_th * sizeof(double));
+
+	// TODO: better way to allocate correct size to mu??
+	mu = Vector::Ones(n);
 
 }
 
@@ -113,39 +85,12 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 		printf("yTy : %f\n", yTy);
 	#endif
 
-	// set up PardisoSolver class in constructor 
-	// to be independent of BFGS loop
-	int threads_level1 = omp_get_max_threads();
-
-	#ifdef PRINT_MSG
-		printf("threads level 1 : %d\n", threads_level1);
-	#endif
-
-	dim_grad_loop      = 2*dim_th;
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	#ifdef PRINT_MSG
-		printf("num solvers     : %d\n", num_solvers);
-	#endif
-
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
 	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
+		solverQ   = new PardisoSolver();
+		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
-		}
+		solverQ   = new RGFSolver();
+		solverQst = new RGFSolver();
 	} 
 
 	// set global counter to count function evaluations
@@ -157,8 +102,6 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 
 	// TODO: better way to allocate correct size to mu??
 	mu = Vector::Ones(n);
-
-	//printf("leaving model constructor now.\n");
 
 }
 
@@ -173,7 +116,6 @@ void Model::ready(){
 	//cout << "entered ready function. Rank : " << rank << endl;
 
 	MPI_Status status;
-
 	// infinite loop thats just waiting for receives
 	for (;;) {
 		MPI_Recv(theta_array, dim_th, MPI_DOUBLE, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -309,7 +251,7 @@ void Model::eval_log_det_Qu(Vector& theta, double &log_det){
 	}
 
 	int tid = omp_get_thread_num();
-	solverQst[tid]->factorize(Qu, log_det);
+	solverQst->factorize(Qu, log_det);
 
 	#ifdef PRINT_MSG
 		std::cout << "log det Qu : " << log_det << std::endl;
@@ -507,7 +449,7 @@ void Model::eval_denominator(Vector& theta, double& log_det, double& val, SpMat&
 	//solve_cholmod(Q, rhs, mu, log_det);
 
 	int tid = omp_get_thread_num();
-	solverQ[tid]->factorize_solve(Q, rhs, mu, log_det);
+	solverQ->factorize_solve(Q, rhs, mu, log_det);
 
 	log_det = 0.5 * (log_det);
 	
@@ -531,8 +473,8 @@ void Model::eval_denominator(Vector& theta, double& log_det, double& val, SpMat&
 
 Model::~Model(){
 
-		delete[] solverQst;
-		delete[] solverQ;		
+		delete solverQst;
+		delete solverQ;		
 }
 
 
