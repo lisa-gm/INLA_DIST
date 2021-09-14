@@ -117,31 +117,63 @@ void Model::ready(){
 
 	MPI_Status status;
 	// infinite loop thats just waiting for receives
+	/* TAG 0 : DIETAG
+	 * TAG 1 : EVAL_WORKTAG
+	 * TAG 2 : RETURN_MU_TAG
+	 * TAG 3 : SEL_INV_WORKTAG
+	 * TAG 4 : FULL_INV_WORKTAG
+	 */
 	for (;;) {
 		MPI_Recv(theta_array, dim_th, MPI_DOUBLE, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+		//cout << "Process " << rank << " received theta " << theta.transpose() << " from process 0" << endl;;
 
 		/* Check the tag of the received message */
 		if (status.MPI_TAG == DIETAG) {
 			//cout << "Process " << rank << " received DIETAG." << endl;
 			return;
+
+		} else if(status.MPI_TAG == EVAL_WORKTAG){
+			// map to eigen vector format
+			theta = Eigen::Map<Vector>(theta_array, dim_th);
+			f_theta = evaluate(theta, mu);
+
+			//cout << "computed f_theta in model " << f_theta << endl;
+			//std::cout << "rank : " << rank << " computed f_theta = " << f_theta << std::endl;
+   			MPI_Send(&f_theta, 1, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
+
+		} else if(status.MPI_TAG == RETURN_MU_WORKTAG){
+			// map to eigen vector format
+			theta = Eigen::Map<Vector>(theta_array, dim_th);
+			f_theta = evaluate(theta, mu);
+
+			//cout << "computed f_theta in model " << f_theta << endl;
+	   		MPI_Send(&f_theta, 1, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
+
+	   		double* mu_array = mu.data();
+   			MPI_Send(mu_array, n, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD);
+
+		} else if(status.MPI_TAG == SEL_INV_WORKTAG){
+			// map to eigen vector format
+			theta = Eigen::Map<Vector>(theta_array, dim_th);
+
+			Vector vars(n);
+			compute_marginals_f(theta, vars);
+
+			double* vars_array = vars.data();
+	   		MPI_Send(vars_array, n, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD);
+
+		} else {
+			std::cerr << "INVALID TAG!" << std::endl;
+			exit(1);
 		}
 
-		//cout << "Process " << rank << " received theta " << theta.transpose() << " from process 0" << endl;;
-
-		// map to eigen vector format
-		theta = Eigen::Map<Vector>(theta_array, dim_th);
-
-		f_theta = evaluate(theta, mu);
-
-		//cout << "computed f_theta in model " << f_theta << endl;
-
-   		MPI_Send(&f_theta, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);
-
-	}
-
+	} // end for loop
 
 }
 
+// introduce another layer of parallelism, evaluate the nominator & denominator independently
+// using OpenMP tasks 
+// then we MPI & two layers of OpenMP : 1 here & 1 inside PARDISO
 double Model::evaluate(Vector& theta, Vector& mu){
 
 	if(omp_get_thread_num() == 0){
@@ -158,12 +190,36 @@ double Model::evaluate(Vector& theta, Vector& mu){
 		std::cout << "theta prior : " << theta_prior.transpose() << std::endl;
 	#endif
 
-	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
+	// initialise variables outside of parallel region
 
-	//VectorXd zero_vec(dim_th); zero_vec.setZero();
+	// variables for prior hyperparameters
 	VectorXd zero_vec(theta_prior.size()); zero_vec.setZero();
-
 	double log_prior_sum = 0;
+
+	// log determinant precision matrix random variables
+	double log_det_Qu = 0;
+
+	// log det, value likelihood
+	double log_det_l;
+	double val_l;
+
+	// denominator :
+	// log_det(Q.x|y), mu, t(mu)*Q.x|y*mu
+	double log_det_d;
+	double val_d;
+
+	//std::cout << "outer omp get max threads = " << omp_get_max_threads() << std::endl;
+
+	#pragma omp parallel
+	#pragma omp single
+	{
+
+
+	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
+	#pragma omp task
+	{ 
+
+	//std::cout << "inner omp get max threads = " << omp_get_max_threads() << std::endl;
 
 	// evaluate prior
 	VectorXd log_prior_vec(dim_th);
@@ -184,8 +240,6 @@ double Model::evaluate(Vector& theta, Vector& mu){
 	// How long does the assembly of Qu take? Should this be passed on to the 
 	// denominator to be reused?
 
-	double log_det_Qu = 0;
-
 	if(ns > 0 ){
 		eval_log_det_Qu(theta, log_det_Qu);
 	}
@@ -194,11 +248,8 @@ double Model::evaluate(Vector& theta, Vector& mu){
 		std::cout << "log det Qu : "  << log_det_Qu << std::endl;
 	#endif
 
-		// =============== evaluate likelihood ================= //
-
-	// eval_likelihood: log_det, -theta*yTy
-	double log_det_l;
-	double val_l; 
+	// =============== evaluate likelihood ================= //
+	// eval_likelihood: log_det, -theta*yTy 
 	eval_likelihood(theta, log_det_l, val_l);
 
 	#ifdef PRINT_MSG
@@ -206,21 +257,24 @@ double Model::evaluate(Vector& theta, Vector& mu){
 		std::cout << "val l     : " << val_l << std::endl;
 	#endif
 
-		// =============== evaluate denominator ================= //
-	// denominator :
-	// log_det(Q.x|y), mu, t(mu)*Q.x|y*mu
-	double log_det_d;
-	double val_d;
+	} // end pragma omp task
+
+	#pragma omp task
+	{
+	// =============== evaluate denominator ================= //
 	SpMat Q(n, n);
 	Vector rhs(n);
-
  	eval_denominator(theta, log_det_d, val_d, Q, rhs, mu);
+
 	#ifdef PRINT_MSG
 		std::cout << "log det d : " << log_det_d << std::endl;
 		std::cout << "val d     : " <<  val_d << std::endl;
 	#endif
+	}
 
-		// =============== add everything together ================= //
+	} // omp parallel region
+
+	// =============== add everything together ================= //
   	double val = -1 * (log_prior_sum + log_det_Qu + log_det_l + val_l - (log_det_d + val_d));
 
   	#ifdef PRINT_MSG
@@ -470,6 +524,26 @@ void Model::eval_denominator(Vector& theta, double& log_det, double& val, SpMat&
 	std::cout << "val d     : " << val << std::endl; */
 }
 
+
+void Model::compute_marginals_f(Vector& theta, Vector& vars){
+
+	SpMat Q(n, n);
+	construct_Q(theta, Q);
+
+	#ifdef PRINT_MSG
+		std::cout << "after construct Q in get get_marginals_f" << std::endl;
+	#endif
+
+	double timespent_sel_inv_pardiso = -omp_get_wtime();
+	int tid = omp_get_thread_num();
+	solverQ->selected_inversion(Q, vars);
+
+	#ifdef PRINT_TIMES
+		timespent_sel_inv_pardiso += omp_get_wtime();
+		std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
+	#endif
+
+}
 
 Model::~Model(){
 

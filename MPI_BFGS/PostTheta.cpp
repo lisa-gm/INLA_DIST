@@ -35,8 +35,6 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 
 	iter_count += 1; 
 
-	t_grad = grad;
-
 	double eps = 0.005;
 	MatrixXd epsId_mat(dim_th, dim_th); 
 	epsId_mat = eps*epsId_mat.setIdentity();
@@ -45,9 +43,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	Vector f_forw(dim_th);
 	Vector f_backw(dim_th);
 
-	/*int threads = omp_get_max_threads();
-	double timespent_f_theta_eval;
-	double timespent_fct_eval = -omp_get_wtime();*/
+	//int threads = omp_get_max_threads();
+	double timespent_fct_eval = -omp_get_wtime();
 
 	//Vector theta_forw_loc[dim_th];
 
@@ -55,14 +52,14 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	// 
 	// MPI_send to evaluate f(theta, mu) -> this always goes to rank 1 !!
 	theta_array = theta.data();
-	MPI_Send(theta_array, dim_th, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD);
+	MPI_Send(theta_array, dim_th, MPI_DOUBLE, 1, 1, MPI_COMM_WORLD);
 
 	// MPI_send to evaluate f(theta+eps_i, mu_dummy)
 	// send to processes 2 - (dim_th+1)
 	for(int i=0; i<dim_th; i++){
 		Vector theta_loc = theta + epsId_mat.col(i);
 		double* theta_loc_array = theta_loc.data();
-		MPI_Send(theta_loc_array, dim_th, MPI_DOUBLE, i+2, 0, MPI_COMM_WORLD);
+		MPI_Send(theta_loc_array, dim_th, MPI_DOUBLE, i+2, 1, MPI_COMM_WORLD);
 	}
 
 	// MPI_send to evaluate f(theta-eps_i, mu_dummy)
@@ -70,27 +67,26 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	for(int i=0; i<dim_th; i++){
 		Vector theta_loc = theta - epsId_mat.col(i);
 		double* theta_loc_array = theta_loc.data();
-		MPI_Send(theta_loc_array, dim_th, MPI_DOUBLE, i+dim_th+2, 0, MPI_COMM_WORLD);
+		MPI_Send(theta_loc_array, dim_th, MPI_DOUBLE, i+dim_th+2, 1, MPI_COMM_WORLD);
 	}
 
-	// TODO: Irecv doesn't receive the right result. Why??
 	MPI_Status statuses[no_f_eval];
 	MPI_Request requests[no_f_eval];
 	int num_requests = 0;
 
 	// MPI_Irecv f_theta, deal with mu later. potentially get it from model
-	MPI_Irecv(&f_theta, 1, MPI_DOUBLE, 1, 0, MPI_COMM_WORLD, requests+num_requests);
+	MPI_Irecv(&f_theta, 1, MPI_DOUBLE, 1, 1, MPI_COMM_WORLD, requests+num_requests);
 	num_requests++;
 
 	// MPI_Irecv f_theta_forw
 	for(int i=0; i<dim_th; i++){
-		MPI_Irecv(&f_forw[i], 1, MPI_DOUBLE, i+2, 0, MPI_COMM_WORLD, requests+num_requests);
+		MPI_Irecv(&f_forw[i], 1, MPI_DOUBLE, i+2, 1, MPI_COMM_WORLD, requests+num_requests);
 		num_requests++;
 	}
 
 	// MPI_Irecv f_theta_back
 	for(int i=0; i<dim_th; i++){
-		MPI_Irecv(&f_backw[i], 1, MPI_DOUBLE, i+dim_th+2, 0, MPI_COMM_WORLD, requests+num_requests);
+		MPI_Irecv(&f_backw[i], 1, MPI_DOUBLE, i+dim_th+2, 1, MPI_COMM_WORLD, requests+num_requests);
 		num_requests++;
 	}
 
@@ -99,6 +95,12 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	#ifdef PRINT_MSG
 		std::cout << "PostTheta received f_theta = " << f_theta << " from model." << std::endl;
 	#endif
+
+	timespent_fct_eval += omp_get_wtime();
+
+	#ifdef PRINT_TIMES
+		std::cout << "time spent for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
+	#endif 
 
 	// print all theta's who result in a new minimum value for f(theta)
 	if(f_theta < min_f_theta){
@@ -110,6 +112,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
 	//std::cout << "grad  : " << grad.transpose() << std::endl;
+
+	t_grad = grad;
 
 	return f_theta;
 }
@@ -159,22 +163,41 @@ void PostTheta::convert_interpret2theta(double sigU, double ranS, double ranT, d
 // ============================================================================================ //
 // FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED
 
-#if 0
+
+Vector PostTheta::get_grad(){
+	return t_grad;
+}
+
 void PostTheta::get_mu(Vector& theta, Vector& mu){
 
 	#ifdef PRINT_MSG
 		std::cout << "get_mu()" << std::endl;
 	#endif
 
-	double f_theta = eval_post_theta(theta, mu);
+	// MPI_send to evaluate f(theta, mu) -> this always goes to rank 1 !!
+	theta_array = theta.data();
+	// send with message tag : 2 means return mu
+	MPI_Send(theta_array, dim_th, MPI_DOUBLE, 1, 2, MPI_COMM_WORLD);
+
+	MPI_Status status;
+
+	// MPI_Recv f_theta
+	double f_theta;
+	MPI_Recv(&f_theta, 1, MPI_DOUBLE, 1, 1, MPI_COMM_WORLD, &status);
+
+	//MPI_Recv mu
+	// allocate memory for incoming array from worker
+	//double* mu_array = (double*)malloc(mu.size() * sizeof(double));
+	double* mu_array = (double*)malloc(mu.size() * sizeof(double));
+	MPI_Recv(mu_array, mu.size(), MPI_DOUBLE, 1, 2, MPI_COMM_WORLD, &status);
+
+	mu = Eigen::Map<Vector>(mu_array, mu.size());
+
+	//double f_theta = eval_post_theta(theta, mu);
 
 	#ifdef PRINT_MSG
 		std::cout << "mu(-10:end) :" << mu.tail(10) << std::endl;
 	#endif
-}
-
-Vector PostTheta::get_grad(){
-	return t_grad;
 }
 
 
@@ -184,48 +207,14 @@ MatrixXd PostTheta::get_Covariance(Vector& theta){
 	MatrixXd hess(dim_th,dim_th);
 
 	// evaluate hessian
-	double timespent_hess_eval = -omp_get_wtime();
 	hess = hess_eval(theta);
-
-
-	timespent_hess_eval += omp_get_wtime();
-
-	#ifdef PRINT_TIMES
-		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
-	#endif 
-
-	//std::cout << "hess : " << hess << std::endl; 
+	std::cout << "hess : \n" << hess << std::endl; 
 
 	MatrixXd cov(dim_th,dim_th);
-	// pardiso call with identity as rhs & solve.
-	PardisoSolver* hessInv;
-	hessInv = new PardisoSolver;
-	hessInv->compute_inverse_pardiso(hess, cov); 
-
+	cov = hess.inverse();
 	//std::cout << "cov  : \n" << cov << std::endl; 
 
 	return cov;
-}
-
-
-void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
-	
-	SpMat Q(n, n);
-	construct_Q(theta, Q);
-
-	#ifdef PRINT_MSG
-		std::cout << "after construct Q in get get_marginals_f" << std::endl;
-	#endif
-
-	double timespent_sel_inv_pardiso = -omp_get_wtime();
-	int tid = omp_get_thread_num();
-	solverQ[tid]->selected_inversion(Q, vars);
-
-	#ifdef PRINT_TIMES
-		timespent_sel_inv_pardiso += omp_get_wtime();
-	#endif	
-
-	std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
 }
 
 
@@ -249,19 +238,15 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 
     double time_omp_task_hess = - omp_get_wtime();
 
-    #pragma omp parallel
-    #pragma omp single
-    {
+	// MPI_send to evaluate f(theta, mu) -> this always goes to rank 1 !!
+	theta_array = theta.data();
+	MPI_Send(theta_array, dim_th, MPI_DOUBLE, 1, 1, MPI_COMM_WORLD);
+	//double f_theta = eval_post_theta(theta, mu_tmp);
 
-    // compute f(theta) only once.
-    #pragma omp task 
-    { 
-	Vector mu_tmp(n);
-	double f_theta = eval_post_theta(theta, mu_tmp);
-    f_i_i.row(1) = f_theta * Eigen::VectorXd::Ones(dim_th).transpose(); 
-    }
+	// master rank 0; f(theta) rank 1; hence start at 2
+	int rank_counter = 2; 
 
-    for(int k = 0; k < loop_dim; k++){          
+    for(int k = 0; k < loop_dim; k++){  
 
         // row index is integer division k / dim_th
         int i = k/dim_th;
@@ -272,62 +257,114 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
         if(i == j){
 
         	// compute f(theta+eps_i)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
             Vector theta_forw_i = theta+epsId.col(i);
-            f_i_i(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
-            }
+            MPI_Send(theta_forw_i.data(), dim_th, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD);
+            rank_counter++;
+            //f_i_i(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
 
         	// compute f(theta-eps_i)
-            # pragma omp task
-            { 
-            Vector mu_tmp(n);
             Vector theta_back_i = theta-epsId.col(i);
-            f_i_i(2,i) = eval_post_theta(theta_back_i, mu_tmp); 
-            }
-
+            MPI_Send(theta_back_i.data(), dim_th, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD);
+            rank_counter++;
+            //f_i_i(2,i) = eval_post_theta(theta_back_i, mu_tmp); 
         
         // symmetric only compute upper triangular part
         } else if(j > i) {
 
         	// compute f(theta+eps_i+eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
             Vector theta_forw_i_j 	   = theta+epsId.col(i)+epsId.col(j);
-            f_i_j(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
-            }
+            MPI_Send(theta_forw_i_j.data(), dim_th, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD);
+            rank_counter++;
+            //f_i_j(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
 
         	// compute f(theta+eps_i-eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
             Vector theta_forw_i_back_j = theta+epsId.col(i)-epsId.col(j);
-            f_i_j(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
-            }
+            MPI_Send(theta_forw_i_back_j.data(), dim_th, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD);
+            rank_counter++;
+            //f_i_j(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
 
         	// compute f(theta-eps_i+eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
             Vector theta_back_i_forw_j = theta-epsId.col(i)+epsId.col(j);
-            f_i_j(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
-            }
+            MPI_Send(theta_back_i_forw_j.data(), dim_th, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD);
+            rank_counter++;
+            //f_i_j(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
 
         	// compute f(theta-eps_i-eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
             Vector theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
-            f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
-            }            
+            MPI_Send(theta_back_i_j.data(), dim_th, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD);
+            rank_counter++;
+            //f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
         }
 
     }
 
-    // potentially use task dependencies
-    #pragma omp taskwait
+    // RECEIVE RESULTS
+
+    // TODO: make sure to receive in correct/bulletproof order
+	MPI_Status statuses[rank_counter];
+	MPI_Request requests[rank_counter];
+
+	int num_requests = 0;
+
+	// reset counter
+	rank_counter = 1;
+
+	// MPI_Irecv f_theta
+	MPI_Irecv(&f_theta, 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+	num_requests++;
+	rank_counter++;
+
+    for(int k = 0; k < loop_dim; k++){  
+
+        // row index is integer division k / dim_th
+        int i = k/dim_th;
+        // col index is k mod dim_th
+        int j = k % dim_th;
+
+        // diagonal elements
+        if(i == j){
+        	MPI_Irecv(&f_i_i(0,i), 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+			num_requests++;
+			rank_counter++; 
+            //f_i_i(0,i) = eval_post_theta(theta_back_i, mu_tmp);        	
+
+			MPI_Irecv(&f_i_i(2,i), 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+			num_requests++;
+			rank_counter++;  
+            //f_i_i(2,i) = eval_post_theta(theta_back_i, mu_tmp); 
+        
+        // symmetric only compute upper triangular part
+        } else if(j > i) {
+        	// compute f(theta+eps_i+eps_j)
+			MPI_Irecv(&f_i_j(0,k), 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+			num_requests++;
+			rank_counter++;  
+            //f_i_j(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
+
+        	// compute f(theta+eps_i-eps_j)
+			MPI_Irecv(&f_i_j(1,k), 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+			num_requests++;
+			rank_counter++;  
+            //f_i_j(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
+
+        	// compute f(theta-eps_i+eps_j)
+			MPI_Irecv(&f_i_j(2,k), 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+			num_requests++;
+			rank_counter++;  
+            //f_i_j(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
+
+        	// compute f(theta-eps_i-eps_j)
+			MPI_Irecv(&f_i_j(3,k), 1, MPI_DOUBLE, rank_counter, 1, MPI_COMM_WORLD, requests+num_requests);
+			num_requests++;
+			rank_counter++;  
+            //f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
+        }
+
+    }
+
+	MPI_Waitall(num_requests, requests, statuses);
+
+	f_i_i.row(1) = f_theta * Eigen::VectorXd::Ones(dim_th).transpose(); 
 
     for(int k = 0; k < loop_dim; k++){          
 
@@ -345,16 +382,10 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
         }
     }
 
-    } // end omp
-
     time_omp_task_hess += omp_get_wtime();
     #ifdef PRINT_TIMES
     	std::cout << "time hess = " << time_omp_task_hess << std::endl;
     	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
-    #endif
-
-    #ifdef PRINT_TIMES
-    	std::cout << "time omp task hessian = " << time_omp_task_hess << std::endl;
     #endif
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
@@ -386,6 +417,23 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 			std::cout << "Hessian is positive definite.";
 		#endif
 	}
+}
+
+
+#if 1
+
+void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
+
+	theta_array = theta.data();
+	// TAG 3 for selected inversion !
+	MPI_Send(theta_array, dim_th, MPI_DOUBLE, 1, 3, MPI_COMM_WORLD);
+		
+	MPI_Status status;
+	double* vars_array = (double*)malloc(vars.size() * sizeof(double));
+	MPI_Recv(vars_array, vars.size(), MPI_DOUBLE, 1, 3, MPI_COMM_WORLD, &status);
+
+	vars = Eigen::Map<Vector>(vars_array, vars.size());
+
 }
 
 #endif

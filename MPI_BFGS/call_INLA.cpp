@@ -40,20 +40,20 @@ int main(int argc, char* argv[])
 {
     /* ======================= SET UP MPI ============================= */
     // Unique rank is assigned to each process in a communicator
-    int rank;
+    int MPI_rank;
 
     // Total number of ranks
-    int size;
+    int MPI_size;
 
     // Initializes the MPI execution environment
     MPI_Init(&argc, &argv);
 
     // Get this process' rank (process within a communicator)
     // MPI_COMM_WORLD is the default communicator
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
     // Get the total number ranks in this communicator
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);
 
     
     #if 0
@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-    if(rank == 1){
+    if(MPI_rank == 1){
         std::cout << "reading in example. " << std::endl;
     }
 
@@ -197,7 +197,7 @@ int main(int argc, char* argv[])
 
     } else if(ns > 0 && nt > 1) {
 
-        if(rank == 1){
+        if(MPI_rank == 1){
             std::cout << "spatial-temporal model." << std::endl;
         }
 
@@ -276,21 +276,19 @@ int main(int argc, char* argv[])
         n = ns*nt + nb;
 
         // =========== synthetic data set =============== //
-        /*std::cout << "using SYNTHETIC DATASET" << std::endl;        
         theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution
-        std::cout << "theta original     : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << 1.4, -5.9,  1,  3.7; 
         theta << 1, -3, 1, 3;
         //theta << 0.5, -1, 2, 2;
-        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
 
         // =========== temperature data set =============== //
-        theta_prior << -0.294769, -5.670050, -3.452297,  5.627084;       // EU only (solution from INLA)
+        /*theta_prior << -0.294769, -5.670050, -3.452297,  5.627084;       // EU only (solution from INLA)
         //theta_original << 5, -10, 2.5, 1;
-        theta << -0.2, -2, -2, 3;
+        theta << -0.2, -2, -2, 3;*/
 
-        if(rank == 1){
-            std::cout << "using TEMPERATURE DATASET" << std::endl; 
+        if(MPI_rank == 1){
+            std::cout << "using SYNTHETIC DATASET" << std::endl;        
+            //std::cout << "using TEMPERATURE DATASET" << std::endl; 
             std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }
@@ -304,7 +302,7 @@ int main(int argc, char* argv[])
 
     // ============================ set up Posterior of theta ======================== //
 
-    if(rank == 0){
+    if(MPI_rank == 0){
         PostTheta* fun;
         fun = new PostTheta(dim_th);
 
@@ -337,9 +335,39 @@ int main(int argc, char* argv[])
         std::cout << niter << " iterations" << std::endl;
         std::cout << "BFGS solver time             : " << time_bfgs << " sec" << std::endl;
 
-        // put all workers to sleep.
-        for(int i=1; i<size; i++){
-            MPI_Send(NULL, 0, MPI_DOUBLE, i, 2, MPI_COMM_WORLD);
+        Vector grad = fun->get_grad();
+        std::cout << "grad                         :" << grad.transpose() << std::endl;
+
+        Vector theta_max(dim_th);
+        //theta_max = theta;
+        theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
+
+        Vector mu(n);
+        fun->get_mu(theta_max, mu);
+        std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
+
+        Vector marg(n);
+        fun->get_marginals_f(theta_max, marg);
+        std::cout << "est. std. dev. fixed eff.    : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
+
+        // check if MPI_size is large enough, for dim(theta) = 4, require :
+        // 1 + 2 * 4 + 4 * 6 = 33 + 1 (master) = 34
+        int required_MPI_size = 34;
+        if(MPI_size < required_MPI_size){
+            std::cout << "Not enough MPI processes to compute covariance of theta!" << std::endl;
+
+        } else {
+
+            MatrixXd cov = fun->get_Covariance(theta_max);
+            //std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
+
+            std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+            std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
+        } 
+
+        // put all workers to sleep using 0 tag
+        for(int i=1; i<MPI_size; i++){
+            MPI_Send(NULL, 0, MPI_DOUBLE, i, 0, MPI_COMM_WORLD);
         }
 
         delete fun;
@@ -356,7 +384,7 @@ int main(int argc, char* argv[])
             // PostTheta fun(nb, no, B, y);
             model = new Model(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior, solver_type);
         } else {
-            if(rank == 1){
+            if(MPI_rank == 1){
                 std::cout << "\ncall spatial-temporal constructor." << std::endl;
             }
             model = new Model(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);

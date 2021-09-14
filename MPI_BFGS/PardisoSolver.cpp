@@ -31,7 +31,13 @@ PardisoSolver::PardisoSolver(){
         #endif
     }
 
-    int threads = omp_get_max_threads();
+    int threads;
+
+    #pragma omp parallel
+    #pragma omp single
+    {
+    threads = omp_get_max_threads();
+    }
 
     if(rank == 1){
         std::cout << "Pardiso will be called with " << threads << " threads per solver. " << std::endl;

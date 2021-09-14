@@ -3,7 +3,7 @@
 //#include <likwid-marker.h>
 
 
-PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type){
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior(theta_prior_), solver_type(solver_type_) {
 	
 	dim_th = 1;  			// only hyperparameter is the precision of the observations
 	ns     = 0;
@@ -29,7 +29,9 @@ PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vec
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
-	printf("num solvers     : %d\n", num_solvers);
+	#ifdef PRINT_MSG
+		printf("num solvers     : %d\n", num_solvers);
+	#endif
 
 	solverQ   = new Solver*[threads_level1];
 	solverQst = new Solver*[threads_level1];
@@ -77,7 +79,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
-	printf("num solvers     : %d\n", num_solvers);
+	#ifdef PRINT_MSG
+		printf("num solvers     : %d\n", num_solvers);
+	#endif
 
 	solverQ   = new Solver*[threads_level1];
 	solverQst = new Solver*[threads_level1];
@@ -126,7 +130,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
-	printf("num solvers     : %d\n", num_solvers);
+	#ifdef PRINT_MSG
+		printf("num solvers     : %d\n", num_solvers);
+	#endif
 
 	solverQ   = new Solver*[threads_level1];
 	solverQst = new Solver*[threads_level1];
@@ -172,7 +178,6 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	iter_count += 1; 
 
 	double f_theta;
-	t_grad = grad;
 
 	int dim_th = theta.size();
 
@@ -267,7 +272,9 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
 	//std::cout << "grad  : " << grad.transpose() << std::endl;
-	
+
+	t_grad = grad;
+
 	return f_theta;
 }
 
@@ -335,14 +342,14 @@ Vector PostTheta::get_grad(){
 }
 
 
-MatrixXd PostTheta::get_Covariance(Vector& theta){
+MatrixXd PostTheta::get_Covariance(Vector& theta, double eps){
 
 	int dim_th = theta.size();
 	MatrixXd hess(dim_th,dim_th);
 
 	// evaluate hessian
 	double timespent_hess_eval = -omp_get_wtime();
-	hess = hess_eval(theta);
+	hess = hess_eval(theta, eps);
 
 
 	timespent_hess_eval += omp_get_wtime();
@@ -351,13 +358,17 @@ MatrixXd PostTheta::get_Covariance(Vector& theta){
 		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
 	#endif 
 
-	//std::cout << "hess : " << hess << std::endl; 
+	//std::cout << "estimated hessian         : \n" << hess << std::endl; 
+	//std::cout << "eps : " << eps << endl;
 
 	MatrixXd cov(dim_th,dim_th);
 	// pardiso call with identity as rhs & solve.
-	PardisoSolver* hessInv;
+	/*PardisoSolver* hessInv;
 	hessInv = new PardisoSolver;
-	hessInv->compute_inverse_pardiso(hess, cov); 
+	hessInv->compute_inverse_pardiso(hess, cov); */
+
+	// just use eigen solver
+	cov = hess.inverse();
 
 	//std::cout << "cov  : \n" << cov << std::endl; 
 
@@ -380,15 +391,24 @@ void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
 
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
+		std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
 	#endif	
 
-	std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
+}
+
+double PostTheta::f_eval(Vector& theta){
+	// x[1]^3*x[2]^2*x[3]
+
+	return(pow(theta[0],3)*pow(theta[1],2)*theta[2] + pow(theta[3],3));
 }
 
 
-MatrixXd PostTheta::hess_eval(Vector& theta){
+MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
 
-	double eps = 0.005;
+	std::cout << "compute hessian." << std::endl;
+	std::cout << "eps : " << eps << std::endl;
+
+	//double eps = 0.005;
 
 	int dim_th = theta.size();
 	MatrixXd epsId(dim_th, dim_th); 
@@ -414,6 +434,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
     #pragma omp task 
     { 
 	Vector mu_tmp(n);
+	//double f_theta = f_eval(theta);
 	double f_theta = eval_post_theta(theta, mu_tmp);
     f_i_i.row(1) = f_theta * Eigen::VectorXd::Ones(dim_th).transpose(); 
     }
@@ -433,6 +454,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
             { 
             Vector mu_tmp(n);
             Vector theta_forw_i = theta+epsId.col(i);
+            //f_i_i(0,i) = f_eval(theta_forw_i);
             f_i_i(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
             }
 
@@ -441,6 +463,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
             { 
             Vector mu_tmp(n);
             Vector theta_back_i = theta-epsId.col(i);
+            //f_i_i(2,i) = f_eval(theta_back_i);
             f_i_i(2,i) = eval_post_theta(theta_back_i, mu_tmp); 
             }
 
@@ -453,6 +476,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
             { 
             Vector mu_tmp(n);
             Vector theta_forw_i_j 	   = theta+epsId.col(i)+epsId.col(j);
+            //f_i_j(0,k) = f_eval(theta_forw_i_j);
             f_i_j(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
             }
 
@@ -461,6 +485,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
             { 
             Vector mu_tmp(n);
             Vector theta_forw_i_back_j = theta+epsId.col(i)-epsId.col(j);
+            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
             f_i_j(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
             }
 
@@ -469,6 +494,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
             { 
             Vector mu_tmp(n);
             Vector theta_back_i_forw_j = theta-epsId.col(i)+epsId.col(j);
+            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
             f_i_j(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
             }
 
@@ -477,6 +503,7 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
             { 
             Vector mu_tmp(n);
             Vector theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
+            //f_i_j(3,k) = f_eval(theta_back_i_j);
             f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
             }            
         }
@@ -495,6 +522,11 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
 
         // diagonal elements
         if(i == j){
+        	/*std::cout << "i = " << i << ",j = " << j << std::endl;
+        	std::cout << "f_i_i(0," << i << ") = " << f_i_i(0,i) << std::endl;
+        	std::cout << "f_i_i(1," << i << ") = " << f_i_i(1,i) << std::endl;
+        	std::cout << "f_i_i(2," << i << ") = " << f_i_i(2,i) << std::endl;*/
+
             hessUpper(i,i) = (f_i_i(0,i) - 2 * f_i_i(1,i) + f_i_i(2,i))/(eps*eps);
 
         } else if(j > i){
@@ -515,9 +547,10 @@ MatrixXd PostTheta::hess_eval(Vector& theta){
     #endif
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
-	//std::cout << "hessian       : \n" << hess << std::endl;
+	std::cout << "hessian       : \n" << hess << std::endl;
 
 	// check that matrix positive definite otherwise use only diagonal
+	//std::cout << "positive definite check disabled." << std::endl;
 	check_pos_def(hess); 
 
 	return hess;
@@ -670,11 +703,12 @@ void PostTheta::eval_log_det_Qu(Vector& theta, double &log_det){
 void PostTheta::eval_likelihood(Vector& theta, double &log_det, double &val){
 	
 	// multiply log det by 0.5
-	log_det = 0.5 * no*theta[0];
+	double theta0 = theta[0];
+	log_det = 0.5 * no*theta0;
 	//log_det = 0.5 * no*3;
 
 	// - 1/2 ...
-	val = - 0.5 * exp(theta[0])*yTy;
+	val = - 0.5 * exp(theta0)*yTy;
 	//*val = - 0.5 * exp(3)*yTy;
 
 	/*std::cout << "in eval eval_likelihood " << std::endl;
@@ -711,9 +745,17 @@ void PostTheta::construct_Q_spatial(Vector& theta, SpMat& Qs){
 
 void PostTheta::construct_Q_spat_temp(Vector& theta, SpMat& Qst){
 
+	//std::cout << "theta : " << theta.transpose() << std::endl;
+
 	double exp_theta1 = exp(theta[1]);
 	double exp_theta2 = exp(theta[2]);
 	double exp_theta3 = exp(theta[3]);
+
+	/*double exp_theta1 = exp(-5.594859);
+	double exp_theta2 = exp(1.039721);
+	double exp_theta3 = exp(3.688879);*/
+
+	//std::cout << "exp(theta) : " << exp(theta[0]) << " " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << " " << std::endl;	
 
 	// g^2 * fem$c0 + fem$g1
 	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
@@ -745,7 +787,6 @@ void PostTheta::construct_Q_spat_temp(Vector& theta, SpMat& Qst){
 void PostTheta::construct_Q(Vector& theta, SpMat& Q){
 
 	double exp_theta0 = exp(theta[0]);
-	//double exp_theta = exp(3);
 
 	SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
 	/*std::cout << "Q_b " << std::endl;
@@ -794,24 +835,29 @@ void PostTheta::construct_Q(Vector& theta, SpMat& Q){
 		#ifdef PRINT_MSG
 			std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
 			std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
+
+			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
+			std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+			std::cout << "theta : \n" << theta.transpose() << std::endl;
+
 		#endif
 	}
 
 	if(ns == 0){
 		// Q.e <- Diagonal(no, exp(theta))
 		// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
-		Q = Q_b + exp_theta0*B.transpose()*B;
+		Q = Q_b + exp_theta0*B.transpose()*B;	
+
+		#ifdef PRINT_MSG
+			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
+			std::cout << "Q : \n" << Q << std::endl;
+			std::cout << "theta : \n" << theta.transpose() << std::endl;
+		#endif 
+
 	}
 
 	/*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
 	std::cout << Eigen::MatrixXd(*Q) - exp_theta*B.transpose()*B << std::endl;*/
-
-	#ifdef PRINT_MSG
-		std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
-		std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-		std::cout << "theta : \n" << theta.transpose() << std::endl;
-
-	#endif 
 
 }
 
@@ -819,7 +865,6 @@ void PostTheta::construct_Q(Vector& theta, SpMat& Q){
 void PostTheta::construct_b(Vector& theta, Vector &rhs){
 
 	double exp_theta = exp(theta[0]);
-	//double exp_theta = exp(3);
 
 	if(ns == 0){
 		rhs = exp_theta*B.transpose()*y;

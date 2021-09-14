@@ -24,7 +24,7 @@
 #include "RGFSolver.h"
 
 //#define PRINT_MSG
-//#define PRINT_TIMES
+#define PRINT_TIMES
 
 using namespace Eigen;
 using namespace std;
@@ -198,7 +198,9 @@ class PostTheta{
      * @param [in] theta hyperparameter Vector
      * @return cov covariance matrix of the hyperparameters
      */	
-	MatrixXd get_Covariance(Vector& theta);
+	MatrixXd get_Covariance(Vector& theta, double eps);
+
+	double f_eval(Vector& theta);
 
 	/**
      * @brief Compute the marginal variances of the latent parameters at theta. 
@@ -215,7 +217,7 @@ class PostTheta{
  	 * @return Dense Matrix with Hessian. 
  	 * \todo not yet parallelised .... 
      */	
-	MatrixXd hess_eval(Vector& theta);
+	MatrixXd hess_eval(Vector& theta, double eps);
 
 	/**
      * @brief check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small)

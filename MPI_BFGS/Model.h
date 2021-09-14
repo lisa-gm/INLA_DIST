@@ -30,8 +30,11 @@
 //#define PRINT_MSG
 //#define PRINT_TIMES
 
-#define WORKTAG 1
-#define DIETAG 2
+#define DIETAG 0
+#define EVAL_WORKTAG 1
+#define RETURN_MU_WORKTAG 2
+#define SEL_INV_WORKTAG 3
+#define FULL_INV_WORKTAG 4
 
 using namespace Eigen;
 using namespace std;
@@ -99,6 +102,8 @@ class Model{
     double* theta_array;
     Vector theta;
     double f_theta;
+    
+    MatrixXd hess;
 
 	public:
 	 /**
@@ -221,6 +226,14 @@ class Model{
  	 * @param[inout] mu insert mean of latent parameters
      */
 	void eval_denominator(Vector& theta, double& log_det, double& val, SpMat& Q, Vector& rhs, Vector& mu);
+
+
+	/** 
+	 * @brief compute marginal variances of latent variables using selected inversion
+	 * @param[in] 	 theta
+	 * @param[inout] vars vector for marginal variances
+	 */
+	void compute_marginals_f(Vector& theta, Vector& vars);
 
 	 /**
      * @brief class destructor. Frees memory allocated by Model class.

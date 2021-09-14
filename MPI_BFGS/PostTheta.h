@@ -190,6 +190,13 @@ class PostTheta{
      */	
 	MatrixXd hess_eval(Vector& theta);
 
+	/** 
+	 * @brief scheduler for assigning work to workers
+	 * @param[inout] counter
+	 * @param[in] 	 mpi size (number of workers)
+	 */
+	void update_counter(int counter, int mpi_size);
+
 	/**
      * @brief check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small)
  	 * @param[inout] updates hessian to only the diagonal entries if not positive definite.

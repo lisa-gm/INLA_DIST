@@ -249,29 +249,38 @@ int main(int argc, char* argv[])
     } else if(ns > 0 && nt == 1){
         n = ns + nb;
         //theta << 1, -1, 1;
-        theta << 1, -2, 2;
-        theta_prior << 0, 0, 0;
-        std::cout << "initial theta : "  << theta.transpose() << std::endl;    
+        //theta << 1, -2, 2;
+        //theta_prior << 0, 0, 0;
+
+        std::cout << "using Elias TOY DATASET" << std::endl;
+        // from INLA : log prec Gauss obs, log(Range) for i, log(Stdev) for i     
+        //theta_prior << 1.0087220,  -1.0536157, 0.6320466;
+        theta_prior << 1, -2.3, 2.1;
+        theta << theta_prior;
+
+        std::cout << "initial theta : "  << theta.transpose() << std::endl;   
 
     } else {
         n = ns*nt + nb;
 
         // =========== synthetic data set =============== //
-        /*std::cout << "using SYNTHETIC DATASET" << std::endl;        
-        theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution
+        std::cout << "using SYNTHETIC DATASET" << std::endl;        
+        //theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
+        //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
+        theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
         std::cout << "theta original     : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << 1.4, -5.9,  1,  3.7; 
         theta << 1, -3, 1, 3;
         //theta << 0.5, -1, 2, 2;
-        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
 
         // =========== temperature data set =============== //
-        std::cout << "using TEMPERATURE DATASET" << std::endl; 
+        /*std::cout << "using TEMPERATURE DATASET" << std::endl; 
         theta_prior << -0.294769, -5.670050, -3.452297,  5.627084;       // EU only (solution from INLA)
         //theta_original << 5, -10, 2.5, 1;
         std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         theta << -0.2, -2, -2, 3;
-        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
     }
 
     Vector b(nb);
@@ -317,7 +326,7 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
     }
 
-
+    #if 1
     double fx;
 
     //Vector grad_test(dim_th);
@@ -339,59 +348,98 @@ int main(int argc, char* argv[])
     std::cout << niter << " iterations" << std::endl;
     std::cout << "BFGS solver time             : " << time_bfgs << " sec" << std::endl;
 
-    #if 0
-
-
     std::cout << "\nf(x)                         : " << fx << std::endl;
 
     /*int fct_count = fun->get_fct_count();
     std::cout << "function counts thread zero  : " << fct_count << std::endl;*/
 
     Vector grad = fun->get_grad();
-    std::cout << "grad                         : " << grad.transpose() << std::endl;
+    std::cout << "grad                         :" << grad.transpose() << std::endl;
 
-    std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
-    std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;
+    /*std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
+    std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;*/
+
+    /*double eps = 0.005;
+    VectorXd temp(4);
+    temp << -5,2,3,-2;
+    double f_temp = fun->f_eval(temp);
+    std::cout << "f eval test : " << f_temp << endl;
+    MatrixXd cov = fun->get_Covariance(temp, eps);
+    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
+
+    std::cout << "\norig. mean parameters        : " << theta_prior.transpose() << std::endl;
+    std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
 
     // convert between different theta parametrisations
     if(dim_th == 4){
+        double prior_sigU; double prior_ranS; double prior_ranT;
+        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
+        std::cout << "\norig. mean interpret. param. : " << theta_prior[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
         fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
-        std::cout << "est. mean interpret. param.  : " << theta[0] << " " << sigU << " " << ranS << " " << ranT << std::endl;
-        
-        double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
-        std::cout << "org. mean interpret. param.  : " << theta_prior[0] << " " << prior_sigU << " " << prior_ranS << " " << prior_ranT << std::endl;
+        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranT << " " << ranS << " " << sigU << std::endl;
     }
+
+    #endif
+
+    #if 1
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    theta_max = theta;
+    //theta_max = theta;
+    //theta_max << 1.388921, -5.588113,  0.985369,  3.719458;
+    theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
+    //theta_max << 1.4608052, -5.8996978,  0.6805342,  3.8358287; 
+
+    /*std::cout << "Estimated Covariance Matrix INLA : " << std::endl;
+    MatrixXd Cov_INLA(4,4);
+
+    Cov_INLA << 0.023833160, 0.01486733, 0.004853688, 0.005288554,
+                0.014867325, 0.12749968, 0.056587582, 0.048833876,
+                0.004853688, 0.05658758, 0.025517230, 0.022059932,
+                0.005288554, 0.04883388, 0.022059932, 0.019274723;
+
+    std::cout << Cov_INLA << std::endl;*/
 
     // in what parametrisation are INLA's results ... ?? 
-    MatrixXd cov = fun->get_Covariance(theta_max);
-    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+    double eps;
+    MatrixXd cov(dim_th,dim_th);
 
-    /*std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
-    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;*/
+    /*eps = 0.01;
+    cov = fun->get_Covariance(theta_max, eps);
+    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
+
+    eps = 0.005;
+    //cov = fun->get_Covariance(theta_max, sqrt(eps));
+    cov = fun->get_Covariance(theta_max, eps);
+    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
+
+    /*eps = 0.001;
+    cov = fun->get_Covariance(theta_max, eps);
+    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
+    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
+    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
 
     #endif
 
-
-
-    #if 0
+    #if 1
 
     Vector mu(n);
-    fun->get_mu(theta_max, mu);
+    fun->get_mu(theta, mu);
     std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
     
     // when the range of u is large the variance of b0 is large.
     Vector marg(n);
-    fun->get_marginals_f(theta_max, marg);
+    fun->get_marginals_f(theta, marg);
     std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
+    std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
+
+
     #endif
+
 
     delete fun;
     return 0;
