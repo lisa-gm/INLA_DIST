@@ -535,8 +535,13 @@ void Model::compute_marginals_f(Vector& theta, Vector& vars){
 	#endif
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
-	int tid = omp_get_thread_num();
+
+	// need this since we have nested parallelism, want lowest layer for PARDISO
+	#pragma omp parallel
+	#pragma omp single
+	{
 	solverQ->selected_inversion(Q, vars);
+	}
 
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();

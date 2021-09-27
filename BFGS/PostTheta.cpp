@@ -330,7 +330,11 @@ void PostTheta::get_mu(Vector& theta, Vector& mu){
 		std::cout << "get_mu()" << std::endl;
 	#endif
 
+	#pragma omp parallel
+	#pragma omp single
+	{
 	double f_theta = eval_post_theta(theta, mu);
+	}
 
 	#ifdef PRINT_MSG
 		std::cout << "mu(-10:end) :" << mu.tail(10) << std::endl;
@@ -386,8 +390,14 @@ void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
 	#endif
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
+	
+	// call this with one thread
+	#pragma omp parallel
+	#pragma omp single
+	{
 	int tid = omp_get_thread_num();
 	solverQ[tid]->selected_inversion(Q, vars);
+	}
 
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
@@ -404,9 +414,6 @@ double PostTheta::f_eval(Vector& theta){
 
 
 MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
-
-	std::cout << "compute hessian." << std::endl;
-	std::cout << "eps : " << eps << std::endl;
 
 	//double eps = 0.005;
 

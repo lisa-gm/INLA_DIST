@@ -24,7 +24,7 @@
 #include "RGFSolver.h"
 
 //#define PRINT_MSG
-#define PRINT_TIMES
+//#define PRINT_TIMES
 
 using namespace Eigen;
 using namespace std;
