@@ -285,7 +285,7 @@ int PostTheta::get_fct_count(){
 // ============================================================================================ //
 // CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
 
-void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& sigU, double& ranS, double& ranT){
+void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& ranT, double& ranS, double& sigU){
 	double alpha_t = 1; 
 	double alpha_s = 2;
 	double alpha_e = 1;
@@ -305,7 +305,7 @@ void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT
 }
 
 
-void PostTheta::convert_interpret2theta(double sigU, double ranS, double ranT, double& lgamE, double& lgamS, double& lgamT){
+void PostTheta::convert_interpret2theta(double ranT, double ranS, double sigU, double& lgamE, double& lgamS, double& lgamT){
 	double alpha_t = 1; 
 	double alpha_s = 2;
 	double alpha_e = 1;
@@ -355,6 +355,47 @@ MatrixXd PostTheta::get_Covariance(Vector& theta, double eps){
 	double timespent_hess_eval = -omp_get_wtime();
 	hess = hess_eval(theta, eps);
 
+
+	timespent_hess_eval += omp_get_wtime();
+
+	#ifdef PRINT_TIMES
+		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
+	#endif 
+
+	//std::cout << "estimated hessian         : \n" << hess << std::endl; 
+	//std::cout << "eps : " << eps << endl;
+
+	MatrixXd cov(dim_th,dim_th);
+	// pardiso call with identity as rhs & solve.
+	/*PardisoSolver* hessInv;
+	hessInv = new PardisoSolver;
+	hessInv->compute_inverse_pardiso(hess, cov); */
+
+	// just use eigen solver
+	cov = hess.inverse();
+
+	//std::cout << "cov  : \n" << cov << std::endl; 
+
+	return cov;
+}
+
+
+MatrixXd PostTheta::get_Cov_interpret_param(Vector& interpret_theta, double eps){
+
+	int dim_th;
+
+	if(interpret_theta.size() != 4){
+		std::cout << "dim(interpret_theta) = " << interpret_theta.size() << ", should be 4!" << std::endl;
+		exit(1);
+	} else {
+		dim_th = 4;
+	}
+
+	MatrixXd hess(dim_th,dim_th);
+
+	// evaluate hessian
+	double timespent_hess_eval = -omp_get_wtime();
+	hess = hess_eval_interpret_theta(interpret_theta, eps);
 
 	timespent_hess_eval += omp_get_wtime();
 
@@ -510,6 +551,180 @@ MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
             { 
             Vector mu_tmp(n);
             Vector theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
+            //f_i_j(3,k) = f_eval(theta_back_i_j);
+            f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
+            }            
+        }
+
+    }
+
+    // potentially use task dependencies
+    #pragma omp taskwait
+
+    for(int k = 0; k < loop_dim; k++){          
+
+        // row index is integer division k / dim_th
+        int i = k/dim_th;
+        // col index is k mod dim_th
+        int j = k % dim_th;
+
+        // diagonal elements
+        if(i == j){
+        	/*std::cout << "i = " << i << ",j = " << j << std::endl;
+        	std::cout << "f_i_i(0," << i << ") = " << f_i_i(0,i) << std::endl;
+        	std::cout << "f_i_i(1," << i << ") = " << f_i_i(1,i) << std::endl;
+        	std::cout << "f_i_i(2," << i << ") = " << f_i_i(2,i) << std::endl;*/
+
+            hessUpper(i,i) = (f_i_i(0,i) - 2 * f_i_i(1,i) + f_i_i(2,i))/(eps*eps);
+
+        } else if(j > i){
+            hessUpper(i,j) = (f_i_j(0,k) - f_i_j(1,k) - f_i_j(2,k) + f_i_j(3,k)) / (4*eps*eps);
+        }
+    }
+
+    } // end omp
+
+    time_omp_task_hess += omp_get_wtime();
+    #ifdef PRINT_TIMES
+    	std::cout << "time hess = " << time_omp_task_hess << std::endl;
+    	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
+    #endif
+
+    #ifdef PRINT_TIMES
+    	std::cout << "time omp task hessian = " << time_omp_task_hess << std::endl;
+    #endif
+
+	MatrixXd hess = hessUpper.selfadjointView<Upper>();
+	std::cout << "hessian       : \n" << hess << std::endl;
+
+	// check that matrix positive definite otherwise use only diagonal
+	//std::cout << "positive definite check disabled." << std::endl;
+	check_pos_def(hess); 
+
+	return hess;
+}
+
+
+
+MatrixXd PostTheta::hess_eval_interpret_theta(Vector& interpret_theta, double eps){
+
+	//double eps = 0.005;
+
+	int dim_th = interpret_theta.size();
+	MatrixXd epsId(dim_th, dim_th); 
+	epsId = eps*epsId.setIdentity();
+
+	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);
+
+	// compute upper tridiagonal structure
+	// map 2D structure to 1D to be using omp parallel more efficiently
+	int loop_dim = dim_th*dim_th;    
+
+    // number of rows stems from the required function evaluations of f(theta)
+    Eigen::MatrixXd f_i_i = Eigen::MatrixXd::Zero(3,dim_th);
+    Eigen::MatrixXd f_i_j = Eigen::MatrixXd::Zero(4,loop_dim);
+
+    double time_omp_task_hess = - omp_get_wtime();
+
+    #pragma omp parallel
+    #pragma omp single
+    {
+
+    // compute f(theta) only once.
+    #pragma omp task 
+    { 
+	Vector mu_tmp(n);
+	//double f_theta = f_eval(theta);
+	// convert interpret_theta to theta
+	Vector theta(4);
+	theta[0] = interpret_theta[0];
+	convert_interpret2theta(interpret_theta[1], interpret_theta[2], interpret_theta[3], theta[1], theta[2], theta[3]);
+	double f_theta = eval_post_theta(theta, mu_tmp);
+    f_i_i.row(1) = f_theta * Eigen::VectorXd::Ones(dim_th).transpose(); 
+    }
+
+    for(int k = 0; k < loop_dim; k++){          
+
+        // row index is integer division k / dim_th
+        int i = k/dim_th;
+        // col index is k mod dim_th
+        int j = k % dim_th;
+
+        // diagonal elements
+        if(i == j){
+
+        	// compute f(theta+eps_i)
+            #pragma omp task 
+            { 
+            Vector mu_tmp(n);
+            Vector interpret_theta_forw_i = interpret_theta+epsId.col(i);
+            Vector theta_forw_i(4);
+			theta_forw_i[0] = interpret_theta_forw_i[0];
+			convert_interpret2theta(interpret_theta_forw_i[1], interpret_theta_forw_i[2], interpret_theta_forw_i[3], theta_forw_i[1], theta_forw_i[2], theta_forw_i[3]);
+            //f_i_i(0,i) = f_eval(theta_forw_i);
+            f_i_i(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
+            }
+
+        	// compute f(theta-eps_i)
+            # pragma omp task
+            { 
+            Vector mu_tmp(n);
+            Vector interpret_theta_back_i = interpret_theta-epsId.col(i);
+            Vector theta_back_i(4);
+			theta_back_i[0] = interpret_theta_back_i[0];
+			convert_interpret2theta(interpret_theta_back_i[1], interpret_theta_back_i[2], interpret_theta_back_i[3], theta_back_i[1], theta_back_i[2], theta_back_i[3]);
+            //f_i_i(2,i) = f_eval(theta_back_i);
+            f_i_i(2,i) = eval_post_theta(theta_back_i, mu_tmp); 
+            }
+
+        
+        // symmetric only compute upper triangular part
+        } else if(j > i) {
+
+        	// compute f(theta+eps_i+eps_j)
+            #pragma omp task 
+            { 
+            Vector mu_tmp(n);
+            Vector interpret_theta_forw_i_j 	   = interpret_theta+epsId.col(i)+epsId.col(j);
+            Vector theta_forw_i_j(4);
+			theta_forw_i_j[0] = interpret_theta_forw_i_j[0];
+			convert_interpret2theta(interpret_theta_forw_i_j[1], interpret_theta_forw_i_j[2], interpret_theta_forw_i_j[3], theta_forw_i_j[1], theta_forw_i_j[2], theta_forw_i_j[3]);
+            //f_i_j(0,k) = f_eval(theta_forw_i_j);
+            f_i_j(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
+            }
+
+        	// compute f(theta+eps_i-eps_j)
+            #pragma omp task 
+            { 
+            Vector mu_tmp(n);
+            Vector interpret_theta_forw_i_back_j = interpret_theta+epsId.col(i)-epsId.col(j);
+            Vector theta_forw_i_back_j(4);
+			theta_forw_i_back_j[0] = interpret_theta_forw_i_back_j[0];
+			convert_interpret2theta(interpret_theta_forw_i_back_j[1], interpret_theta_forw_i_back_j[2], interpret_theta_forw_i_back_j[3], theta_forw_i_back_j[1], theta_forw_i_back_j[2], theta_forw_i_back_j[3]);
+            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
+            f_i_j(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
+            }
+
+        	// compute f(theta-eps_i+eps_j)
+            #pragma omp task 
+            { 
+            Vector mu_tmp(n);
+            Vector interpret_theta_back_i_forw_j = interpret_theta-epsId.col(i)+epsId.col(j);
+            Vector theta_back_i_forw_j(4);
+			theta_back_i_forw_j[0] = interpret_theta_back_i_forw_j[0];
+			convert_interpret2theta(interpret_theta_back_i_forw_j[1], interpret_theta_back_i_forw_j[2], interpret_theta_back_i_forw_j[3], theta_back_i_forw_j[1], theta_back_i_forw_j[2], theta_back_i_forw_j[3]);
+            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
+            f_i_j(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
+            }
+
+        	// compute f(theta-eps_i-eps_j)
+            #pragma omp task 
+            { 
+            Vector mu_tmp(n);
+            Vector interpret_theta_back_i_j 	   = interpret_theta-epsId.col(i)-epsId.col(j);
+            Vector theta_back_i_j(4);
+			theta_back_i_j[0] = interpret_theta_back_i_j[0];
+			convert_interpret2theta(interpret_theta_back_i_j[1], interpret_theta_back_i_j[2], interpret_theta_back_i_j[3], theta_back_i_j[1], theta_back_i_j[2], theta_back_i_j[3]);
             //f_i_j(3,k) = f_eval(theta_back_i_j);
             f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
             }            

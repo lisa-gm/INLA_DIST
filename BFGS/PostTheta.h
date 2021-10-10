@@ -200,6 +200,8 @@ class PostTheta{
      */	
 	MatrixXd get_Covariance(Vector& theta, double eps);
 
+	MatrixXd get_Cov_interpret_param(Vector& interpret_theta, double eps);
+
 	double f_eval(Vector& theta);
 
 	/**
@@ -218,6 +220,8 @@ class PostTheta{
  	 * \todo not yet parallelised .... 
      */	
 	MatrixXd hess_eval(Vector& theta, double eps);
+
+	MatrixXd hess_eval_interpret_theta(Vector& interpret_theta, double eps);
 
 	/**
      * @brief check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small)

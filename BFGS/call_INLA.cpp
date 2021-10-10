@@ -326,7 +326,7 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
     }
 
-    #if 1
+    #if 0
     double fx;
 
     //Vector grad_test(dim_th);
@@ -373,12 +373,12 @@ int main(int argc, char* argv[])
     // convert between different theta parametrisations
     if(dim_th == 4){
         double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
+        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_ranT, prior_ranS, prior_sigU);
         std::cout << "\norig. mean interpret. param. : " << theta_prior[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
+        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranT, ranS, sigU);
         std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranT << " " << ranS << " " << sigU << std::endl;
     }
 
@@ -390,8 +390,9 @@ int main(int argc, char* argv[])
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
     //theta_max = theta;
+    theta_max << 1.382388, -5.626002,  1.156931,  3.644319;
     //theta_max << 1.388921, -5.588113,  0.985369,  3.719458;
-    theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
+    //theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
     //theta_max << 1.4608052, -5.8996978,  0.6805342,  3.8358287; 
 
     /*std::cout << "Estimated Covariance Matrix INLA : " << std::endl;
@@ -423,9 +424,21 @@ int main(int argc, char* argv[])
     std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
     std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
 
+    //convert to interpretable parameters
+    // order of variables : gaussian obs, range t, range s, sigma u
+    Vector interpret_theta(4);
+    interpret_theta[0] = theta_max[0];
+    fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
+    std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+
+    cov = fun->get_Cov_interpret_param(interpret_theta, eps);
+
+    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
+
+
     #endif
 
-    #if 1
+    #if 0
 
     Vector mu(n);
     fun->get_mu(theta, mu);
