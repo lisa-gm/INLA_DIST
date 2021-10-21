@@ -79,6 +79,7 @@ class Model{
     SpMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
     						 observation locations onto FEM mesh and 
     						 includes covariates at the end.                */
+    SpMat AxTAx;        /**< sparse matrix defined as Ax.transpose()*Ax     */
     MatrixXd B; 		/**< if space (-time) model included in last 
     						 columns of Ax. For regression only B exists.   */
 
@@ -94,6 +95,7 @@ class Model{
     							-> account for boundary						*/
     SpMat M2;			/**< stiffness matrix time.							*/
 
+
     double yTy;			/**< compute t(y)*y once. */
     Vector mu;			/**< conditional mean */
     Vector t_grad;		/**< gradient of theta */
@@ -104,6 +106,9 @@ class Model{
     double f_theta;
     
     MatrixXd hess;
+
+    int MPI_rank;        /**< MPI rank of model*/
+
 
 	public:
 	 /**

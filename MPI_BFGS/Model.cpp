@@ -3,6 +3,9 @@
 
 Model::Model(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type){
 	
+	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);	
+	//cout << "entered model constructor. Rank : " << rank << endl;
+
 	dim_th = 1;  			// only hyperparameter is the precision of the observations
 	ns     = 0;
 	n      = nb;
@@ -34,11 +37,17 @@ Model::Model(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector thet
 	// TODO: better way to allocate correct size to mu??
 	mu = Vector::Ones(n);
 
+	// compute once
+	AxTAx = Ax.transpose() * Ax;
+
 
 }
 
 
 Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_), solver_type(solver_type_) {
+	
+	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);	
+	//cout << "entered model constructor. Rank : " << rank << endl;
 
 	dim_th      = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
 	nu          = ns;
@@ -70,10 +79,17 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 	// TODO: better way to allocate correct size to mu??
 	mu = Vector::Ones(n);
 
+	// compute once
+	AxTAx = Ax.transpose() * Ax;
+
 }
 
 
 Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(theta_prior_), solver_type(solver_type_)  {
+
+	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);	
+
+	//cout << "entered model constructor. Rank : " << rank << endl;
 
 	dim_th      = 4;    	 	// 4 hyperparameters, precision for the observations, 3 for the spatial-temporal model
 	nu          = ns*nt;
@@ -103,17 +119,15 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 	// TODO: better way to allocate correct size to mu??
 	mu = Vector::Ones(n);
 
+	// compute once
+	AxTAx = Ax.transpose() * Ax;
+
 }
 
 // ============================================================================================ //
 // ALL FOLLOWING FUNCTIONS CONTRIBUTE TO THE EVALUATION OF F(THETA) 
 
 void Model::ready(){
-
-	int rank;
-	MPI_Comm_rank(MPI_COMM_WORLD, &rank);	
-
-	//cout << "entered ready function. Rank : " << rank << endl;
 
 	MPI_Status status;
 	// infinite loop thats just waiting for receives
@@ -392,6 +406,13 @@ void Model::construct_Q_spat_temp(Vector& theta, SpMat& Qst){
 
 void Model::construct_Q(Vector& theta, SpMat& Q){
 
+	/*if(MPI_rank == 1){
+		int threads_eigen = Eigen::nbThreads( );
+		std::cout << "number of Eigen threads : " << threads_eigen << std::endl;
+	}*/
+
+	double time_construct_Qx_total = - omp_get_wtime();
+
 	double exp_theta0 = exp(theta[0]);
 	//double exp_theta = exp(3);
 
@@ -403,11 +424,20 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 		SpMat Qu(nu, nu);
 		// TODO: find good way to assemble Qx
 
+		double time_construct_Qst = - omp_get_wtime();
+
 		if(nt > 1){
 			construct_Q_spat_temp(theta, Qu);
 		} else {	
 			construct_Q_spatial(theta, Qu);
 		}	
+
+		if(MPI_rank == 1){
+			time_construct_Qst += omp_get_wtime();
+			std::cout << "construct Qst time             : " << time_construct_Qst << std::endl;
+		}
+
+		double time_construct_extraQ = - omp_get_wtime();
 
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
 		// construct Qx from Qs values, extend by zeros 
@@ -422,9 +452,17 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 		    Qx.insert(it.row(),it.col()) = it.value();                 
 		  }
 
+		if(MPI_rank == 1){
+			time_construct_extraQ += omp_get_wtime();
+			std::cout << "construct extraQ time      : " << time_construct_extraQ << std::endl;
+		}
+
 		//Qs.makeCompressed();
 		//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
         //                   Qs.innerIndexPtr(),Qs.valuePtr());
+
+
+		double time_construct_Qperturb = - omp_get_wtime();
 
 		for(int i=nu; i<(n); i++){
 			Qx.coeffRef(i,i) = 1e-5;
@@ -432,18 +470,32 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 
 		Qx.makeCompressed();
 
+		if(MPI_rank == 1){
+			time_construct_Qperturb += omp_get_wtime();
+			std::cout << "construct Qperturb time      : " << time_construct_Qperturb << std::endl;
+		}
+
+
 		#ifdef PRINT_MSG
 			//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 			//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
 		#endif
 
-		Q =  Qx + exp_theta0 * Ax.transpose() * Ax;
+		Q =  Qx + exp_theta0 * AxTAx;
 
 		#ifdef PRINT_MSG
 			std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
 			std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
 		#endif
+
+		if(MPI_rank == 1){
+			time_construct_Qx_total += omp_get_wtime();
+			std::cout << "construct time_construct_Qx_total      : " << time_construct_Qx_total << std::endl;
+		}
+
 	}
+
+
 
 	if(ns == 0){
 		// Q.e <- Diagonal(no, exp(theta))
@@ -502,8 +554,14 @@ void Model::eval_denominator(Vector& theta, double& log_det, double& val, SpMat&
 	// returns vector mu, which is of the same size as rhs
 	//solve_cholmod(Q, rhs, mu, log_det);
 
+	double time_solve_fct = - omp_get_wtime();
 	int tid = omp_get_thread_num();
 	solverQ->factorize_solve(Q, rhs, mu, log_det);
+
+	if(MPI_rank == 1){
+		time_solve_fct += omp_get_wtime();
+		std::cout << "factorise solve function time : " << time_solve_fct << std::endl;
+	}
 
 	log_det = 0.5 * (log_det);
 	

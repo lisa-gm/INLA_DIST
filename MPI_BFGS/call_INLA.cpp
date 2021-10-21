@@ -338,6 +338,7 @@ int main(int argc, char* argv[])
         Vector grad = fun->get_grad();
         std::cout << "grad                         :" << grad.transpose() << std::endl;
 
+        #if 0 
         Vector theta_max(dim_th);
         //theta_max = theta;
         theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
@@ -364,6 +365,7 @@ int main(int argc, char* argv[])
             std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
             std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
         } 
+        #endif
 
         // put all workers to sleep using 0 tag
         for(int i=1; i<MPI_size; i++){
@@ -394,101 +396,6 @@ int main(int argc, char* argv[])
 
         delete model;
     }
-
-
-
-
-    #if 0 
-    //std::optional<PostTheta> fun;
-    PostTheta* fun;
-
-    if(ns == 0){
-        // fun.emplace(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior, solver_type);
-    } else if(ns > 0 && nt == 1) {
-        std::cout << "\ncall spatial constructor." << std::endl;
-        // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior, solver_type);
-    } else {
-        std::cout << "\ncall spatial-temporal constructor." << std::endl;
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
-    }
-
-
-    double fx;
-
-    //Vector grad_test(dim_th);
-    //fx = fun(theta, grad_test);
-    //std::cout <<  "f(x) = " << fx << std::endl;
-
-    std::cout << "\nCall BFGS solver now. " << std::endl;
-
-    double time_bfgs = -omp_get_wtime();
-    int niter = solver.minimize(*fun, theta, fx);
-
-    time_bfgs += omp_get_wtime();
-
-    std::cout << niter << " iterations" << std::endl;
-    std::cout << "BFGS solver time             : " << time_bfgs << " sec" << std::endl;
-
-    #endif
-
-    #if 0
-
-
-    std::cout << "\nf(x)                         : " << fx << std::endl;
-
-    /*int fct_count = fun->get_fct_count();
-    std::cout << "function counts thread zero  : " << fct_count << std::endl;*/
-
-    Vector grad = fun->get_grad();
-    std::cout << "grad                         : " << grad.transpose() << std::endl;
-
-    std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
-    std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;
-
-    // convert between different theta parametrisations
-    if(dim_th == 4){
-        double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
-        double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret(lgamE, lgamS, lgamT, sigU, ranS, ranT);
-        std::cout << "est. mean interpret. param.  : " << theta[0] << " " << sigU << " " << ranS << " " << ranT << std::endl;
-        
-        double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_sigU, prior_ranS, prior_ranT);
-        std::cout << "org. mean interpret. param.  : " << theta_prior[0] << " " << prior_sigU << " " << prior_ranS << " " << prior_ranT << std::endl;
-    }
-
-    Vector theta_max(dim_th);
-    //theta_max << 2.675054, -2.970111, 1.537331;    // theta
-    //theta_max = theta_prior;
-    theta_max = theta;
-
-    // in what parametrisation are INLA's results ... ?? 
-    MatrixXd cov = fun->get_Covariance(theta_max);
-    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
-
-    /*std::cout << "estimated covariance theta   :  \n" << cov << std::endl;
-    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;*/
-
-    #endif
-
-
-
-    #if 0
-
-    Vector mu(n);
-    fun->get_mu(theta_max, mu);
-    std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
-    
-    // when the range of u is large the variance of b0 is large.
-    Vector marg(n);
-    fun->get_marginals_f(theta_max, marg);
-    std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
-    #endif
-
-    //delete fun;
-    //delete model;
 
     MPI_Finalize();
 

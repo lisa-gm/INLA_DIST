@@ -16,7 +16,7 @@
 #include <iomanip>
 
 #include <Eigen/Dense>
-#include <Eigen/CholmodSupport>
+//#include <Eigen/CholmodSupport>
 #include <unsupported/Eigen/KroneckerProduct>
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now

@@ -12,7 +12,7 @@
 #include <iostream>
 #include <LBFGS.h>
 
-#include <optional>
+//#include <optional>
 
 #include <armadillo>
 
@@ -90,7 +90,10 @@ int main(int argc, char* argv[])
     size_t ns = atoi(argv[1]);
     size_t nt = atoi(argv[2]);
     size_t nb = atoi(argv[3]);
-    size_t no = atoi(argv[4]);
+    //size_t no = atoi(argv[4]);
+    std::string no_s = argv[4];
+    // to be filled later
+    size_t no;
 
     // set nt = 1 if ns > 0 & nt = 0
     if(ns > 0 && nt == 0){
@@ -101,7 +104,7 @@ int main(int argc, char* argv[])
     std::string ns_s = std::to_string(ns);
     std::string nt_s = std::to_string(nt);
     std::string nb_s = std::to_string(nb);
-    std::string no_s = std::to_string(no); 
+    //std::string no_s = std::to_string(no); 
     std::string n_s  = std::to_string(ns*nt + nb);
 
     std::string base_path = argv[5];    
@@ -143,6 +146,10 @@ int main(int argc, char* argv[])
         std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
         file_exists(B_file); 
 
+        // casting no_s as integer
+        no = std::stoi(no_s);
+        std::cout << "total number of observations : " << no << std::endl;
+      
         B = read_matrix(B_file, no, nb);
 
         // std::cout << "y : \n"  << y << std::endl;    
@@ -171,7 +178,13 @@ int main(int argc, char* argv[])
         g1 = read_sym_CSC(g1_file);
         g2 = read_sym_CSC(g2_file);
 
+        // doesnt require no to be read, can read no from Ax
         Ax = readCSC(Ax_file);
+        // get rows from the matrix directly
+        // doesnt work for B
+        no = Ax.rows();
+        std::cout << "total number of observations : " << no << std::endl;
+
 
         /*std::cout << "g1 : \n" << g1.block(0,0,10,10) << std::endl;
         std::cout << "g2 : \n" << g2.block(0,0,10,10) << std::endl;
@@ -219,16 +232,21 @@ int main(int argc, char* argv[])
         //arma::mat(M2).submat(0,0,nt-1,nt-1).print();
 
         Ax = readCSC(Ax_file);
+        // get rows from the matrix directly
+        // doesnt work for B
+        no = Ax.rows();
+        std::cout << "total number of observations : " << no << std::endl;
 
     } else {
         std::cout << "invalid parameters : ns nt !!" << std::endl;
         exit(1);
     }
 
-
     // data y
     std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
     file_exists(y_file);
+    // at this point no is set ... 
+    // not a pretty solution. 
     y = read_matrix(y_file, no, 1);
 
 
@@ -265,9 +283,9 @@ int main(int argc, char* argv[])
 
         // =========== synthetic data set =============== //
         std::cout << "using SYNTHETIC DATASET" << std::endl;        
-        //theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
+        theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
-        theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
+        //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
         std::cout << "theta original     : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << 1.4, -5.9,  1,  3.7; 
         theta << 1, -3, 1, 3;
@@ -326,7 +344,7 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
     }
 
-    #if 0
+    #if 1
     double fx;
 
     //Vector grad_test(dim_th);
@@ -389,8 +407,8 @@ int main(int argc, char* argv[])
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    //theta_max = theta;
-    theta_max << 1.382388, -5.626002,  1.156931,  3.644319;
+    theta_max = theta;
+    //theta_max << 1.382388, -5.626002,  1.156931,  3.644319;
     //theta_max << 1.388921, -5.588113,  0.985369,  3.719458;
     //theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
     //theta_max << 1.4608052, -5.8996978,  0.6805342,  3.8358287; 
@@ -438,7 +456,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
 
     Vector mu(n);
     fun->get_mu(theta, mu);

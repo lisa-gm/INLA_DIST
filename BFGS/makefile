@@ -60,16 +60,16 @@ CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-llikwid -DLI
 # LIBRARIES
 LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
-LIBCHOLMOD=-lcholmod
+#LIBCHOLMOD=-lcholmod
 
-LIBS=$(LIBPARDISO) $(LIBMKL) $(LIBCHOLMOD)
+LIBS=$(LIBPARDISO) $(LIBMKL) #$(LIBCHOLMOD)
 
 # INCLUDES
 INCEIGEN=-I/usr/include/eigen3
 INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
-INCCHOLMOD= -I/usr/include/suitesparse
+#INCCHOLMOD= -I/usr/include/suitesparse
 
-INCLUDES=$(INCEIGEN) $(INCBFGS) $(INCCHOLMOD)
+INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
 all: call_INLA
 
