@@ -18,13 +18,13 @@ PardisoSolver::PardisoSolver(){
 
     if (error != 0) 
     {
-    if (error == -10 )
-       printf("No license file found \n");
-    if (error == -11 )
-       printf("License is expired \n");
-    if (error == -12 )
-       printf("Wrong username or hostname \n");
-       exit(1); 
+        if (error == -10 )
+           printf("No license file found \n");
+        if (error == -11 )
+           printf("License is expired \n");
+        if (error == -12 )
+           printf("Wrong username or hostname \n");
+        exit(1); 
     } else {
         #ifdef PRINT_PAR
             printf("[PARDISO]: License check was successful ... \n");
@@ -97,12 +97,12 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
         ia[i] = Q_lower.outerIndexPtr()[i]; 
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        ja[i] = Q_lower.innerIndexPtr()[i];
+    for (l = 0; l < nnz; ++l){
+        ja[l] = Q_lower.innerIndexPtr()[l];
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        a[i] = Q_lower.valuePtr()[i];
+    for (l = 0; l < nnz; ++l){
+        a[l] = Q_lower.valuePtr()[l];
     } 
 
     nnz = ia[n];
@@ -114,8 +114,8 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
     for (i = 0; i < n+1; i++) {
         ia[i] += 1;
     }
-    for (i = 0; i < nnz; i++) {
-        ja[i] += 1;
+    for (l = 0; l < nnz; l++) {
+        ja[l] += 1;
     }
 
     /* -------------------------------------------------------------------- */
@@ -182,9 +182,9 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
     SpMat Q_lower = Q.triangularView<Lower>(); 
 
     // check if nnz and Q_lower.nonZeros match
-    if(nnz != Q_lower.nonZeros()){
+    if(nnz != (long unsigned int)Q_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
     }
 
     int* ia; 
@@ -198,16 +198,16 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
 
     Q_lower.makeCompressed();
 
-    for (int i = 0; i < n+1; ++i){
+    for (i = 0; i < n+1; ++i){
         ia[i] = Q_lower.outerIndexPtr()[i]; 
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        ja[i] = Q_lower.innerIndexPtr()[i];
+    for (l = 0; l < nnz; ++l){
+        ja[l] = Q_lower.innerIndexPtr()[l];
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        a[i] = Q_lower.valuePtr()[i];
+    for (l = 0; l < nnz; ++l){
+        a[l] = Q_lower.valuePtr()[l];
     }
 
     // TODO: save work, some already 1-based ... make sure that this is bullet proof.
@@ -219,8 +219,8 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
     for (i = 0; i < n+1; i++) {
         ia[i] += 1;
     }
-    for (i = 0; i < nnz; i++) {
-        ja[i] += 1;
+    for (l = 0; l < nnz; l++) {
+        ja[l] += 1;
     }      
 
     /* -------------------------------------------------------------------- */
@@ -278,9 +278,9 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &
     SpMat Q_lower = Q.triangularView<Lower>(); 
 
     // check if nnz and Q_lower.nonZeros match
-    if(nnz != Q_lower.nonZeros()){
+    if(nnz != (long unsigned int)Q_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
     }
 
     int* ia; 
@@ -294,23 +294,23 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &
 
     Q_lower.makeCompressed();
 
-    for (int i = 0; i < n+1; ++i){
+    for (i = 0; i < n+1; ++i){
         ia[i] = Q_lower.outerIndexPtr()[i]; 
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        ja[i] = Q_lower.innerIndexPtr()[i];
+    for (l = 0; l < nnz; ++l){
+        ja[l] = Q_lower.innerIndexPtr()[l];
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        a[i] = Q_lower.valuePtr()[i];
+    for (l = 0; l < nnz; ++l){
+        a[l] = Q_lower.valuePtr()[l];
     }
 
     b = new double [n];
     x = new double [n];
 
     /* Set right hand side to i. */
-    for (int i = 0; i < n; i++) {
+    for (i = 0; i < n; i++) {
         b[i] = rhs[i];
     } 
 
@@ -338,8 +338,8 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &
     for (i = 0; i < n+1; i++) {
         ia[i] += 1;
     }
-    for (i = 0; i < nnz; i++) {
-        ja[i] += 1;
+    for (l = 0; l < nnz; l++) {
+        ja[l] += 1;
     }      
 
     /* -------------------------------------------------------------------- */
@@ -422,9 +422,9 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vector& inv_diag){
     SpMat Q_lower = Q.triangularView<Lower>(); 
 
     // check if nnz and Q_lower.nonZeros match
-    if(nnz != Q_lower.nonZeros()){
+    if(nnz != (long unsigned int)Q_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
     }
 
     int* ia; 
@@ -438,16 +438,16 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vector& inv_diag){
 
     Q_lower.makeCompressed();
 
-    for (int i = 0; i < n+1; ++i){
+    for (i = 0; i < n+1; ++i){
         ia[i] = Q_lower.outerIndexPtr()[i]; 
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        ja[i] = Q_lower.innerIndexPtr()[i];
+    for (l = 0; l < nnz; ++l){
+        ja[l] = Q_lower.innerIndexPtr()[l];
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        a[i] = Q_lower.valuePtr()[i];
+    for (l = 0; l < nnz; ++l){
+        a[l] = Q_lower.valuePtr()[l];
     }
 
     // TODO: make already one-based in the above loop
@@ -459,8 +459,8 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vector& inv_diag){
     for (i = 0; i < n+1; i++) {
         ia[i] += 1;
     }
-    for (i = 0; i < nnz; i++) {
-        ja[i] += 1;
+    for (l = 0; l < nnz; l++) {
+        ja[l] += 1;
     }      
 
     /* -------------------------------------------------------------------- */
@@ -546,9 +546,9 @@ void PardisoSolver::compute_inverse_pardiso(MatrixXd& Q, MatrixXd& C){
     SpMat H_lower = H.triangularView<Lower>(); 
 
     // check if nnz and H_lower.nonZeros match
-    if(nnz != H_lower.nonZeros()){
+    if(nnz != (long unsigned int)H_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %d.\n nnz(H_lower) = %ld\n", nnz, H_lower.nonZeros());
+        printf("nnz = %ld.\n nnz(H_lower) = %ld\n", nnz, H_lower.nonZeros());
     }
 
     // IMPORTANT : change the number of right-hand sides
@@ -565,16 +565,16 @@ void PardisoSolver::compute_inverse_pardiso(MatrixXd& Q, MatrixXd& C){
 
     H_lower.makeCompressed();
 
-    for (int i = 0; i < n+1; ++i){
+    for (i = 0; i < n+1; ++i){
         ia[i] = H_lower.outerIndexPtr()[i]; 
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        ja[i] = H_lower.innerIndexPtr()[i];
+    for (l = 0; l < nnz; ++l){
+        ja[l] = H_lower.innerIndexPtr()[l];
     }  
 
-    for (int i = 0; i < nnz; ++i){
-        a[i] = H_lower.valuePtr()[i];
+    for (l = 0; l < nnz; ++l){
+        a[l] = H_lower.valuePtr()[l];
     }
 
     int n2 = n*n;
@@ -613,8 +613,8 @@ void PardisoSolver::compute_inverse_pardiso(MatrixXd& Q, MatrixXd& C){
     for (i = 0; i < n+1; i++) {
         ia[i] += 1;
     }
-    for (i = 0; i < nnz; i++) {
-        ja[i] += 1;
+    for (l = 0; l < nnz; l++) {
+        ja[l] += 1;
     }      
 
     /* -------------------------------------------------------------------- */

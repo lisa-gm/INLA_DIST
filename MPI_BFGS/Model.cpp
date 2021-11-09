@@ -23,8 +23,8 @@ Model::Model(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector thet
 		solverQ   = new PardisoSolver();
 		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver();
-		solverQst = new RGFSolver();
+		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
 
 	// set global counter to count function evaluations
@@ -65,8 +65,8 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 		solverQ   = new PardisoSolver();
 		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver();
-		solverQst = new RGFSolver();
+		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
 
 	// set global counter to count function evaluations
@@ -105,8 +105,8 @@ Model::Model(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c
 		solverQ   = new PardisoSolver();
 		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver();
-		solverQst = new RGFSolver();
+		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
 
 	// set global counter to count function evaluations
@@ -318,7 +318,6 @@ void Model::eval_log_det_Qu(Vector& theta, double &log_det){
 		construct_Q_spatial(theta, Qu);
 	}
 
-	int tid = omp_get_thread_num();
 	solverQst->factorize(Qu, log_det);
 
 	#ifdef PRINT_MSG
@@ -411,7 +410,9 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 		std::cout << "number of Eigen threads : " << threads_eigen << std::endl;
 	}*/
 
+	#ifdef PRINT_TIMES
 	double time_construct_Qx_total = - omp_get_wtime();
+	#endif
 
 	double exp_theta0 = exp(theta[0]);
 	//double exp_theta = exp(3);
@@ -424,7 +425,9 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 		SpMat Qu(nu, nu);
 		// TODO: find good way to assemble Qx
 
+		#ifdef PRINT_TIMES		
 		double time_construct_Qst = - omp_get_wtime();
+		#endif
 
 		if(nt > 1){
 			construct_Q_spat_temp(theta, Qu);
@@ -432,12 +435,16 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 			construct_Q_spatial(theta, Qu);
 		}	
 
+		#ifdef PRINT_TIMES
 		if(MPI_rank == 1){
 			time_construct_Qst += omp_get_wtime();
 			std::cout << "construct Qst time             : " << time_construct_Qst << std::endl;
 		}
+		#endif
 
+		#ifdef PRINT_TIMES
 		double time_construct_extraQ = - omp_get_wtime();
+		#endif
 
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
 		// construct Qx from Qs values, extend by zeros 
@@ -452,17 +459,22 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 		    Qx.insert(it.row(),it.col()) = it.value();                 
 		  }
 
+		#ifdef PRINT_TIMES
 		if(MPI_rank == 1){
 			time_construct_extraQ += omp_get_wtime();
 			std::cout << "construct extraQ time      : " << time_construct_extraQ << std::endl;
 		}
+		#endif
+
 
 		//Qs.makeCompressed();
 		//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
         //                   Qs.innerIndexPtr(),Qs.valuePtr());
 
 
+		#ifdef PRINT_TIMES
 		double time_construct_Qperturb = - omp_get_wtime();
+		#endif
 
 		for(int i=nu; i<(n); i++){
 			Qx.coeffRef(i,i) = 1e-5;
@@ -470,10 +482,12 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 
 		Qx.makeCompressed();
 
+		#ifdef PRINT_TIMES
 		if(MPI_rank == 1){
 			time_construct_Qperturb += omp_get_wtime();
 			std::cout << "construct Qperturb time      : " << time_construct_Qperturb << std::endl;
 		}
+		#endif
 
 
 		#ifdef PRINT_MSG
@@ -488,10 +502,12 @@ void Model::construct_Q(Vector& theta, SpMat& Q){
 			std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
 		#endif
 
+		#ifdef PRINT_TIMES
 		if(MPI_rank == 1){
 			time_construct_Qx_total += omp_get_wtime();
 			std::cout << "construct time_construct_Qx_total      : " << time_construct_Qx_total << std::endl;
 		}
+		#endif
 
 	}
 
@@ -554,14 +570,18 @@ void Model::eval_denominator(Vector& theta, double& log_det, double& val, SpMat&
 	// returns vector mu, which is of the same size as rhs
 	//solve_cholmod(Q, rhs, mu, log_det);
 
+	#ifdef PRINT_TIMES
 	double time_solve_fct = - omp_get_wtime();
-	int tid = omp_get_thread_num();
+	#endif
+
 	solverQ->factorize_solve(Q, rhs, mu, log_det);
 
+	#ifdef PRINT_TIMES
 	if(MPI_rank == 1){
 		time_solve_fct += omp_get_wtime();
 		std::cout << "factorise solve function time : " << time_solve_fct << std::endl;
 	}
+	#endif
 
 	log_det = 0.5 * (log_det);
 	
@@ -592,7 +612,9 @@ void Model::compute_marginals_f(Vector& theta, Vector& vars){
 		std::cout << "after construct Q in get get_marginals_f" << std::endl;
 	#endif
 
+	#ifdef PRINT_TIMES
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
+	#endif
 
 	// need this since we have nested parallelism, want lowest layer for PARDISO
 	#pragma omp parallel

@@ -34,6 +34,9 @@ class Solver {
 		virtual void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det) = 0;
 		virtual void selected_inversion(SpMat&Q, Vector& inv_diag) = 0;
 
+   		virtual ~Solver(){
+   			// ok what
+   		}
 		// "simple inversion" function for small matrices. exists already in pardiso.
    
    protected:
@@ -44,6 +47,7 @@ class Solver {
 		SpMat Q; 			/**< sparse precision matrix Q. Eigen format. */
 		Vector rhs;			/**< right-hand side, solving Q*sol = rhs     */
 		Vector sol;			/**< solution vector, solving Q*sol = rhs     */
+
 };
 
 

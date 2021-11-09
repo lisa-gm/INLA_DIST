@@ -45,7 +45,7 @@ private:
 
     /* matrix size */
     int n;                  /**< size of the matrix */
-    unsigned int nnz;       /**< number of nonzeros */
+    long unsigned int nnz;       /**< number of nonzeros */
 
     SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
 
@@ -66,7 +66,9 @@ private:
     int      num_procs;     /**< Number of processors. */
 
     /* Auxiliary variables. */
-    int      i, k;
+    int      i;
+    int      k;
+    long unsigned int l;
 
     double   ddum;              /**< Double dummy */
     int      idum;              /**< Integer dummy. */

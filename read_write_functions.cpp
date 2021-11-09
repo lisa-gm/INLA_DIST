@@ -240,7 +240,7 @@ int main(int argc, char** argv)
   std::cout << B << std::endl; 
 
 
-  /*SpMat A = read_sym_CSC(path_to_file);
+  SpMat A = read_sym_CSC(path_to_file);
   std::cout << "A : " << std::endl;
   std::cout << MatrixXd(A) << std::endl; */
 

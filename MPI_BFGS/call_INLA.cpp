@@ -14,7 +14,7 @@
 
 #include "mpi.h"
 
-#include <optional>
+//#include <optional>
 
 #include <armadillo>
 
@@ -256,25 +256,19 @@ int main(int argc, char* argv[])
     Vector theta(dim_th);
     Vector theta_prior(dim_th);
 
-    int n;
-
     // initialise theta
     if(ns == 0 && nt == 0){
-        n = nb;
         // Initial guess
         theta[0] = 3;
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else if(ns > 0 && nt == 1){
-        n = ns + nb;
         //theta << 1, -1, 1;
         theta << 1, -2, 2;
         theta_prior << 0, 0, 0;
         std::cout << "initial theta : "  << theta.transpose() << std::endl;    
 
     } else {
-        n = ns*nt + nb;
-
         // =========== synthetic data set =============== //
         theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution
         //theta << 1.4, -5.9,  1,  3.7; 
@@ -320,7 +314,7 @@ int main(int argc, char* argv[])
         // in the past ... steps
         param.past = 1;
         // maximum line search iterations
-        param.max_iterations = 30;
+        param.max_iterations = 1;
         // TODO: stepsize too small? seems like it almost always accepts step first step.
 
         // Create solver and function object

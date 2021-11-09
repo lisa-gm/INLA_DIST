@@ -53,8 +53,8 @@ RGF/CWC_utility.o: RGF/CWC_utility.cu
 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
 
-call_INLA: call_INLA.cpp PostTheta.o Model.o PardisoSolver.o RGFSolver.o #RGF/Utilities.o RGF/CWC_utility.o #solver_cholmod.o 
-	$(CXX) $^ -o $@  $(INCLUDES) $(LIBS) $(CXXFLAGS) #$(LOADFLAGS) $(RGF_FLAGS) $(RGF_LIBS) -lm #$(LDFLAGS) $(LDLIBS) 
+call_INLA: call_INLA.cpp PostTheta.o Model.o PardisoSolver.o RGFSolver.o RGF/Utilities.o RGF/CWC_utility.o #solver_cholmod.o 
+	$(CXX) $^ -o $@  $(INCLUDES) $(LIBS) $(CXXFLAGS) $(LOADFLAGS) $(RGF_FLAGS) $(RGF_LIBS) -lm #$(LDFLAGS) $(LDLIBS) 
 
 %.o : %.cpp %.h
 	$(CXX) $(LIBS) -c $< -o $@ $(INCLUDES) $(CXXFLAGS) 

@@ -20,7 +20,7 @@
 #include <iomanip>
 
 #include <Eigen/Dense>
-#include <Eigen/CholmodSupport>
+//#include <Eigen/CholmodSupport>
 #include <unsupported/Eigen/KroneckerProduct>
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
@@ -58,30 +58,19 @@ class Model{
     int nu;				/**<  number of random effects, that ns*nu 			*/
     int n;				/**<  total number of unknowns, i.e. ns*nt + nb 	*/
 
-	int dim_th;			/**<  dimension of hyperparameter vector theta 		*/
-	int threads_level1; /**<  number of threads on first level 				*/
-	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
-	int num_solvers;    /**<  number of pardiso solvers 					*/
-
-	Solver* solverQ;
-	Solver* solverQst;
-
-	string solver_type;
-
 	int fct_count;      /**< count total number of function evaluations 	*/
 	int iter_count;		/**< count total number of operator() call        	*/
 
-    VectorXd y; 		/**<  vector of observations y. has length no. 		*/
-    Vector theta_prior; /**<  vector with prior values. Constructs normal
- 						      distribution with sd = 1 around these values. */
-
     // either Ax or B used
-    SpMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
-    						 observation locations onto FEM mesh and 
-    						 includes covariates at the end.                */
+    SpMat Ax;           /**< sparse matrix of size no x (nu+nb). Projects 
+                             observation locations onto FEM mesh and 
+                             includes covariates at the end.                */
     SpMat AxTAx;        /**< sparse matrix defined as Ax.transpose()*Ax     */
-    MatrixXd B; 		/**< if space (-time) model included in last 
-    						 columns of Ax. For regression only B exists.   */
+    MatrixXd B;         /**< if space (-time) model included in last 
+                             columns of Ax. For regression only B exists.   */
+
+    VectorXd y; 		/**<  vector of observations y. has length no. 		*/
+    double yTy;         /**< compute t(y)*y once. */
 
     // used in spatial and spatial-temporal case
     SpMat c0;			/**< Diagonal mass matrix spatial part. 			*/
@@ -95,16 +84,28 @@ class Model{
     							-> account for boundary						*/
     SpMat M2;			/**< stiffness matrix time.							*/
 
+    Vector theta_prior; /**<  vector with prior values. Constructs normal
+                              distribution with sd = 1 around these values. */
 
-    double yTy;			/**< compute t(y)*y once. */
-    Vector mu;			/**< conditional mean */
-    Vector t_grad;		/**< gradient of theta */
-    double min_f_theta; /**< minimum of function*/
+    int dim_th;         /**<  dimension of hyperparameter vector theta      */
+    int threads_level1; /**<  number of threads on first level              */
+    int dim_grad_loop;  /**<  dimension of gradient loop                    */
+    int num_solvers;    /**<  number of pardiso solvers                     */
+
+    Solver* solverQ;
+    Solver* solverQst;
+
+    string solver_type;
 
     double* theta_array;
     Vector theta;
-    double f_theta;
     
+    double f_theta;
+    double min_f_theta; /**< minimum of function*/
+
+    Vector mu;          /**< conditional mean */
+    Vector t_grad;      /**< gradient of theta */
+
     MatrixXd hess;
 
     int MPI_rank;        /**< MPI rank of model*/
