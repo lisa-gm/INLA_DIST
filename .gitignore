@@ -1,3 +1,6 @@
+# ignore data folders
+./BFGS/RGF/data
+
 # ignoring data files
 *.dat
 
