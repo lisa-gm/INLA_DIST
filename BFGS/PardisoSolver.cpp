@@ -15,12 +15,12 @@ PardisoSolver::PardisoSolver(){
 
     if (error != 0) 
     {
-    if (error == -10 )
-       printf("No license file found \n");
-    if (error == -11 )
-       printf("License is expired \n");
-    if (error == -12 )
-       printf("Wrong username or hostname \n");
+        if (error == -10 )
+           printf("No license file found \n");
+        if (error == -11 )
+           printf("License is expired \n");
+        if (error == -12 )
+           printf("Wrong username or hostname \n");
        exit(1); 
     } else {
         #ifdef PRINT_PAR

@@ -43,8 +43,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y
 		}
 	} else if(solver_type == "RGF"){
 		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
+			solverQ[i]   = new RGFSolver(ns, nt, nb, no);
+			solverQst[i] = new RGFSolver(ns, nt, nb, no);
 		}
 	} 
 
@@ -93,8 +93,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 		}
 	} else if(solver_type == "RGF"){
 		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
+			solverQ[i]   = new RGFSolver(ns, nt, nb, no);
+			solverQst[i] = new RGFSolver(ns, nt, nb, no);
 		}
 	} 
 
@@ -144,8 +144,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 		}
 	} else if(solver_type == "RGF"){
 		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver();
-			solverQst[i] = new RGFSolver();
+			solverQ[i]   = new RGFSolver(ns, nt, nb, no);
+			solverQst[i] = new RGFSolver(ns, nt, nb, no);
 		}
 	} 
 

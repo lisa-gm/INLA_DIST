@@ -9,19 +9,19 @@
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <iostream>
+#include <unsupported/Eigen/KroneckerProduct>
+
+#include <armadillo>
+
 #include <LBFGS.h>
 
 //#include <optional>
-
-#include <armadillo>
 
 #include "PostTheta.h"
 #include "../read_write_functions.cpp"
 
 //#include "PardisoSolver.h"
 //#include "RGFSolver.h"
-#include <unsupported/Eigen/KroneckerProduct>
 
 //#include <likwid-marker.h>
 
@@ -402,7 +402,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta

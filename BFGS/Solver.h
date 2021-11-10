@@ -33,6 +33,9 @@ class Solver {
 		virtual void selected_inversion(SpMat&Q, Vector& inv_diag) = 0;
 
 		// "simple inversion" function for small matrices. exists already in pardiso.
+        virtual ~Solver(){                      
+              // ok what                   
+      	}
    
    protected:
    		int init;			/**< flag indicating if symbolic factorisation

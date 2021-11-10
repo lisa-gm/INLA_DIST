@@ -1,65 +1,19 @@
 
-
-#CXX_COMPILER=g++
-#CXX_FLAGS= -lm -lcholmod -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC
-
-#SRC_FILES= example.cpp theta_function.cpp ../read_write_functions.cpp
-
-#INCLUDES= -I/usr/include/eigen3 -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse
-
 MKLROOT?=$(shell echo $$MKLROOT)
-#PARDISO_LIB=/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so
 
-
-#example: $(SRC_FILES)
-#	$(CXX_COMPILER) $(SRC_FILES) -o example $(INCLUDES) $(MKL_LIB) $(PARDISO_LIB) $(CXX_FLAGS)
-
-# -O0 -g -fsanitize=address -Wall 
-# -pg
-# call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
-#call_INLA: call_INLA.cpp PostTheta.cpp PardisoSolver.cpp
-#	g++ call_INLA.cpp PostTheta.cpp PardisoSolver.cpp -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
-	-fopenmp \
-	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L/opt/intel/oneapi/mkl/latest/lib/intel64 -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
-
-
-# -O0 -g -fsanitize=address 
-#call_INLA: call_INLA.cpp
-#	rm -f example || true
-#	g++ $< -o $@ -O0 -g -fsanitize=address -lgfortran -lpthread -lm -lgomp -fPIC -fopenmp -fPIC -lm -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
-#	-fopenmp \
-#	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core \
-	
-
-#example: example.cpp
-#	rm -f test_file || true
-#	g++ $< -o $@ -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
-	-fopenmp \
-	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -lblas -llapack -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
-
-
-# -std=c++17
-#g++ -I/path/to/eigen -I/path/to/lbfgspp/include -O2 example.cpp
-
-#test_file: test_file.cpp
-#	g++ $< -o $@ -fopenmp -I/usr/include/eigen3 -lm -I/home/x_gaedkelb/applications/LBFGSpp/include -I/usr/include/suitesparse -lcholmod -lm \
-#	/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so -L/opt/intel/oneapi/mkl/latest/lib/intel64 -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -lpthread -lm -lgomp -lgfortran -fPIC  -fopenmp -fPIC -lm
-
-#test_omp: test_omp.cpp
-#	g++ $< -o $@ -fopenmp
-
-#clean: 
-#	rm -f call_INLA
-#	rm -f test_file
-
-
+include ./RGF/make.inc
 #############################################################################################################
 
-CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-llikwid -DLIKWID_PERFMON
+CXX=g++
+CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
-LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
+#LIBRGF=-lrgf
+#LDFLAGS = -LRGF
+#LDLIBS = -lrgf
+
 #LIBCHOLMOD=-lcholmod
 
 LIBS=$(LIBPARDISO) $(LIBMKL) #$(LIBCHOLMOD)
@@ -71,17 +25,65 @@ INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
+############# RGF ################
+
+MKLHOME       = $(MKLROOT)/lib/intel64
+BLAHOME       = $(MKLHOME)
+LAPHOME       = $(MKLHOME)
+SCAHOME       = $(MKLHOME)
+
+RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
+RGF_LIBS	    = $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
+
+RGF_CC_FILES   = RGF/Utilities.o RGF/main.o
+RGF_CU_FILES   = RGF/CWC_utility.o
+
 all: call_INLA
 
-call_INLA: call_INLA.cpp PostTheta.o PardisoSolver.o RGFSolver.o #solver_cholmod.o 
-	$(CXX) $^ -o $@  $(INCLUDES) $(LIBS) $(CXXFLAGS) 
+#librgf.a: $(CC_FILES) $(CU_FILES)
+#	ar rvs $@ $^
+
+#librgf.so: $(CC_FILES) $(CU_FILES)
+#	$(LOADER) --shared $(CC_FILES) $(CU_FILES) $(LOADFLAGS) $(LIBS) -lm -o $@ $(DEBUG) -fPIC
+
+#RGF/main: $(RGF_CC_FILES) $(RGF_CU_FILES) 
+#	$(RGF_LOADER) $^ $(RGF_LOADFLAGS) $(RGF_LIBS) $(OPENMP) -lm -o $@ $(DEBUG)
+
+#RGF/main.o: RGF/main.C
+#	$(CXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@	
+
+RGF/Utilities.o: RGF/Utilities.C
+	$(RGF_LOADER) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@
+
+RGF/CWC_utility.o: RGF/CWC_utility.cu
+	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
+
+call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver.o RGF/Utilities.o RGF/CWC_utility.o #solver_cholmod.o 
+	$(RGF_LOADER) $^ $(LOADFLAGS) $(RGF_LOADFLAGS) $(LIBS) $(RGF_LIBS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
+
+call_INLA.o: call_INLA.cpp
+	$(CXX) -c $< $(CXXFLAGS) $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCLUDES) $(RGF_INCLUDEDIR) -o $@ 
 
 %.o : %.cpp %.h
-	$(CXX) $(LIBS) -c $< -o $@ $(INCLUDES) $(CXXFLAGS)
+	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@ 
+
+#RGF/librgf.a:
+#	$(MAKE) -C RGF
+
+#RGF/librgf.so:
+#	$(MAKE) -C RGF
 
 
-clean:
-	rm -f call_INLA
-	rm -f *.o
+#clean:
+#	rm -f call_INLA
+#	rm -f *.o
+
+clean:	
+	rm -f *.o call_INLA
+	rm -f RGF/*.o
+	rm -f RGF/main
+	#rm -f librgf.so
+	#rm -f librgf.a
+
 
 
