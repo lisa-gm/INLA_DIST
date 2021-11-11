@@ -4,7 +4,10 @@
 
 
 RGFSolver::RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_) : ns(ns_), nt(nt_), nb(nb_), no(no_){
+   	
+   	#ifdef PRINT_MSG
    	std::cout << "constructing RGF solver." << std::endl;
+   	#endif
 
    	n = ns*nt + nb;
 
@@ -16,16 +19,23 @@ void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 	std::cout << "Placeholder SYMBOLIC_FACTORIZATION()." << std::endl;
 }
 
+// NOTE: this function is written to factorize prior! Assumes tridiagonal structure.
 void RGFSolver::factorize(SpMat& Q, double& log_det) {
-	log_det = 1;
+
+	#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE()." << std::endl;
+	#endif
 
 	// check if n and Q.size() match
-    if(n != Q.rows()){
+    if((n-nb) != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
-        printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+        printf("n-nb = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
         exit(1);
     }
+
+    #ifdef PRINT_MSG
+    	std::cout << "Q in RGFSolver.cpp : \n" << Q.block(0,0,10,10) << std::endl;
+    #endif
 
 	// only take lower triangular part of A
     SpMat Q_lower = Q.triangularView<Lower>(); 
@@ -58,16 +68,10 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	double t_factorise;
 	RGF<T> *solver;
 
-	time_t rawtime;
-	struct tm *timeinfo;
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	printf ("The current date/time is: %s\n",asctime(timeinfo));
-
 	// cast ns, nt, nb as size_t
 	size_t ns_ = ns;
 	size_t nt_ = nt;
-	size_t nb_ = nb;
+	size_t nb  = 0;
 
 	solver = new RGF<T>(ia, ja, a, ns_, nt_, nb_);
 
@@ -77,7 +81,19 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	t_factorise = get_time(t_factorise);
 
 	log_det = solver->logDet();
+
+	#ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
+	#endif
+
+	#ifdef PRINT_TIMES
+	printf("RGF factorise time: %lg\n",t_factorise);
+	#endif
+
+	delete solver;
+	delete ia;
+	delete ja;
+	delete a;
 
 	#endif
 
@@ -88,8 +104,9 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
 	//sol.setOnes();
 	//std::cout << "Placeholder FACTORIZE_SOLVE()." << std::endl;
 
-		log_det = 1;
-	std::cout << "in RGF FACTORIZE()." << std::endl;
+	#ifdef PRINT_MSG
+	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
+	#endif
 
 	// check if n and Q.size() match
     if(n != Q.rows()){
@@ -130,12 +147,6 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
 	double t_solve;
 	RGF<T> *solver;
 
-	time_t rawtime;
-	struct tm *timeinfo;
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	printf ("The current date/time is: %s\n",asctime(timeinfo));
-
 	// cast ns, nt, nb as size_t
 	size_t ns_ = ns;
 	size_t nt_ = nt;
@@ -149,7 +160,10 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
 	t_factorise = get_time(t_factorise);
 
 	log_det = solver->logDet();
+
+	#ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
+	#endif
 
 	T *b;
   	T *x;
@@ -166,13 +180,17 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
   	t_solve = get_time(0.0); 
   	double flops_solve = solver->solve(x, b, 1);
   	t_solve = get_time(t_solve);
-  	printf("flops solve:     %f\n", flops_solve);
 
-  	printf("RGF factorise time: %lg\n",t_factorise);
-  	printf("RGF solve     time: %lg\n",t_solve);
-
+  	#ifdef PRINT_MSG
+  	//printf("flops solve:     %f\n", flops_solve);
 	printf("Residual norm: %e\n", solver->residualNorm(x, b));
 	printf("Residual norm normalized: %e\n", solver->residualNormNormalized(x, b));
+	#endif
+
+	#ifdef PRINT_TIMES
+	printf("RGF factorise time: %lg\n",t_factorise);
+  	printf("RGF solve     time: %lg\n",t_solve);
+  	#endif
 
   	// assign b to correct format
   	for (int i = 0; i < n; i++){
@@ -181,6 +199,13 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
   	}	
 
   	#endif
+
+  	delete ia;
+  	delete ja;
+  	delete a;
+  	delete solver;
+  	delete x;
+  	delete b;
 }
 
 void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {

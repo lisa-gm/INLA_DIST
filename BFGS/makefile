@@ -8,7 +8,7 @@ CXX=g++
 CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
-LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 #LIBRGF=-lrgf
 #LDFLAGS = -LRGF
@@ -35,7 +35,7 @@ SCAHOME       = $(MKLHOME)
 RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
 RGF_LIBS	    = $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
 
-RGF_CC_FILES   = RGF/Utilities.o RGF/main.o
+RGF_CC_FILES   = RGF/Utilities.o #RGF/main.o
 RGF_CU_FILES   = RGF/CWC_utility.o
 
 all: call_INLA
