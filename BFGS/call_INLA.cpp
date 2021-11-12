@@ -115,7 +115,9 @@ int main(int argc, char* argv[])
         std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
         exit(1);
     }
+    std::cout << "Using " << solver_type << " solver." << std::endl;
 
+    
     /* ---------------- read in matrices ---------------- */
 
     // dimension hyperparamter vector
@@ -456,7 +458,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
 
     Vector mu(n);
     fun->get_mu(theta, mu);

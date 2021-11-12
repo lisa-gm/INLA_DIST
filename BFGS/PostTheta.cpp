@@ -863,8 +863,8 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 	eval_likelihood(theta, log_det_l, val_l);
 
 	#ifdef PRINT_MSG
-		std::cout << "log det l : "  << log_det_l << std::endl;
-		std::cout << "val l     : " << val_l << std::endl;
+		std::cout << "log det likelihood : "  << log_det_l << std::endl;
+		std::cout << "val likelihood     : " << val_l << std::endl;
 	#endif
 
 		// =============== evaluate denominator ================= //
