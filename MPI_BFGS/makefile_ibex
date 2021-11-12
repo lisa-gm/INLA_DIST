@@ -1,0 +1,81 @@
+
+MKLROOT?=$(shell echo $$MKLROOT)
+
+include ./RGF/make.inc
+#############################################################################################################
+
+CXX=mpic++
+CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
+
+# LIBRARIES
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
+#LIBRGF=-lrgf
+#LDFLAGS = -LRGF
+#LDLIBS = -lrgf
+
+#LIBCHOLMOD=-lcholmod
+
+LIBS=$(LIBPARDISO) $(LIBMKL) #$(LIBCHOLMOD)
+
+# INCLUDES
+INCEIGEN=-I/usr/include/eigen3
+INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
+#INCCHOLMOD= -I/usr/include/suitesparse
+
+INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
+
+
+RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
+RGF_LIBS	    = $(LAPACK) $(RGF_LINKS) $(CUDA) $(MAGMA) $(F90_LIBS)
+
+#RGF_CC_FILES   = RGF/Utilities.o RGF/main.o
+#RGF_CU_FILES   = RGF/CWC_utility.o
+
+#all: call_INLA
+
+#librgf.a: $(CC_FILES) $(CU_FILES)
+#	ar rvs $@ $^
+
+#librgf.so: $(CC_FILES) $(CU_FILES)
+#	$(LOADER) --shared $(CC_FILES) $(CU_FILES) $(LOADFLAGS) $(LIBS) -lm -o $@ $(DEBUG) -fPIC
+
+RGF/main: $(RGF_CC_FILES) $(RGF_CU_FILES) 
+	$(RGF_LOADER) $^ $(RGF_LOADFLAGS) $(RGF_LIBS) -lm -o $@ $(DEBUG)
+
+RGF/main.o: RGF/main.C
+	$(CXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_LIBS) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@	
+
+RGF/Utilities.o: RGF/Utilities.C
+	$(CXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@
+
+RGF/CWC_utility.o: RGF/CWC_utility.cu
+	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
+
+
+call_INLA: call_INLA.cpp PostTheta.o Model.o PardisoSolver.o RGFSolver.o RGF/Utilities.o RGF/CWC_utility.o #solver_cholmod.o 
+	$(CXX) $^ -o $@  $(INCLUDES) $(LIBS) $(CXXFLAGS) $(LOADFLAGS) $(RGF_FLAGS) $(RGF_LIBS) -lm #$(LDFLAGS) $(LDLIBS) 
+
+%.o : %.cpp %.h
+	$(CXX) $(LIBS) -c $< -o $@ $(INCLUDES) $(CXXFLAGS) 
+
+#RGF/librgf.a:
+#	$(MAKE) -C RGF
+
+#RGF/librgf.so:
+#	$(MAKE) -C RGF
+
+
+#clean:
+#	rm -f call_INLA
+#	rm -f *.o
+
+clean:	
+	rm -f *.o call_INLA
+	rm -f RGF/*.o
+	rm -f RGF/main
+	#rm -f librgf.so
+	#rm -f librgf.a
+
+
+
