@@ -11,17 +11,12 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
 
    	n = ns_t*nt_t + nb_t;
 
-   	/*ns_t = ns;
-   	nt_t = nt;
-   	nb_t = nb;*/
-
-
 }
 
 // currently not needed !!
 void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 	init = 1;
-	std::cout << "Placeholder SYMBOLIC_FACTORIZATION()." << std::endl;
+	std::cout << "Placeholder SYMBOLIC_FACTORIZATION() not needed for RGF." << std::endl;
 }
 
 // NOTE: this function is written to factorize prior! Assumes tridiagonal structure.
@@ -183,7 +178,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
   	#endif
 
   	// assign b to correct format
-  	for (int i = 0; i < n; i++){
+  	for (i = 0; i < n; i++){
 	    sol[i] = x[i];
   	}	
 
@@ -245,7 +240,6 @@ void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {
         a[i] = Q_lower.valuePtr()[i];
     }
 
-    #if 1
     double t_factorise;
 	double t_inv;
 
@@ -277,24 +271,9 @@ void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {
 	    inv_diag[i] = invDiag[i];
   	}
 
-    // print/write diag 
-    // base_path +
-	/*string sel_inv_file_name = "/RGF_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
-	cout << sel_inv_file_name << endl;
-	ofstream sel_inv_file(sel_inv_file_name,    ios::out | ::ios::trunc);
-
-	for (int i = 0; i < n; i++){
-	  sel_inv_file << invDiag[i] << endl;
-	}
-
-	sel_inv_file.close();
-	cout << "after writing file " << endl;*/
-
-	delete solver;
-
-	#endif
 
 	// free memory
+	delete solver;
 	delete[] ia;
 	delete[] ja;
 	delete[] a;

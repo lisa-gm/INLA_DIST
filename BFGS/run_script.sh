@@ -54,8 +54,8 @@ data_type=synthetic
 k=7
 
 #solver_type=$1
-#solver_type=PARDISO
-solver_type=RGF
+solver_type=PARDISO
+#solver_type=RGF
 	
 export PARDISOLICMESSAGE=1
 

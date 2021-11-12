@@ -1,6 +1,13 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
+############# RGF ################
+
+MKLHOME       = $(MKLROOT)/lib/intel64
+BLAHOME       = $(MKLHOME)
+LAPHOME       = $(MKLHOME)
+SCAHOME       = $(MKLHOME)
+
 include ./RGF/make.inc
 #############################################################################################################
 
@@ -11,12 +18,12 @@ CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwi
 LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 #LIBRGF=-lrgf
-#LDFLAGS = -LRGF
-#LDLIBS = -lrgf
+
 
 #LIBCHOLMOD=-lcholmod
+ARMADILLO=-larmadillo
 
-LIBS=$(LIBPARDISO) $(LIBMKL) #$(LIBCHOLMOD)
+LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
 INCEIGEN=-I/usr/include/eigen3
@@ -24,13 +31,6 @@ INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
-
-############# RGF ################
-
-MKLHOME       = $(MKLROOT)/lib/intel64
-BLAHOME       = $(MKLHOME)
-LAPHOME       = $(MKLHOME)
-SCAHOME       = $(MKLHOME)
 
 RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
 RGF_LIBS	    = $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
@@ -74,16 +74,13 @@ call_INLA.o: call_INLA.cpp
 #	$(MAKE) -C RGF
 
 
-#clean:
-#	rm -f call_INLA
-#	rm -f *.o
-
 clean:	
 	rm -f *.o call_INLA
 	rm -f RGF/*.o
 	rm -f RGF/main
-	#rm -f librgf.so
-	#rm -f librgf.a
+
+#rm -f librgf.so
+#rm -f librgf.a
 
 
 

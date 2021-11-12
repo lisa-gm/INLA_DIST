@@ -11,8 +11,10 @@ SCAHOME       = $(MKLHOME)
 
 DEBUG       =   #-Wall # -g -fsanitize=address,signed-integer-overflow
 
+ARMADILLO   = -larmadillo
+
 INCLUDEDIR  = $(INCCUD) $(INCMAG)
-LIBS	    = $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
+LIBS	    = $(ARMADILLO) $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
 
 CC_FILES   = Utilities.o main.o #intermed_fct_RGF.o
 CU_FILES   = CWC_utility.o

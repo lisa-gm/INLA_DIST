@@ -546,7 +546,7 @@ void PardisoSolver::compute_inverse_pardiso(MatrixXd& Q, MatrixXd& C){
     // check if nnz and H_lower.nonZeros match
     if(nnz != H_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %d.\n nnz(H_lower) = %ld\n", nnz, H_lower.nonZeros());
+        printf("nnz = %ld.\n nnz(H_lower) = %ld\n", nnz, H_lower.nonZeros());
     }
 
     // IMPORTANT : change the number of right-hand sides
