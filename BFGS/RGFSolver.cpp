@@ -3,13 +3,18 @@
 #include "RGF/RGF.H"
 
 
-RGFSolver::RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_) : ns(ns_), nt(nt_), nb(nb_), no(no_){
+RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
    	
    	#ifdef PRINT_MSG
    	std::cout << "constructing RGF solver." << std::endl;
    	#endif
 
-   	n = ns*nt + nb;
+   	n = ns_t*nt_t + nb_t;
+
+   	/*ns_t = ns;
+   	nt_t = nt;
+   	nb_t = nb;*/
+
 
 }
 
@@ -27,7 +32,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	#endif
 
 	// check if n and Q.size() match
-    if((n-nb) != Q.rows()){
+    if((n - nb_t) != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
         printf("n-nb = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
         exit(1);
@@ -64,16 +69,11 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
         a[i] = Q_lower.valuePtr()[i];
     }
 
-    #if 1
 	double t_factorise;
 	RGF<T> *solver;
 
-	// cast ns, nt, nb as size_t
-	size_t ns_ = ns;
-	size_t nt_ = nt;
-	size_t nb  = 0;
-
-	solver = new RGF<T>(ia, ja, a, ns_, nt_, nb_);
+	// SET nb_t to zero : this function is for precision matrix of prior!
+	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, 0);
 
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
@@ -91,18 +91,14 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	#endif
 
 	delete solver;
-	delete ia;
-	delete ja;
-	delete a;
-
-	#endif
+	delete[] ia;
+	delete[] ja;
+	delete[] a;
 
 
 }
 
 void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det) {
-	//sol.setOnes();
-	//std::cout << "Placeholder FACTORIZE_SOLVE()." << std::endl;
 
 	#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
@@ -142,17 +138,11 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
         a[i] = Q_lower.valuePtr()[i];
     }
 
-    #if 1
 	double t_factorise;
 	double t_solve;
 	RGF<T> *solver;
 
-	// cast ns, nt, nb as size_t
-	size_t ns_ = ns;
-	size_t nt_ = nt;
-	size_t nb_ = nb;
-
-	solver = new RGF<T>(ia, ja, a, ns_, nt_, nb_);
+	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, nb_t);
 
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
@@ -172,7 +162,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
   	x      = new T[n];
 
   	// assign b to correct format
-  	for (int i = 0; i < n; i++){
+  	for (i = 0; i < n; i++){
 	    b[i] = rhs[i];
 	    //printf("%f\n", b[i]);
   	}
@@ -195,22 +185,121 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
   	// assign b to correct format
   	for (int i = 0; i < n; i++){
 	    sol[i] = x[i];
-	    //printf("%f\n", b[i]);
   	}	
 
-  	#endif
 
-  	delete ia;
-  	delete ja;
-  	delete a;
   	delete solver;
-  	delete x;
-  	delete b;
+
+  	delete[] ia;
+  	delete[] ja;
+  	delete[] a;
+  	delete[] x;
+  	delete[] b;
 }
 
+// IMPLEMENT IN A WAY SUCH THAT FACTORISATION WILL BE PERFORMED AGAIN
+// FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {
-	inv_diag = 5*Vector::Ones(inv_diag.size());
-	std::cout << "Placeholder SELECTED_INVERSION()." << std::endl;
+
+	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
+
+
+	#ifdef PRINT_MSG
+	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
+	#endif
+
+	// check if n and Q.size() match
+    if(n != Q.rows()){
+        printf("\nInitialised matrix size and current matrix size don't match!\n");
+        printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+        exit(1);
+    }
+
+	// only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+    size_t nnz = Q_lower.nonZeros();
+
+    size_t* ia; 
+    size_t* ja;
+    T* a; 
+  	T* invDiag;
+
+  	invDiag  = new T[n];
+
+    // allocate memory
+    ia = new long unsigned int [n+1];
+    ja = new long unsigned int [nnz];
+    a = new double [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        a[i] = Q_lower.valuePtr()[i];
+    }
+
+    #if 1
+    double t_factorise;
+	double t_inv;
+
+	RGF<T> *solver;
+	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, nb_t);
+
+	t_factorise = get_time(0.0);
+	double flops_factorize = solver->factorize();
+	t_factorise = get_time(t_factorise);
+
+  	printf("RGF factorise time: %lg\n",t_factorise);
+
+	t_inv = get_time(0.0);
+  	double flops_inv = solver->RGFdiag(invDiag);
+  	t_inv = get_time(t_inv);
+
+  	#ifdef PRINT_MSG
+  	printf("flops factorise:      %f\n", flops_factorize);
+  	printf("flops inv      :      %f\n", flops_inv);
+  	#endif
+
+	#ifdef PRINT_TIMES
+	printf("RGF factorise time: %lg\n",t_factorise);
+  	printf("RGF sel inv time  : %lg\n",t_inv);
+  	#endif
+
+  	// fill Eigen vector
+  	for (i = 0; i < n; i++){
+	    inv_diag[i] = invDiag[i];
+  	}
+
+    // print/write diag 
+    // base_path +
+	/*string sel_inv_file_name = "/RGF_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+	cout << sel_inv_file_name << endl;
+	ofstream sel_inv_file(sel_inv_file_name,    ios::out | ::ios::trunc);
+
+	for (int i = 0; i < n; i++){
+	  sel_inv_file << invDiag[i] << endl;
+	}
+
+	sel_inv_file.close();
+	cout << "after writing file " << endl;*/
+
+	delete solver;
+
+	#endif
+
+	// free memory
+	delete[] ia;
+	delete[] ja;
+	delete[] a;
+	delete[] invDiag;
+
 }
 
 
