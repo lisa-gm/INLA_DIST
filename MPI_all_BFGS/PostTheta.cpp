@@ -4,6 +4,9 @@
 
 
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior(theta_prior_), solver_type(solver_type_) {
+
+	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
+    MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 	
 	dim_th = 1;  			// only hyperparameter is the precision of the observations
 	ns     = 0;
@@ -19,11 +22,13 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
 	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
+
+	if(MPI_rank == 0){
+		printf("threads level 1 : %d\n", threads_level1);
+	}
 
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
-
 
 	// one solver per thread, but not more than required
 	//num_solvers        = std::min(threads_level1, dim_grad_loop);
@@ -35,32 +40,24 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
 
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
 	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
+		solverQ   = new PardisoSolver();
+		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver(ns, nt, nb, no);
-			solverQst[i] = new RGFSolver(ns, nt, nb, no);
-		}
+		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
-
-	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
-    MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
-
 }
 
 
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_), solver_type(solver_type_) {
+
+	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
+	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
 	dim_th      = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
 	nu          = ns;
@@ -75,7 +72,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
 	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
+	
+	if(MPI_rank == 0){
+		printf("threads level 1 : %d\n", threads_level1);
+	}
 
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
@@ -91,32 +91,25 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
 
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
 	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
+		solverQ   = new PardisoSolver();
+		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver(ns, nt, nb, no);
-			solverQst[i] = new RGFSolver(ns, nt, nb, no);
-		}
-	} 
+		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQst = new RGFSolver(ns, nt, nb, no);
+	}  
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 
-	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
-	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
-
 }
 
 
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(theta_prior_), solver_type(solver_type_)  {
+
+	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
+    MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
 	dim_th      = 4;    	 	// 4 hyperparameters, precision for the observations, 3 for the spatial-temporal model
 	nu          = ns*nt;
@@ -131,7 +124,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
 	int threads_level1 = omp_get_max_threads();
-	printf("threads level 1 : %d\n", threads_level1);
+	
+	if(MPI_rank == 0){
+		printf("threads level 1 : %d\n", threads_level1);
+	}
 
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
@@ -146,27 +142,17 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
 
-	solverQ   = new Solver*[threads_level1];
-	solverQst = new Solver*[threads_level1];
-
 	if(solver_type == "PARDISO"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new PardisoSolver();
-			solverQst[i] = new PardisoSolver();
-		}
+		solverQ   = new PardisoSolver();
+		solverQst = new PardisoSolver();
 	} else if(solver_type == "RGF"){
-		for(int i = 0; i < threads_level1; i++){
-			solverQ[i]   = new RGFSolver(ns, nt, nb, no);
-			solverQst[i] = new RGFSolver(ns, nt, nb, no);
-		}
+		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
-
-	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
-    MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
 }
 
@@ -200,9 +186,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	epsId_mat = eps*epsId_mat.setIdentity();
 	//std::cout << "epsId_mat : " << epsId_mat << std::endl;
 
-	double f_theta = 0;
-	Vector f_forw; f_forw.setZero(dim_th);
-	Vector f_backw; f_backw.setZero(dim_th);
+	// initialise local f_value lists
+	Vector f_temp_list_loc(no_f_eval); f_temp_list_loc.setZero();
 
 	int threads = omp_get_max_threads();
 	double timespent_f_theta_eval;
@@ -215,32 +200,15 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	int divd = ceil(no_f_eval / double(MPI_size));
 	//std::cout << "div : " << div << std::endl;
 
-	VectorXi no_elem_p_rank(MPI_size); no_elem_p_rank.setZero();
 	for(int i=0; i<no_f_eval; i++){
-		int elem =  i / divd;
-		task_to_rank_list(i) = elem;
-		no_elem_p_rank(elem)++;
+		task_to_rank_list(i) = i / divd;
 	}
 
-	VectorXi start_ind_p_rank(MPI_size); start_ind_p_rank.setZero();
-	for(int i=0; i<MPI_size; i++){
-		start_ind_p_rank(i) = no_elem_p_rank.head(i).sum();
-	}
-
-	// create temp vector for results of each process
-	int len_f_temp_list = (task_to_rank_list == MPI_rank).count(); 
-	Vector f_temp_list_loc; f_temp_list_loc.setZero(len_f_temp_list);
-
+	#ifdef PRINT_MSG
 	if(MPI_rank == 0){  
 		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
-		std::cout << "no elem per rank  : " << no_elem_p_rank.transpose() << std::endl;
-		std::cout << "start_ind_p_rank  : " << start_ind_p_rank.transpose() << std::endl;
-		//cout << "len_f_temp_list = " << len_f_temp_list << endl;
-
 	}
-
-	// do all function evaluations in parallel if enough ranks are available
-	int counter = 0;
+	#endif
 
 	// ===================================== compute f(theta) ===================================== //
 	if(MPI_rank == task_to_rank_list[0])
@@ -248,40 +216,26 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 		mu.setZero(n);
 		timespent_f_theta_eval = -omp_get_wtime();
 
-
 		//LIKWID_MARKER_START("fThetaComputation");
-		//f_theta = eval_post_theta(theta, mu);
-		f_theta = eval_post_theta(theta, mu);
-		f_temp_list_loc[counter] = f_theta;
-		counter++;
+		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//LIKWID_MARKER_STOP("fThetaComputation");
 		
-
 		timespent_f_theta_eval += omp_get_wtime();
-		
-		// print all theta's who result in a new minimum value for f(theta)
-		if(f_theta < min_f_theta){
-			min_f_theta = f_theta;
-			if(MPI_rank == 0){
-				std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-				//std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
-			}
-		}
-	} // end if 
+	} // end if MPI
 
 	// ===================================== compute grad f(theta) ============================== //
 	divd = ceil(no_f_eval / double(2));
 
 	for(int i=1; i<no_f_eval; i++){
 
+		// compute all FORWARD DIFFERENCES
 		if(i / divd == 0){
 			if(MPI_rank == task_to_rank_list[i])
 			{
-				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
-				int k = i-1;
+				int k = i-1; 
 
 				#ifdef PRINT_MSG
-					std::cout << "forward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
+				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
 					std::cout << "i : " << i << " and k : " << k << std::endl;
 				#endif
 
@@ -289,63 +243,72 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 				Vector mu_dummy(n);
 
 				theta_forw = theta + epsId_mat.col(k);
-				f_temp_list_loc[counter] = eval_post_theta(theta_forw, mu_dummy);
-				counter++;
-				//f_forw[k] = eval_post_theta(theta_forw, mu_dummy);
+				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy);
 			} // end MPI if
+		
+		// compute all BACKWARD DIFFERENCES
 		} else if (i / divd > 0){
 			if(MPI_rank == task_to_rank_list[i])
 			{				
-				int k = i-1-dim_th;
-				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
-
+				int k = i-1-dim_th; // backward difference in the k-th direction
 
 				#ifdef PRINT_MSG
-					std::cout << "backward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
-					std::cout << "i : " << i << " and k : " << k << std::endl;
+					std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
+					//std::cout << "i : " << i << " and k : " << k << std::endl;
 				#endif
 
 				Vector theta_backw(dim_th);
 				Vector mu_dummy(n);
 
 				theta_backw = theta - epsId_mat.col(k);
-				f_temp_list_loc[counter] = eval_post_theta(theta_backw, mu_dummy);
-				counter++;
-				//f_backw[k] = eval_post_theta(theta_backw, mu_dummy);
+				f_temp_list_loc(i) = eval_post_theta(theta_backw, mu_dummy);
 			} // end MPI if
 		}
-
 	} // end for loop
 
 	// ================== MPI Waitall & MPI All_Gather ====================== //
 
-	/*std::cout << "my rank : " << MPI_rank << ", f_theta : " << f_theta << std::endl;
-	std::cout << "my rank : " << MPI_rank << ", f_forw  : " << f_forw.transpose() << std::endl;
-	std::cout << "my rank : " << MPI_rank << ", f_backw : " << f_backw.transpose() << std::endl;*/
-
+	#ifdef PRINT_MSG
 	std::cout << "rank : " << MPI_rank << ", res : " << f_temp_list_loc.transpose() << std::endl;
+	#endif
+
+	// wait for all processes to finish
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	// distribute the results among all processes
 	Vector f_temp_list(no_f_eval);
-	MPI_Allgatherv(f_temp_list_loc.data(), len_f_temp_list, MPI_DOUBLE,
-                   f_temp_list.data(), no_elem_p_rank.data(), start_ind_p_rank.data(),
-                   MPI_DOUBLE, MPI_COMM_WORLD);
 
+	MPI_Allreduce(f_temp_list_loc.data(), f_temp_list.data(), no_f_eval, MPI_DOUBLE, MPI_SUM,
+              MPI_COMM_WORLD);
+
+	#ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		std::cout << "f temp list : " << f_temp_list.transpose() << std::endl;
 	}
+	#endif
 
 	// now write them into appropriate forward / backward buffer
-	f_theta = f_temp_list(0);
-	f_forw  = f_temp_list.segment(1,dim_th);
-	f_backw = f_temp_list.tail(dim_th);
+	double f_theta = f_temp_list(0);
+
+	// print all theta's who result in a new minimum value for f(theta)
+	if(f_theta < min_f_theta){
+		min_f_theta = f_theta;
+		if(MPI_rank == 0){
+			std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			//std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
+		}
+	}
+
+	Vector f_forw  = f_temp_list.segment(1,dim_th);
+	Vector f_backw = f_temp_list.tail(dim_th);
 
 	timespent_fct_eval += omp_get_wtime();
 
 	#ifdef PRINT_TIMES
-		std::cout << "time spent evaluation f(theta) : " << timespent_f_theta_eval << std::endl;
-		std::cout << "time spent for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
+		if(MPI_rank == 0){
+			std::cout << "time spent evaluation f(theta) : " << timespent_f_theta_eval << std::endl;
+			std::cout << "time spent for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
+		}
 	#endif 
 
 	// compute finite difference in each direction
@@ -512,15 +475,9 @@ void PostTheta::get_marginals_f(Vector& theta, Vector& vars){
 	#endif
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
-	
-	// call this with one thread
-	#pragma omp parallel
-	#pragma omp single
-	{
-	int tid = omp_get_thread_num();
-	solverQ[tid]->selected_inversion(Q, vars);
-	}
 
+	solverQ->selected_inversion(Q, vars);
+	
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
 		std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
@@ -883,7 +840,7 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 
 // ============================================================================================ //
 // ALL FOLLOWING FUNCTIONS CONTRIBUTE TO THE EVALUATION OF F(THETA) & GRADIENT
-
+// INCLUDE: OpenMP division for computation of nominator & denominator : ie. 2 tasks -> 2 threads!
 double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 
 	if(omp_get_thread_num() == 0){
@@ -899,6 +856,27 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 		std::cout << "nt : " << nt << std::endl;			
 		std::cout << "theta prior : " << theta_prior.transpose() << std::endl;
 	#endif
+
+	// sum log prior, log det spat-temp prior
+	double log_prior_sum;
+	double log_det_Qu = 0;
+
+	// eval_likelihood: log_det, -theta*yTy
+	double log_det_l;
+	double val_l; 
+
+	// log det denominator, value
+	double log_det_d;
+	double val_d;
+
+	#pragma omp parallel
+	#pragma omp single
+	{
+
+
+	// =============== evaluate NOMINATOR ================= //
+	#pragma omp task
+	{ 
 
 	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
 
@@ -919,14 +897,12 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 		std::cout << "log prior sum : " << log_prior_sum << std::endl;
 	#endif
 
-		// =============== evaluate prior of random effects : need log determinant ================= //
+	// =============== evaluate prior of random effects : need log determinant ================= //
 
 	// requires factorisation of Q.u -> can this be done in parallel with the 
 	// factorisation of the denominator? 
 	// How long does the assembly of Qu take? Should this be passed on to the 
 	// denominator to be reused?
-
-	double log_det_Qu = 0;
 
 	if(ns > 0 ){
 		eval_log_det_Qu(theta, log_det_Qu);
@@ -936,11 +912,8 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 		std::cout << "log det Qu : "  << log_det_Qu << std::endl;
 	#endif
 
-		// =============== evaluate likelihood ================= //
+	// =============== evaluate likelihood ================= //
 
-	// eval_likelihood: log_det, -theta*yTy
-	double log_det_l;
-	double val_l; 
 	eval_likelihood(theta, log_det_l, val_l);
 
 	#ifdef PRINT_MSG
@@ -948,11 +921,13 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 		std::cout << "val likelihood     : " << val_l << std::endl;
 	#endif
 
-		// =============== evaluate denominator ================= //
+	} // end pragma omp task of computing nominator
+
+	#pragma omp task
+	{
+	// =============== evaluate denominator ================= //
 	// denominator :
 	// log_det(Q.x|y), mu, t(mu)*Q.x|y*mu
-	double log_det_d;
-	double val_d;
 	SpMat Q(n, n);
 	Vector rhs(n);
 
@@ -961,8 +936,11 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 		std::cout << "log det d : " << log_det_d << std::endl;
 		std::cout << "val d     : " <<  val_d << std::endl;
 	#endif
+	}
 
-		// =============== add everything together ================= //
+	} // closing omp parallel region
+
+	// =============== add everything together ================= //
   	double val = -1 * (log_prior_sum + log_det_Qu + log_det_l + val_l - (log_det_d + val_d));
 
   	#ifdef PRINT_MSG
@@ -992,8 +970,7 @@ void PostTheta::eval_log_det_Qu(Vector& theta, double &log_det){
 		construct_Q_spatial(theta, Qu);
 	}
 
-	int tid = omp_get_thread_num();
-	solverQst[tid]->factorize(Qu, log_det);
+	solverQst->factorize(Qu, log_det);
 
 	#ifdef PRINT_MSG
 		std::cout << "log det Qu : " << log_det << std::endl;
@@ -1198,8 +1175,7 @@ void PostTheta::eval_denominator(Vector& theta, double& log_det, double& val, Sp
 	// returns vector mu, which is of the same size as rhs
 	//solve_cholmod(Q, rhs, mu, log_det);
 
-	int tid = omp_get_thread_num();
-	solverQ[tid]->factorize_solve(Q, rhs, mu, log_det);
+	solverQ->factorize_solve(Q, rhs, mu, log_det);
 
 	log_det = 0.5 * (log_det);
 	
@@ -1223,8 +1199,8 @@ void PostTheta::eval_denominator(Vector& theta, double& log_det, double& val, Sp
 
 PostTheta::~PostTheta(){
 
-		delete[] solverQst;
-		delete[] solverQ;		
+		delete solverQst;
+		delete solverQ;		
 }
 
 
