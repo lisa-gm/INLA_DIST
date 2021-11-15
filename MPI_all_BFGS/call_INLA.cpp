@@ -358,7 +358,7 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 1;
+    param.max_iterations = 30;
     // TODO: stepsize too small? seems like it almost always accepts step first step.
 
     // Create solver and function object

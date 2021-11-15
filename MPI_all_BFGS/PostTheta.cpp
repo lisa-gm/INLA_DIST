@@ -200,9 +200,6 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	epsId_mat = eps*epsId_mat.setIdentity();
 	//std::cout << "epsId_mat : " << epsId_mat << std::endl;
 
-	// create temp vector for all results
-	Vector f_temp_list; f_temp_list.setZero(no_f_eval);
-
 	double f_theta = 0;
 	Vector f_forw; f_forw.setZero(dim_th);
 	Vector f_backw; f_backw.setZero(dim_th);
@@ -214,18 +211,36 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	// ======================================== set up MPI ========================================== //
 	// create list that assigns each of the no_f_eval = 2*dim_th+1 function evaluations to a rank
 	// if e.g. 9 tasks and mpi_size = 3, then task 1: rank 0, task 2: rank 1, task 3: rank 2, task 4: rank 0, etc.
-	VectorXi task_to_rank_list(no_f_eval);
+	ArrayXi task_to_rank_list(no_f_eval);
 	int divd = ceil(no_f_eval / double(MPI_size));
 	//std::cout << "div : " << div << std::endl;
+
+	VectorXi no_elem_p_rank(MPI_size); no_elem_p_rank.setZero();
 	for(int i=0; i<no_f_eval; i++){
-		task_to_rank_list[i] = i / divd;
+		int elem =  i / divd;
+		task_to_rank_list(i) = elem;
+		no_elem_p_rank(elem)++;
 	}
 
-	if(MPI_rank == 0){
+	VectorXi start_ind_p_rank(MPI_size); start_ind_p_rank.setZero();
+	for(int i=0; i<MPI_size; i++){
+		start_ind_p_rank(i) = no_elem_p_rank.head(i).sum();
+	}
+
+	// create temp vector for results of each process
+	int len_f_temp_list = (task_to_rank_list == MPI_rank).count(); 
+	Vector f_temp_list_loc; f_temp_list_loc.setZero(len_f_temp_list);
+
+	if(MPI_rank == 0){  
 		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
+		std::cout << "no elem per rank  : " << no_elem_p_rank.transpose() << std::endl;
+		std::cout << "start_ind_p_rank  : " << start_ind_p_rank.transpose() << std::endl;
+		//cout << "len_f_temp_list = " << len_f_temp_list << endl;
+
 	}
 
 	// do all function evaluations in parallel if enough ranks are available
+	int counter = 0;
 
 	// ===================================== compute f(theta) ===================================== //
 	if(MPI_rank == task_to_rank_list[0])
@@ -237,7 +252,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 		//LIKWID_MARKER_START("fThetaComputation");
 		//f_theta = eval_post_theta(theta, mu);
 		f_theta = eval_post_theta(theta, mu);
-		f_temp_list[0] = f_theta;
+		f_temp_list_loc[counter] = f_theta;
+		counter++;
 		//LIKWID_MARKER_STOP("fThetaComputation");
 		
 
@@ -254,12 +270,15 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	} // end if 
 
 	// ===================================== compute grad f(theta) ============================== //
-	for(int i=0; i<2*dim_th; i++){
+	divd = ceil(no_f_eval / double(2));
 
-		if(i % 2 == 0){
-			if(MPI_rank == task_to_rank_list[i+1])
+	for(int i=1; i<no_f_eval; i++){
+
+		if(i / divd == 0){
+			if(MPI_rank == task_to_rank_list[i])
 			{
-				int k = i/2;
+				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
+				int k = i-1;
 
 				#ifdef PRINT_MSG
 					std::cout << "forward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
@@ -270,13 +289,16 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 				Vector mu_dummy(n);
 
 				theta_forw = theta + epsId_mat.col(k);
-				f_temp_list[i+1] = eval_post_theta(theta_forw, mu_dummy);
+				f_temp_list_loc[counter] = eval_post_theta(theta_forw, mu_dummy);
+				counter++;
 				//f_forw[k] = eval_post_theta(theta_forw, mu_dummy);
 			} // end MPI if
-		} else if (i% 2 == 1){
-			if(MPI_rank == task_to_rank_list[i+1])
+		} else if (i / divd > 0){
+			if(MPI_rank == task_to_rank_list[i])
 			{				
-				int k = (i-1)/2;
+				int k = i-1-dim_th;
+				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
+
 
 				#ifdef PRINT_MSG
 					std::cout << "backward loop thread rank: " << omp_get_thread_num() << " out of " << threads << std::endl;
@@ -287,7 +309,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 				Vector mu_dummy(n);
 
 				theta_backw = theta - epsId_mat.col(k);
-				f_temp_list[i+1] = eval_post_theta(theta_backw, mu_dummy);
+				f_temp_list_loc[counter] = eval_post_theta(theta_backw, mu_dummy);
+				counter++;
 				//f_backw[k] = eval_post_theta(theta_backw, mu_dummy);
 			} // end MPI if
 		}
@@ -300,15 +323,23 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	std::cout << "my rank : " << MPI_rank << ", f_forw  : " << f_forw.transpose() << std::endl;
 	std::cout << "my rank : " << MPI_rank << ", f_backw : " << f_backw.transpose() << std::endl;*/
 
-	std::cout << "my rank : " << f_temp_list.transpose() << std::endl;
+	std::cout << "rank : " << MPI_rank << ", res : " << f_temp_list_loc.transpose() << std::endl;
+	MPI_Barrier(MPI_COMM_WORLD);
 
+	// distribute the results among all processes
+	Vector f_temp_list(no_f_eval);
+	MPI_Allgatherv(f_temp_list_loc.data(), len_f_temp_list, MPI_DOUBLE,
+                   f_temp_list.data(), no_elem_p_rank.data(), start_ind_p_rank.data(),
+                   MPI_DOUBLE, MPI_COMM_WORLD);
 
-
-	if(true){
-		return f_theta;
+	if(MPI_rank == 0){
+		std::cout << "f temp list : " << f_temp_list.transpose() << std::endl;
 	}
 
-
+	// now write them into appropriate forward / backward buffer
+	f_theta = f_temp_list(0);
+	f_forw  = f_temp_list.segment(1,dim_th);
+	f_backw = f_temp_list.tail(dim_th);
 
 	timespent_fct_eval += omp_get_wtime();
 
