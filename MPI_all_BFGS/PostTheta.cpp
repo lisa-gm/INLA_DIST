@@ -374,11 +374,7 @@ void PostTheta::get_mu(Vector& theta, Vector& mu){
 		std::cout << "get_mu()" << std::endl;
 	#endif
 
-	#pragma omp parallel
-	#pragma omp single
-	{
 	double f_theta = eval_post_theta(theta, mu);
-	}
 
 	#ifdef PRINT_MSG
 		std::cout << "mu(-10:end) :" << mu.tail(10) << std::endl;
@@ -507,23 +503,39 @@ MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
 	int loop_dim = dim_th*dim_th;    
 
     // number of rows stems from the required function evaluations of f(theta)
-    Eigen::MatrixXd f_i_i = Eigen::MatrixXd::Zero(3,dim_th);
-    Eigen::MatrixXd f_i_j = Eigen::MatrixXd::Zero(4,loop_dim);
+    Eigen::MatrixXd f_i_i_loc = Eigen::MatrixXd::Zero(3,dim_th);
+    Eigen::MatrixXd f_i_j_loc = Eigen::MatrixXd::Zero(4,loop_dim);
+
+    // ======================================== set up MPI ========================================== //
+	// create list that assigns each of the function evaluations to a rank
+	// we have to evaluate f(theta), 2*dim_th for forward-backward diagonal entries &
+	// 4 * (no_of_upper_diagonal_entries)
+	int no_of_tasks = 1 + 2*dim_th + 4/2*dim_th*(dim_th-1);
+	ArrayXi task_to_rank_list(no_of_tasks);
+	int divd = ceil(no_of_tasks / double(MPI_size));
+	//std::cout << "div : " << div << std::endl;
+	double counter = 0;
+
+	for(int i=0; i<task_to_rank_list.size(); i++){
+		task_to_rank_list(i) = i / divd;
+	}
+
+	#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
+	}
+	#endif
 
     double time_omp_task_hess = - omp_get_wtime();
 
-    #pragma omp parallel
-    #pragma omp single
-    {
-
     // compute f(theta) only once.
-    #pragma omp task 
-    { 
-	Vector mu_tmp(n);
-	//double f_theta = f_eval(theta);
-	double f_theta = eval_post_theta(theta, mu_tmp);
-    f_i_i.row(1) = f_theta * Eigen::VectorXd::Ones(dim_th).transpose(); 
+	if(MPI_rank == task_to_rank_list(0)){
+		Vector mu_tmp(n);
+		//double f_theta = f_eval(theta);
+		double f_theta = eval_post_theta(theta, mu_tmp);
+	    f_i_i_loc.row(1) = f_theta * Eigen::VectorXd::Ones(dim_th).transpose(); 
     }
+    counter++;
 
     for(int k = 0; k < loop_dim; k++){          
 
@@ -536,68 +548,89 @@ MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
         if(i == j){
 
         	// compute f(theta+eps_i)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
-            Vector theta_forw_i = theta+epsId.col(i);
-            //f_i_i(0,i) = f_eval(theta_forw_i);
-            f_i_i(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
+            if(MPI_rank == task_to_rank_list(counter)){ 
+	            Vector mu_tmp(n);
+	            Vector theta_forw_i = theta+epsId.col(i);
+	            //f_i_i(0,i) = f_eval(theta_forw_i);
+	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
             }
+            counter++;
 
         	// compute f(theta-eps_i)
-            # pragma omp task
-            { 
-            Vector mu_tmp(n);
-            Vector theta_back_i = theta-epsId.col(i);
-            //f_i_i(2,i) = f_eval(theta_back_i);
-            f_i_i(2,i) = eval_post_theta(theta_back_i, mu_tmp); 
+            if(MPI_rank == task_to_rank_list(counter)){ 
+	            Vector mu_tmp(n);
+	            Vector theta_back_i = theta-epsId.col(i);
+	            //f_i_i(2,i) = f_eval(theta_back_i);
+	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp);
             }
+            counter++;
 
         
         // symmetric only compute upper triangular part
+        // diagonal entries from f_temp_list_loc(1:2*dim_th+1)
+
         } else if(j > i) {
 
         	// compute f(theta+eps_i+eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
-            Vector theta_forw_i_j 	   = theta+epsId.col(i)+epsId.col(j);
-            //f_i_j(0,k) = f_eval(theta_forw_i_j);
-            f_i_j(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
+            if(MPI_rank == task_to_rank_list(counter)){             
+	            Vector mu_tmp(n);
+	            Vector theta_forw_i_j 	   = theta+epsId.col(i)+epsId.col(j);
+	            //f_i_j(0,k) = f_eval(theta_forw_i_j);
+	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
             }
+            counter++;
 
         	// compute f(theta+eps_i-eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
-            Vector theta_forw_i_back_j = theta+epsId.col(i)-epsId.col(j);
-            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
-            f_i_j(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
+            if(MPI_rank == task_to_rank_list(counter)){ 
+	            Vector mu_tmp(n);
+	            Vector theta_forw_i_back_j = theta+epsId.col(i)-epsId.col(j);
+	            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
+	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
             }
+            counter++;
 
         	// compute f(theta-eps_i+eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
-            Vector theta_back_i_forw_j = theta-epsId.col(i)+epsId.col(j);
-            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
-            f_i_j(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
+            if(MPI_rank == task_to_rank_list(counter)){ 
+	            Vector mu_tmp(n);
+	            Vector theta_back_i_forw_j = theta-epsId.col(i)+epsId.col(j);
+	            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
+	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
             }
+            counter++;
 
         	// compute f(theta-eps_i-eps_j)
-            #pragma omp task 
-            { 
-            Vector mu_tmp(n);
-            Vector theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
-            //f_i_j(3,k) = f_eval(theta_back_i_j);
-            f_i_j(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
-            }            
+            if(MPI_rank == task_to_rank_list(counter)){ 
+	            Vector mu_tmp(n);
+	            Vector theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
+	            //f_i_j(3,k) = f_eval(theta_back_i_j);
+	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
+            }
+            counter++;            
         }
 
     }
 
-    // potentially use task dependencies
-    #pragma omp taskwait
+    //std::cout << "rank : " << MPI_rank << ", counter : " << counter << ", f_i_j : \n" << f_i_j_loc << std::endl;
+    //std::cout << "rank : " << MPI_rank << ", f_i_i : \n" << f_i_i_loc << std::endl;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // number of rows stems from the required function evaluations of f(theta)
+    Eigen::MatrixXd f_i_i(3,dim_th);
+    Eigen::MatrixXd f_i_j(4,loop_dim);
+
+	MPI_Allreduce(f_i_i_loc.data(), f_i_i.data(), 3*dim_th, MPI_DOUBLE, MPI_SUM,
+              MPI_COMM_WORLD);
+
+	MPI_Allreduce(f_i_j_loc.data(), f_i_j.data(), 4*loop_dim, MPI_DOUBLE, MPI_SUM,
+          MPI_COMM_WORLD);
+
+	#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "f_i_i : \n" << f_i_i << std::endl;
+		std::cout << "f_i_j : \n" << f_i_j << std::endl;
+	}
+	#endif
 
     for(int k = 0; k < loop_dim; k++){          
 
@@ -620,8 +653,6 @@ MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
         }
     }
 
-    } // end omp
-
     time_omp_task_hess += omp_get_wtime();
     #ifdef PRINT_TIMES
     	std::cout << "time hess = " << time_omp_task_hess << std::endl;
@@ -633,7 +664,9 @@ MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
     #endif
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
-	std::cout << "hessian       : \n" << hess << std::endl;
+	if(MPI_rank == 0){
+		std::cout << "hessian       : \n" << hess << std::endl;
+	}
 
 	// check that matrix positive definite otherwise use only diagonal
 	//std::cout << "positive definite check disabled." << std::endl;
