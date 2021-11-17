@@ -36,7 +36,7 @@ PardisoSolver::PardisoSolver(){
     }
 
     #ifdef PRINT_OMP
-        if(omp_get_thread_num() == 0){
+        if(omp_get_thread_num() == 0 && MPI_rank == 0){
             //char* var = getenv("OMP_NUM_THREADS");
             //std::cout << "OMP_NUM_THREADS = " << var << std::endl;
             std::cout << "Pardiso will be called with " << threads_level2 << " threads per solver. " << std::endl;

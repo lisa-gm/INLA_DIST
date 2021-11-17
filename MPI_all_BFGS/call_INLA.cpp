@@ -455,14 +455,14 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    //theta_max = theta;
+    theta_max = theta;
     //theta_max << 1.382388, -5.626002,  1.156931,  3.644319;
-    theta_max << 1.388921, -5.588113,  0.985369,  3.719458;
+    //theta_max << 1.331607, -5.893736,  1.001546,  3.743028;
     //theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
     //theta_max << 1.4608052, -5.8996978,  0.6805342,  3.8358287; 
 
@@ -487,25 +487,38 @@ int main(int argc, char* argv[])
     eps = 0.005;
     //cov = fun->get_Covariance(theta_max, sqrt(eps));
     cov = fun->get_Covariance(theta_max, eps);
-    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
+   
+   #if 0
+   if(MPI_rank == 0){
+       std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
 
-    /*eps = 0.001;
-    cov = fun->get_Covariance(theta_max, eps);
-    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
-    std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
-    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+        /*eps = 0.001;
+        cov = fun->get_Covariance(theta_max, eps);
+        std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
+        std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
+        std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+    }
+    #endif
 
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vector interpret_theta(4);
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
-    std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+    
+    #if 0
+    if(MPI_rank == 0){
+        std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+    }
+    #endif
 
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
 
-    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
-
+    #if 0
+    if(MPI_rank == 0){
+        std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
+    }
+    #endif
 
     #endif
 

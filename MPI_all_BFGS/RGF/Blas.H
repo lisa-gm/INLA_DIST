@@ -405,6 +405,7 @@ template <typename T>
 inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, \
                     T alpha, T *a, int lda, T *b, int ldb);
 
+// for real numbers (double)
 template <>
 inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, \
                     double alpha, double *a, int lda, double *b, int ldb)
@@ -412,6 +413,7 @@ inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, 
     c_dtrsm(side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb);
 }
 
+// for complex numbers
 template <>
 inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, \
                     CPX alpha, CPX *a, int lda, CPX *b, int ldb)
