@@ -35,10 +35,20 @@ INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
 RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
-RGF_LIBS	    = $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
+RGF_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
 
 RGF_CC_FILES   = RGF/Utilities.o #RGF/main.o
 RGF_CU_FILES   = RGF/CWC_utility.o
+
+$(info ============== Library paths ==============)
+$(info MKL      : $(MKLHOME))
+$(info MAGMA    : $(MAGMA))
+$(info EIGEN    : $(INCEIGEN))
+
+
+$(info )
+$(info ============== Compiling ==============)
+
 
 all: call_INLA
 
@@ -55,13 +65,13 @@ all: call_INLA
 #	$(CXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@	
 
 RGF/Utilities.o: RGF/Utilities.C
-	$(RGF_LOADER) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@
+	$(RGF_MPICXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@
 
 RGF/CWC_utility.o: RGF/CWC_utility.cu
 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
 call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver.o RGF/Utilities.o RGF/CWC_utility.o #solver_cholmod.o 
-	$(RGF_LOADER) $^ $(LOADFLAGS) $(RGF_LOADFLAGS) $(LIBS) $(RGF_LIBS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
+	$(CXX) $^ $(LIBS) $(RGF_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp
 	$(CXX) -c $< $(CXXFLAGS) $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCLUDES) $(RGF_INCLUDEDIR) -o $@ 
