@@ -54,8 +54,8 @@ data_type=synthetic
 k=7
 
 #solver_type=$1
-solver_type=PARDISO
-#solver_type=RGF
+#solver_type=PARDISO
+solver_type=RGF
 	
 export PARDISOLICMESSAGE=1
 
@@ -69,7 +69,7 @@ num_ranks=$1
 
 # nested parallelism : 
 # 1st number : 8 because dim(theta)=4, forward & backward difference in gradient
-l1t=1
+l1t=2
 # 2nd number : Pardiso will be run with this many threads for each linear system
 l2t=1
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 

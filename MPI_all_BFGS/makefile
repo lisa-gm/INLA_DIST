@@ -8,7 +8,9 @@ BLAHOME       = $(MKLHOME)
 LAPHOME       = $(MKLHOME)
 SCAHOME       = $(MKLHOME)
 
-include ./RGF/make.inc
+
+RGF_PATH      = ../RGF
+include $(RGF_PATH)/make.inc
 #############################################################################################################
 
 CXX=mpic++
@@ -37,13 +39,14 @@ INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
 RGF_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
 
-RGF_CC_FILES   = RGF/Utilities.o #RGF/main.o
-RGF_CU_FILES   = RGF/CWC_utility.o
+RGF_CC_FILES   = $(RGF_PATH)/Utilities.o #RGF/main.o
+RGF_CU_FILES   = $(RGF_PATH)/CWC_utility.o
 
 $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))
 $(info MAGMA    : $(MAGMA))
 $(info EIGEN    : $(INCEIGEN))
+$(info RGF      : $(RGF_PATH))
 
 
 $(info )
@@ -64,13 +67,13 @@ all: call_INLA
 #RGF/main.o: RGF/main.C
 #	$(CXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@	
 
-RGF/Utilities.o: RGF/Utilities.C
+$(RGF_PATH)/Utilities.o: $(RGF_PATH)/Utilities.C
 	$(RGF_MPICXX) -c $^ $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(RGF_INCLUDEDIR) -fPIC -o $@
 
-RGF/CWC_utility.o: RGF/CWC_utility.cu
+$(RGF_PATH)/CWC_utility.o: $(RGF_PATH)/CWC_utility.cu
 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver.o RGF/Utilities.o RGF/CWC_utility.o #solver_cholmod.o 
+call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver.o $(RGF_CC_FILES) $(RGF_CU_FILES) #solver_cholmod.o 
 	$(CXX) $^ $(LIBS) $(RGF_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp
