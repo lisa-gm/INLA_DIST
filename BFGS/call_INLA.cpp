@@ -319,7 +319,7 @@ int main(int argc, char* argv[])
     // in the past ... steps
     param.past = 1;
     // maximum line search iterations
-    param.max_iterations = 1;
+    param.max_iterations = 30;
     // TODO: stepsize too small? seems like it almost always accepts step first step.
 
     // Create solver and function object
@@ -409,9 +409,9 @@ int main(int argc, char* argv[])
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    //theta_max = theta;
+    theta_max = theta;
     //theta_max << 1.382388, -5.626002,  1.156931,  3.644319;
-    theta_max << 1.388921, -5.588113,  0.985369,  3.719458;
+    //theta_max << 1.388921, -5.588113,  0.985369,  3.719458;
     //theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
     //theta_max << 1.4608052, -5.8996978,  0.6805342,  3.8358287; 
 
