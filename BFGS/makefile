@@ -39,6 +39,16 @@ RGF_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
 RGF_CC_FILES   = $(RGF_PATH)/Utilities.o #RGF/main.o
 RGF_CU_FILES   = $(RGF_PATH)/CWC_utility.o
 
+$(info ============== Library paths ==============)
+$(info MKL      : $(MKLHOME))
+$(info MAGMA    : $(MAGMA))
+$(info EIGEN    : $(INCEIGEN))
+$(info RGF      : $(RGF_PATH))
+
+$(info )
+$(info ============== Compiling ==============)
+
+
 all: call_INLA
 
 #librgf.a: $(CC_FILES) $(CU_FILES)
