@@ -1,6 +1,6 @@
 #include "RGFSolver.h"
 
-#include "RGF/RGF.H"
+#include "../RGF/RGF.H"
 
 
 RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){

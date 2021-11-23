@@ -34,7 +34,7 @@ INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
 RGF_INCLUDEDIR  = $(INCCUD) $(INCMAG)
-RGF_LIBS	    = $(SCALAPACK) $(BLACS) $(LAPACK) $(BLAS) $(LINKS) $(OPENMP) $(CUDA) $(MAGMA) $(F90_LIBS)
+RGF_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA) 
 
 RGF_CC_FILES   = $(RGF_PATH)/Utilities.o #RGF/main.o
 RGF_CU_FILES   = $(RGF_PATH)/CWC_utility.o
