@@ -60,6 +60,9 @@ class PostTheta{
 
 	string solver_type;
 
+	std::string prior;  /**<  type of pripr to be used                      */
+
+
 	//PardisoSolver* solverQ;   /**<  list of Pardiso solvers, for denom.		*/
 	//PardisoSolver* solverQst; /**<  list of Pardiso solvers, for Qu         */
 
@@ -67,7 +70,7 @@ class PostTheta{
 	int iter_count;		/**< count total number of operator() call        	*/
 
     VectorXd y; 		/**<  vector of observations y. has length no. 		*/
-    Vector theta_prior; /**<  vector with prior values. Constructs normal
+    Vector theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */
 
     // either Ax or B used
@@ -93,6 +96,8 @@ class PostTheta{
     Vector mu;			/**< conditional mean */
     Vector t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
+
+
 
     int no_f_eval;      /**< number of function evaluations per iteration   */
 
@@ -256,7 +261,16 @@ class PostTheta{
  	 * @details variance / precision of 1 : no normalising constant. 
  	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
      */	
-	void eval_log_prior(double& log_prior, double* thetai, double* thetai_original);
+	void eval_log_gaussian_prior(double& log_prior, double* thetai, double* thetai_original);
+
+	/**
+     * @brief evaluate log prior using PC prior 
+ 	 * @param[inout] log sum     
+ 	 * @param[in] lambda : parameters for penalised complexity prior
+ 	 * @param[in] theta_interpret current theta value in interpretable scale
+ 	 * @details complicated prior. check appropriate references for details.
+     */	
+	void eval_log_pc_prior(double& log_sum, Vector& lambda, Vector& theta_interpret);
 
 	/**
 	 * @brief evaluate log prior of random effects

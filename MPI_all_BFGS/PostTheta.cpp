@@ -3,7 +3,7 @@
 //#include <likwid-marker.h>
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior(theta_prior_), solver_type(solver_type_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y_, Vector theta_prior_param_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior_param(theta_prior_param_), solver_type(solver_type_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -48,13 +48,15 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y
 		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
 
+	prior = "gaussian";
+
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior(theta_prior_), solver_type(solver_type_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, Vector theta_prior_param_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
 	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -99,6 +101,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 		solverQst = new RGFSolver(ns, nt, nb, no);
 	}  
 
+	prior = "gaussian";
+
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
@@ -106,7 +110,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior(theta_prior_), solver_type(solver_type_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vector theta_prior_param_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -149,6 +153,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
 	} 
+
+	// set prior to be gaussian
+	//prior = "gaussian";
+	prior = "pc";
+
+	if(MPI_rank == 0){
+		std::cout << "Prior : " << prior << std::endl;	
+	}
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
@@ -220,7 +232,11 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//LIKWID_MARKER_STOP("fThetaComputation");
 		
-		timespent_f_theta_eval += omp_get_wtime();
+		#ifdef PRINT_TIMES
+			timespent_f_theta_eval += omp_get_wtime();
+			std::cout << "timespent_f_theta_eval : " << timespent_f_theta_eval << std::endl;
+		#endif
+
 	} // end if MPI
 
 	// ===================================== compute grad f(theta) ============================== //
@@ -923,7 +939,7 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 		std::cout << "in eval post theta function. " << std::endl;
 		std::cout << "dim_th : " << dim_th << std::endl;
 		std::cout << "nt : " << nt << std::endl;			
-		std::cout << "theta prior : " << theta_prior.transpose() << std::endl;
+		std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
 	#endif
 
 	// sum log prior, log det spat-temp prior
@@ -945,15 +961,38 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 	#pragma omp task
 	{ 
 	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
-	log_prior_sum = 0;
+	
+	#ifdef PRINT_MSG
+		std::cout << "prior : " << prior << std::endl;
+	#endif
 
-	// evaluate prior
-	VectorXd log_prior_vec(dim_th);
-	for( int i=0; i<dim_th; i++ ){
-		eval_log_prior(log_prior_vec[i], &theta[i], &theta_prior[i]);
+	if(prior == "gaussian" || dim_th != 4){
+		// evaluate gaussian prior
+		VectorXd log_prior_vec(dim_th);
+		for( int i=0; i<dim_th; i++ ){
+			eval_log_gaussian_prior(log_prior_vec[i], &theta[i], &theta_prior_param[i]);
+		}
+	    
+		log_prior_sum = log_prior_vec.sum();
+
+	} else if(prior == "pc"){
+		// pc prior
+		Vector theta_interpret(dim_th); // order: sigma s, range t, range s, sigma u
+		theta_interpret[0] = theta[0];
+		convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+		//theta_interpret << 0.5, 10, 1, 4; 
+		
+		//Vector lambda(4);
+		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
+		// pc prior(lambda, theta_interpret) -> expects order: sigma s, range t, range s, sigma u (same for lambdas!!)
+		//eval_log_pc_prior(log_prior_sum, lambda, theta_interpret);
+		eval_log_pc_prior(log_prior_sum, theta_prior_param, theta_interpret);
+
+
+	} else {
+		std::cout << "Prior not appropriately defined." << std::endl;
+		exit(1);
 	}
-    
-	log_prior_sum = log_prior_vec.sum();
 
 	#ifdef PRINT_MSG
 		std::cout << "log prior sum : " << log_prior_sum << std::endl;
@@ -1016,12 +1055,33 @@ double PostTheta::eval_post_theta(Vector& theta, Vector& mu){
 }
 
 
-void PostTheta::eval_log_prior(double& log_prior, double* thetai, double* thetai_original){
+void PostTheta::eval_log_gaussian_prior(double& log_prior, double* thetai, double* thetai_original){
 
 	log_prior = -0.5 * (*thetai - *thetai_original) * (*thetai - *thetai_original);
 
 	#ifdef PRINT_MSG
 		std::cout << "log prior for theta_i " << (*thetai) << " : " << (log_prior) << std::endl;
+	#endif
+}
+
+// assume interpret_theta order : sigma.e, range t, range s, sigma.u
+void PostTheta::eval_log_pc_prior(double& log_sum, Vector& lambda, Vector& interpret_theta){
+
+  double prior_se = log(lambda[0]) - lambda[0] * exp(interpret_theta[0]) + interpret_theta[0];
+  //printf("prior se = %f\n", prior_se);
+  double prior_su = log(lambda[3]) - lambda[3] * exp(interpret_theta[3]) + interpret_theta[3];
+  //printf("prior su = %f\n", prior_su);
+
+  
+  double prior_rt = log(lambda[1]) - lambda[1] * exp(-0.5*interpret_theta[1]) + log(0.5) - 0.5*interpret_theta[1];
+  //printf("prior rt = %f\n", prior_rt);
+  double prior_rs = log(lambda[2]) - lambda[2] * exp(-interpret_theta[2]) - interpret_theta[2];
+  //printf("prior rs = %f\n", prior_rs);
+
+  log_sum = prior_rt + prior_rs + prior_su + prior_se;
+
+	#ifdef PRINT_MSG
+		std::cout << "log prior sum " << log_sum << std::endl;
 	#endif
 }
 

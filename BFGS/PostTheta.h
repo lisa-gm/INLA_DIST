@@ -253,12 +253,11 @@ class PostTheta{
 	void eval_log_gaussian_prior(double& log_prior, double* thetai, double* thetai_original);
 
 	/**
-     * @brief evaluate log prior using original theta value
-     * @param[in] thetai current theta_i value
-     * @param[in] thetai_original original theta_i value
- 	 * @param[inout] log prior is being updated.
- 	 * @details variance / precision of 1 : no normalising constant. 
- 	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
+     * @brief evaluate log prior using PC prior 
+ 	 * @param[inout] log sum     
+ 	 * @param[in] lambda : parameters for penalised complexity prior
+ 	 * @param[in] theta_interpret current theta value in interpretable scale
+ 	 * @details complicated prior. check appropriate references for details.
      */	
 	void eval_log_pc_prior(double& log_sum, Vector& lambda, Vector& theta_interpret);
 

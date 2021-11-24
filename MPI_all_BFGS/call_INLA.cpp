@@ -41,6 +41,8 @@ using namespace LBFGSpp;
 
 int main(int argc, char* argv[])
 {
+    // start timer for overall runtime
+    double total_time = -omp_get_wtime();
 
     /* ======================= SET UP MPI ============================= */
     // Unique rank is assigned to each process in a communicator
@@ -285,7 +287,8 @@ int main(int argc, char* argv[])
     /* ----------------------- initialise random theta -------------------------------- */
 
     Vector theta(dim_th);
-    Vector theta_prior(dim_th);
+    Vector theta_prior_param(dim_th);
+    Vector theta_original(dim_th);
 
     int n;
 
@@ -308,8 +311,8 @@ int main(int argc, char* argv[])
         std::cout << "using Elias TOY DATASET" << std::endl;
         // from INLA : log prec Gauss obs, log(Range) for i, log(Stdev) for i     
         //theta_prior << 1.0087220,  -1.0536157, 0.6320466;
-        theta_prior << 1, -2.3, 2.1;
-        theta << theta_prior;
+        theta_prior_param << 1, -2.3, 2.1;
+        theta << theta_prior_param;
 
         std::cout << "initial theta : "  << theta.transpose() << std::endl;   
 
@@ -320,11 +323,14 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }     
-        theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
+        theta_original << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
         //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
+        // using PC prior, choose lambda  
+        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+
         if(MPI_rank == 0){
-            std::cout << "theta original     : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
+            std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         }
         //theta << 1.4, -5.9,  1,  3.7; 
         theta << 1, -3, 1, 3;
@@ -357,9 +363,12 @@ int main(int argc, char* argv[])
     param.epsilon_rel = 1e-1;
     // in the past ... steps
     param.past = 1;
+    // TODO: stepsize too small? seems like it almost always accepts step first step.    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
+    // is this sufficiently bullet proof?!
+    param.delta = 1e-1;
     // maximum line search iterations
     param.max_iterations = 30;
-    // TODO: stepsize too small? seems like it almost always accepts step first step.
+
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -375,18 +384,18 @@ int main(int argc, char* argv[])
 
     if(ns == 0){
         // fun.emplace(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior, solver_type);
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type);
     } else if(ns > 0 && nt == 1) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior, solver_type);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type);
     } else {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
     }
 
     #if 1
@@ -437,15 +446,15 @@ int main(int argc, char* argv[])
     std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
 
     if(MPI_rank == 0){
-        std::cout << "\norig. mean parameters        : " << theta_prior.transpose() << std::endl;
+        std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
         std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
     }
 
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
         double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_ranT, prior_ranS, prior_sigU);
-        std::cout << "\norig. mean interpret. param. : " << theta_prior[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
+        std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
@@ -500,21 +509,21 @@ int main(int argc, char* argv[])
     }
     #endif
 
+    #if 0
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vector interpret_theta(4);
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
     
-    #if 0
     if(MPI_rank == 0){
         std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
     }
     #endif
 
+    #if 0
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
 
-    #if 0
     if(MPI_rank == 0){
         std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
     }
@@ -522,17 +531,29 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
-    Vector mu(n);
-    fun->get_mu(theta, mu);
-    std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
-    
+    if(MPI_rank == 0){
+        Vector mu(n);
+        fun->get_mu(theta, mu);
+        std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << "\n" << std::endl;
+    }
+  
+    #if 1
+
+
     // when the range of u is large the variance of b0 is large.
-    Vector marg(n);
-    fun->get_marginals_f(theta, marg);
-    std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
-    std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
+    if(MPI_rank == 0){
+        Vector marg(n);
+        fun->get_marginals_f(theta, marg);
+
+        std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
+        std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
+    }
     #endif
+
+    total_time +=omp_get_wtime();
+    if(MPI_rank == 0){
+        std::cout << "total time                   : " << total_time << std::endl;
+    }
 
     delete fun;
 
