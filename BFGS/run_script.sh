@@ -67,9 +67,9 @@ export OMP_NESTED=TRUE
 
 # nested parallelism : 
 # 1st number : 8 because dim(theta)=4, forward & backward difference in gradient
-l1t=1
+l1t=9
 # 2nd number : Pardiso will be run with this many threads for each linear system
-l2t=1
+l2t=8
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 
 # significant increase in performance for pardiso until 16 threads, 32 only slightly faster
 export OMP_NUM_THREADS="${l1t},${l2t}"

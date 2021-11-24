@@ -399,6 +399,7 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &
 } // end factorise solve function
 
 
+// TODO: Is the selected inversion being called with the correct number of threads!
 void PardisoSolver::selected_inversion(SpMat& Q, Vector& inv_diag){
 
     #ifdef PRINT_PAR

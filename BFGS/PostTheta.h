@@ -53,6 +53,8 @@ class PostTheta{
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
+	std::string prior;  /**<  type of pripr to be used                      */
+
 	Solver** solverQ;
 	Solver** solverQst;
 
@@ -64,8 +66,8 @@ class PostTheta{
 	int fct_count;      /**< count total number of function evaluations 	*/
 	int iter_count;		/**< count total number of operator() call        	*/
 
-    VectorXd y; 		/**<  vector of observations y. has length no. 		*/
-    Vector theta_prior; /**<  vector with prior values. Constructs normal
+    VectorXd y; 			 /**<  vector of observations y. has length no. 		*/
+    Vector theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */
 
     // either Ax or B used
@@ -248,7 +250,17 @@ class PostTheta{
  	 * @details variance / precision of 1 : no normalising constant. 
  	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
      */	
-	void eval_log_prior(double& log_prior, double* thetai, double* thetai_original);
+	void eval_log_gaussian_prior(double& log_prior, double* thetai, double* thetai_original);
+
+	/**
+     * @brief evaluate log prior using original theta value
+     * @param[in] thetai current theta_i value
+     * @param[in] thetai_original original theta_i value
+ 	 * @param[inout] log prior is being updated.
+ 	 * @details variance / precision of 1 : no normalising constant. 
+ 	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
+     */	
+	void eval_log_pc_prior(double& log_sum, Vector& lambda, Vector& theta_interpret);
 
 	/**
 	 * @brief evaluate log prior of random effects

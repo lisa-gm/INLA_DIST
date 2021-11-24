@@ -116,7 +116,6 @@ int main(int argc, char* argv[])
         exit(1);
     }
     std::cout << "Solver : " << solver_type << std::endl;
-
     
     /* ---------------- read in matrices ---------------- */
 
@@ -255,7 +254,8 @@ int main(int argc, char* argv[])
     /* ----------------------- initialise random theta -------------------------------- */
 
     Vector theta(dim_th);
-    Vector theta_prior(dim_th);
+    Vector theta_prior_param(dim_th);
+    Vector theta_original(dim_th);       // only relevant for synthetic dataset
 
     int n;
 
@@ -275,8 +275,8 @@ int main(int argc, char* argv[])
         std::cout << "using Elias TOY DATASET" << std::endl;
         // from INLA : log prec Gauss obs, log(Range) for i, log(Stdev) for i     
         //theta_prior << 1.0087220,  -1.0536157, 0.6320466;
-        theta_prior << 1, -2.3, 2.1;
-        theta << theta_prior;
+        theta_prior_param << 1, -2.3, 2.1;
+        theta << theta_prior_param;
 
         std::cout << "initial theta : "  << theta.transpose() << std::endl;   
 
@@ -285,10 +285,13 @@ int main(int argc, char* argv[])
 
         // =========== synthetic data set =============== //
         std::cout << "using SYNTHETIC DATASET" << std::endl;        
-        theta_prior << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
+        theta_original << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
+        // using PC prior, choose lambda  
+        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
         //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
-        std::cout << "theta original     : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
+        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         //theta << 1.4, -5.9,  1,  3.7; 
         theta << 1, -3, 1, 3;
         //theta << 0.5, -1, 2, 2;
@@ -321,6 +324,9 @@ int main(int argc, char* argv[])
     // maximum line search iterations
     param.max_iterations = 30;
     // TODO: stepsize too small? seems like it almost always accepts step first step.
+    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
+    // is this sufficiently bullet proof?!
+    param.delta = 1e-1;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -336,14 +342,14 @@ int main(int argc, char* argv[])
 
     if(ns == 0){
         // fun.emplace(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior, solver_type);
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type);
     } else if(ns > 0 && nt == 1) {
         std::cout << "\ncall spatial constructor." << std::endl;
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior, solver_type);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type);
     } else {
         std::cout << "\ncall spatial-temporal constructor." << std::endl;
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior, solver_type);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
     }
 
     #if 1
@@ -387,14 +393,14 @@ int main(int argc, char* argv[])
     MatrixXd cov = fun->get_Covariance(temp, eps);
     std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
 
-    std::cout << "\norig. mean parameters        : " << theta_prior.transpose() << std::endl;
+    std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
     std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
 
     // convert between different theta parametrisations
     if(dim_th == 4){
         double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_prior[1], theta_prior[2], theta_prior[3], prior_ranT, prior_ranS, prior_sigU);
-        std::cout << "\norig. mean interpret. param. : " << theta_prior[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
+        std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
@@ -404,7 +410,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
@@ -458,7 +464,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
 
     Vector mu(n);
     fun->get_mu(theta, mu);
