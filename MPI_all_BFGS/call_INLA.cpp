@@ -9,6 +9,9 @@
 
 #include "mpi.h"
 
+#include <likwid.h>
+
+
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
@@ -25,7 +28,6 @@
 //#include "PardisoSolver.h"
 //#include "RGFSolver.h"
 
-//#include <likwid-marker.h>
 
 
 
