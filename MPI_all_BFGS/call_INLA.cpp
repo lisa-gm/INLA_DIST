@@ -322,7 +322,7 @@ int main(int argc, char* argv[])
         n = ns*nt + nb;
 
         // =========== synthetic data set =============== //
-        if(MPI_rank == 0){ 
+        /*if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }     
         theta_original << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
@@ -339,15 +339,26 @@ int main(int argc, char* argv[])
         //theta << 0.5, -1, 2, 2;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }
+        }*/
 
         // =========== temperature data set =============== //
-        /*std::cout << "using TEMPERATURE DATASET" << std::endl; 
-        theta_prior << -0.294769, -5.670050, -3.452297,  5.627084;       // EU only (solution from INLA)
+        
+        if(MPI_rank == 0){
+            std::cout << "using TEMPERATURE DATASET" << std::endl; 
+        }
+        // initial theta
+        theta << -1.3862944,  0.8139294, -0.3465736, -1.3862944;       // EU only (solution from INLA)
+;       // EU only (solution from INLA)
         //theta_original << 5, -10, 2.5, 1;
-        std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
-        theta << -0.2, -2, -2, 3;
-        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
+
+        // using PC prior, choose lambda  
+        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+
+        //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
+        //theta << -0.2, -2, -2, 3;
+        if(MPI_rank == 0){
+            std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+        }
     }
 
     Vector b(nb);
@@ -367,7 +378,7 @@ int main(int argc, char* argv[])
     param.past = 1;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    param.delta = 1e-1;
+    param.delta = 1e-2;
     // maximum line search iterations
     param.max_iterations = 30;
 
@@ -448,15 +459,15 @@ int main(int argc, char* argv[])
     std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
 
     if(MPI_rank == 0){
-        std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
+        //std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
         std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
     }
 
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
         double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
-        std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        //fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
+        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
@@ -511,7 +522,7 @@ int main(int argc, char* argv[])
     }
     #endif
 
-    #if 0
+    #if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vector interpret_theta(4);
@@ -523,7 +534,7 @@ int main(int argc, char* argv[])
     }
     #endif
 
-    #if 0
+    #if 1
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
 
     if(MPI_rank == 0){
