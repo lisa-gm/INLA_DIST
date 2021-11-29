@@ -4,7 +4,7 @@
 #include <mpi.h>
 #include <omp.h>
 #include <iostream>
-
+#include <unistd.h>
 
 #include "likwid.h"
 
@@ -60,7 +60,10 @@ int main(int argc, char *argv[]) {
        << " Machine: " << name << endl;
 
   double get_time = -omp_get_wtime();
-  
+ 
+  int threads;
+  int tid; 
+ 
   #pragma omp parallel 
   //for(int i = 0; i < 4; ++i)
   {
