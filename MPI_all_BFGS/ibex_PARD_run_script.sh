@@ -1,14 +1,15 @@
 #!/bin/bash
 
 #SBATCH --job-name=call_INLA_mpi           #Your Job Name
-#SBATCH --nodes=10                       #Number of Nodes desired e.g 1 node
+#SBATCH --nodes=3                       #Number of Nodes desired e.g 1 node
 #SBATCH --ntasks-per-node=1              #MPI task per node
 #SBATCH --cpus-per-task=4               # 16 cores per process
 #SBATCH --time=00:05:00                 #Walltime: Duration for the Job to run HH:MM:SS
+#SBATCH --gres=gpu:1
 #SBATCH --error=%x.err          #The .error file name
 #SBATCH --output=%x.out         #The .output file name
 
-# hard code example to see if code runs
+num_ranks=3
 
 #ns=2252
 #nt=0
@@ -43,7 +44,6 @@ data_type=synthetic
 
 	
 export PARDISOLICMESSAGE=1
-
 export OMP_NESTED=TRUE
 
 # LAUNCH 10 MPI processes with x threads each. 8 or 16 threads for larger matrices seems appropriate.
@@ -53,7 +53,7 @@ export OMP_NESTED=TRUE
 # -N : how nodes
 # -n : how many processes per node
 # --cpus-per-task=64 : how many threads per task
-l1t=1
+l1t=2
 l2t=1
 
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 
@@ -68,8 +68,7 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 folder_path=/home/x_gaedkelb/b_INLA/data/${data_type}/ns${ns}_nt${nt}
 
 # CAREFUL : needs to be AT LEAST 11 (main + 10 workers, 10 because of hessian, for BFGS only 9 are required)
-num_ranks=10
 echo "mpirun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
+mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >${folder_path}/INLA_PARDISO_output.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 

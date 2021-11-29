@@ -378,7 +378,8 @@ int main(int argc, char* argv[])
     param.past = 1;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    param.delta = 1e-2;
+    //param.delta = 1e-2;
+    //param.delta = 1e-1;
     // maximum line search iterations
     param.max_iterations = 30;
 
