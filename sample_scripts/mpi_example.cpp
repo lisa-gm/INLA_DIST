@@ -5,28 +5,7 @@
 #include <omp.h>
 #include <iostream>
 
-
-#include "likwid.h"
-
 using namespace std;
-
-
-int compute(int n){
-
-    int fk = 0;
-    int fn = 1;
-    int tmp;
-
-    for(int i=0; i<n; i++){
-
-        tmp = fn + fk;
-        fk = fn;
-        fn = tmp;
-    }
-
-    return fn;
-
- }
 
 int main(int argc, char *argv[]) {
   // Unique rank is assigned to each process in a communicator
@@ -58,40 +37,6 @@ int main(int argc, char *argv[]) {
   // Print out for each rank
   cout << "Hello, MPI! Rank: " << rank << " Total: " << size
        << " Machine: " << name << endl;
-
-  double get_time = -omp_get_wtime();
-  
-  #pragma omp parallel 
-  //for(int i = 0; i < 4; ++i)
-  {
-
-  threads = omp_get_num_threads();
-  tid = omp_get_thread_num();
-
-  printf("1st layer, thread = %d out of %d threads\n", tid, threads);
-  sleep(1);
-
-
-  /*    #pragma omp parallel 
-      {
-        tid = omp_get_thread_num();
-        int max_threads = omp_get_max_threads();
-    int threads = omp_get_num_threads();
-    printf("2nd layer, thread = %d out of %d threads\n", tid, threads);
-          
-          //sleep(2);
-
-          // add computational task to see threads working
-          int fn = compute(1000000000);
-          //std::cout << "pi : " << pi << std::endl;
-
-
-      }*/
-  }
-
-  get_time += omp_get_wtime();
-
-  std::cout << "time passed : " << get_time << std::endl;
 
   // Terminate MPI execution environment
   MPI_Finalize();
