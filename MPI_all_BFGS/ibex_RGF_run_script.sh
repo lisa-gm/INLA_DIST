@@ -1,14 +1,15 @@
 #!/bin/bash
 
 #SBATCH --job-name=call_INLA_mpi_gpu    #Your Job Name
-#SBATCH --nodes=10                      #Number of Nodes desired e.g 1 node
+#SBATCH --nodes=2                     #Number of Nodes desired e.g 1 node
 #SBATCH --mem=4G
 #SBATCH --ntasks-per-node=1             #MPI task per node
 #SBATCH --cpus-per-task=1               #16 cores per process
-#SBATCH --gres=gpu:2                    #Run on 1 GPU of any type
-#SBATCH --time=00:01:00                 #Walltime: Duration for the Job to run HH:MM:SS
+#SBATCH --gres=gpu:v100:2                    #Run on 1 GPU of any type
+#SBATCH --time=00:02:00                 #Walltime: Duration for the Job to run HH:MM:SS
 #SBATCH --error=%x.err          	#The .error file name
 #SBATCH --output=%x.out     		#The .output file name
+num_ranks=2
 
 # hard code example to see if code runs
 
@@ -38,8 +39,8 @@ no=7872
 #no=12873
 
 #solver_type=$1
-solver_type=PARDISO
-#solver_type=RGF
+#solver_type=PARDISO
+solver_type=RGF
 
 data_type=synthetic
 
@@ -70,8 +71,7 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 folder_path=/home/x_gaedkelb/b_INLA/data/${data_type}/ns${ns}_nt${nt}
 
 # CAREFUL : needs to be AT LEAST 11 (main + 10 workers, 10 because of hessian, for BFGS only 9 are required)
-num_ranks=10
 echo "mpirun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
+mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >${folder_path}/INLA_GPU_output.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 

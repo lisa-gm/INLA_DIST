@@ -196,8 +196,6 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
 // FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {
 
-	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
-
 
 	#ifdef PRINT_MSG
 	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
