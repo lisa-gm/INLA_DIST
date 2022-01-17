@@ -20,3 +20,17 @@ RGF folder that contains all the code required for the GPU Solver. (1)-(3) all a
 
 #### 5.) Contains a whole bunch of example scripts to test individual compenents, develop the MPI implementation, etc.
 
+################################################################################################
+
+### Installation
+
+we require 
+
+- Eigen
+- LBFGSpp 
+
+both are header only, hence only git clone required.
+
+- MAGMA 
+
+This needs installation and slightly altered makefile. See e.g. version on Haavards cluster.
