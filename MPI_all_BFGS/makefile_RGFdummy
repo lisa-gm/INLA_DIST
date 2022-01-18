@@ -3,10 +3,10 @@ MKLROOT?=$(shell echo $$MKLROOT)
 
 # PARDISO only
 #############################################################################################################
-BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/users/lgaedkem
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/users/lgaedkem
 
-CXX=mpic++
+CXX=CC     #mpic++
 CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
@@ -18,8 +18,8 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
 
 # INCLUDES
-INCEIGEN=-I/usr/include/eigen3
-#INCEIGEN=-I$(BASE_PATH)/include/eigen3
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I$(BASE_PATH)/applications/eigen
 
 INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
