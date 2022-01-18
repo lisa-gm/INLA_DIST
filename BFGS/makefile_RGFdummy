@@ -1,6 +1,9 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/users/lgaedkem
+
 # PARDISO only
 #############################################################################################################
 
@@ -17,7 +20,8 @@ LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
 
 # INCLUDES
 INCEIGEN=-I/usr/include/eigen3
-INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
