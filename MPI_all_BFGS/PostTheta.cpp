@@ -41,8 +41,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, VectorXd y
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver();
-		solverQst = new PardisoSolver();
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
@@ -74,9 +74,16 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
 	int threads_level1 = omp_get_max_threads();
+	int threads_level2;
+
+	#pragma omp parallel
+    {  
+   	threads_level2 = omp_get_max_threads();
+    }
 	
 	if(MPI_rank == 0){
 		printf("threads level 1 : %d\n", threads_level1);
+		printf("threads level 2 : %d\n", threads_level2);
 	}
 
 	dim_grad_loop      = 2*dim_th;
@@ -94,8 +101,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver();
-		solverQst = new PardisoSolver();
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
@@ -128,9 +135,16 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
 	int threads_level1 = omp_get_max_threads();
+	int threads_level2;
+
+	#pragma omp parallel
+    {  
+   	threads_level2 = omp_get_max_threads();
+    }
 	
 	if(MPI_rank == 0){
 		printf("threads level 1 : %d\n", threads_level1);
+		printf("threads level 2 : %d\n", threads_level2);
 	}
 
 	dim_grad_loop      = 2*dim_th;
@@ -147,8 +161,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, VectorXd y_,
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver();
-		solverQst = new PardisoSolver();
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
@@ -186,7 +200,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 	#endif
 
 	#ifdef PRINT_TIMES
-		std::cout << "\niteration : " << iter_count << std::endl;
+		if(MPI_rank == 0)
+			std::cout << "\niteration : " << iter_count << std::endl;
 	#endif
 
 	iter_count += 1; 
@@ -232,11 +247,7 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//LIKWID_MARKER_STOP("fThetaComputation");
 		
-		#ifdef PRINT_TIMES
-			timespent_f_theta_eval += omp_get_wtime();
-			std::cout << "timespent_f_theta_eval : " << timespent_f_theta_eval << std::endl;
-		#endif
-
+		timespent_f_theta_eval += omp_get_wtime();
 	} // end if MPI
 
 	// ===================================== compute grad f(theta) ============================== //
@@ -322,8 +333,8 @@ double PostTheta::operator()(Vector& theta, Vector& grad){
 
 	#ifdef PRINT_TIMES
 		if(MPI_rank == 0){
-			std::cout << "time spent evaluation f(theta) : " << timespent_f_theta_eval << std::endl;
-			std::cout << "time spent for eval f(theta) and grad(f) : " << timespent_fct_eval << std::endl;
+			std::cout << "time spent evaluation f(theta)         : " << timespent_f_theta_eval << std::endl;
+			std::cout << "time spent for all funct. evaluations  : " << timespent_fct_eval << std::endl;
 		}
 	#endif 
 
@@ -414,9 +425,10 @@ MatrixXd PostTheta::get_Covariance(Vector& theta, double eps){
 
 	timespent_hess_eval += omp_get_wtime();
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
+	if(MPI_rank == 0)
 		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
-	#endif 
+#endif 
 
 	//std::cout << "estimated hessian         : \n" << hess << std::endl; 
 	//std::cout << "eps : " << eps << endl;
@@ -672,14 +684,16 @@ MatrixXd PostTheta::hess_eval(Vector& theta, double eps){
     }
 
     time_omp_task_hess += omp_get_wtime();
-    #ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
+    if(MPI_rank == 0){
     	std::cout << "time hess = " << time_omp_task_hess << std::endl;
     	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
-    #endif
+    	}
+#endif
 
- 	if(MPI_rank == 0){
+ 	/*if(MPI_rank == 0){
  		std::cout << "time hess = " << time_omp_task_hess << std::endl;
- 	}
+ 	}*/
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
 	if(MPI_rank == 0){
@@ -1088,18 +1102,32 @@ void PostTheta::eval_log_pc_prior(double& log_sum, Vector& lambda, Vector& inter
 
 void PostTheta::eval_log_det_Qu(Vector& theta, double &log_det){
 
+
+	double time_construct_Qst = -omp_get_wtime();
 	SpMat Qu(nu, nu);
 	if(nt > 1){
 		construct_Q_spat_temp(theta, Qu);
 	} else {
 		construct_Q_spatial(theta, Qu);
 	}
+	time_construct_Qst += omp_get_wtime();
 
+
+	double time_factorize_Qst = -omp_get_wtime();
 	solverQst->factorize(Qu, log_det);
+	time_factorize_Qst += omp_get_wtime();
 
-	#ifdef PRINT_MSG
-		std::cout << "log det Qu : " << log_det << std::endl;
-	#endif
+#ifdef PRINT_TIMES
+	if(MPI_rank ==0){
+		std::cout << "time construct Qst prior = " << time_construct_Qst << std::endl;
+		std::cout << "time factorize Qst prior = " << time_factorize_Qst << std::endl;
+	}
+#endif
+
+
+#ifdef PRINT_MSG
+	std::cout << "log det Qu : " << log_det << std::endl;
+#endif
 
 	log_det = 0.5 * (log_det);
 }
@@ -1281,32 +1309,41 @@ void PostTheta::construct_b(Vector& theta, Vector &rhs){
 
 void PostTheta::eval_denominator(Vector& theta, double& log_det, double& val, SpMat& Q, Vector& rhs, Vector& mu){
 
+	double time_construct_Q = -omp_get_wtime();
 	// construct Q_x|y,
 	construct_Q(theta, Q);
-	//Q->setIdentity();
+	time_construct_Q += omp_get_wtime();
 
-	#ifdef PRINT_MSG
-		printf("\nin eval denominator after construct_Q call.");
-	#endif
+#ifdef PRINT_MSG
+	printf("\nin eval denominator after construct_Q call.");
+#endif
 
 	//  construct b_xey
 	construct_b(theta, rhs);
 
-	#ifdef PRINT_MSG
-		printf("\nin eval denominator after construct_b call.");
-	#endif
+#ifdef PRINT_MSG
+	printf("\nin eval denominator after construct_b call.");
+#endif
 
 	// solve linear system
 	// returns vector mu, which is of the same size as rhs
 	//solve_cholmod(Q, rhs, mu, log_det);
-
+	double time_solve_Q = -omp_get_wtime();
 	solverQ->factorize_solve(Q, rhs, mu, log_det);
+	time_solve_Q += omp_get_wtime();
+
+#ifdef PRINT_TIMES
+	if(MPI_rank == 0){
+		std::cout << "time construct Q         = " << time_construct_Q << std::endl;
+		std::cout << "time factorize & solve Q = " << time_solve_Q << std::endl;
+	}
+#endif
 
 	log_det = 0.5 * (log_det);
 	
-	#ifdef PRINT_MSG
-		std::cout << "log det d : " << log_det << std::endl;
-	#endif
+#ifdef PRINT_MSG
+	std::cout << "log det d : " << log_det << std::endl;
+#endif
 
 	// compute value
 	val = -0.5 * mu.transpose()*(Q)*(mu); 

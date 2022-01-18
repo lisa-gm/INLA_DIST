@@ -1,6 +1,6 @@
 #include "PardisoSolver.h"
 
-PardisoSolver::PardisoSolver(){
+PardisoSolver::PardisoSolver(int MPI_rank){
 
     mtype  = -2;             /* set to positive semi-definite */
     nrhs   = 1;              /* Number of right hand sides. */

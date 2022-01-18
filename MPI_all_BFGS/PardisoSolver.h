@@ -43,6 +43,9 @@ class PardisoSolver : public Solver{
 
 private:
 
+
+    int MPI_rank;           /**< pass on current MPI rank */
+
     /* matrix size */
     int n;                  /**< size of the matrix */
     long unsigned int nnz;       /**< number of nonzeros */
@@ -83,7 +86,7 @@ public:
      /**
      * @brief constructor. initialises parameters, check pardiso license.
      */
-    PardisoSolver();
+    PardisoSolver(int MPI_rank);
 
 
     /* ======================================================================== */

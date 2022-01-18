@@ -9,7 +9,7 @@
 
 #include "mpi.h"
 
-#include <likwid.h>
+//#include <likwid.h>
 
 
 #include <Eigen/Core>
@@ -322,7 +322,7 @@ int main(int argc, char* argv[])
         n = ns*nt + nb;
 
         // =========== synthetic data set =============== //
-        /*if(MPI_rank == 0){ 
+        if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }     
         theta_original << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
@@ -339,11 +339,11 @@ int main(int argc, char* argv[])
         //theta << 0.5, -1, 2, 2;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }*/
+        }
 
         // =========== temperature data set =============== //
         
-        if(MPI_rank == 0){
+        /*if(MPI_rank == 0){
             std::cout << "using TEMPERATURE DATASET" << std::endl; 
         }
         // initial theta
@@ -358,7 +358,7 @@ int main(int argc, char* argv[])
         //theta << -0.2, -2, -2, 3;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }
+        }*/
     }
 
     Vector b(nb);
@@ -460,7 +460,7 @@ int main(int argc, char* argv[])
     std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
 
     if(MPI_rank == 0){
-        //std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
+        std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
         std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
     }
 
@@ -478,7 +478,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
 
     Vector theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
@@ -543,15 +543,17 @@ int main(int argc, char* argv[])
     }
     #endif
 
-    #endif
 
     if(MPI_rank == 0){
         Vector mu(n);
         fun->get_mu(theta, mu);
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << "\n" << std::endl;
     }
+
+    #endif
+
   
-    #if 1
+    #if 0
 
 
     // when the range of u is large the variance of b0 is large.
