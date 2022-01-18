@@ -17,7 +17,7 @@
 //#define PRINT_PAR
 //#define PRINT_OMP
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 typedef Eigen::SparseMatrix<double> SpMat;
 
 using namespace Eigen;
@@ -115,7 +115,7 @@ public:
      * @param[inout]    sol solution of the system.
      * @param[inout]    log_det log determinant of Q.
      */    
-    void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det);
+    void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
 
 
     /**
@@ -123,7 +123,7 @@ public:
      * @param[in]       Q precision matrix.
      * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
      */
-    void selected_inversion(SpMat& Q, Vector& inv_diag);
+    void selected_inversion(SpMat& Q, Vect& inv_diag);
 
     /**
      * @brief inversion of the entire matrix (only meant for small matrices) by means of using identity 

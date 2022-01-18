@@ -255,7 +255,7 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
 }
 
  
-void PardisoSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det){
+void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det){
 
     #ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;
@@ -399,7 +399,7 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &
 } // end factorise solve function
 
 
-void PardisoSolver::selected_inversion(SpMat& Q, Vector& inv_diag){
+void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
 
     #ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;

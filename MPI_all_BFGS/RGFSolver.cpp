@@ -93,7 +93,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 }
 
-void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det) {
+void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
 
 	#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
@@ -194,7 +194,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_
 
 // IMPLEMENT IN A WAY SUCH THAT FACTORISATION WILL BE PERFORMED AGAIN
 // FOR NOW: cannot rely on factorisation to be there.
-void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {
+void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 
 
 	#ifdef PRINT_MSG
