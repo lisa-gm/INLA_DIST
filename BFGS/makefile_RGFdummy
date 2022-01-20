@@ -8,10 +8,10 @@ BASE_PATH=/users/lgaedkem
 #############################################################################################################
 
 CXX=g++
-CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
-LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_ibex 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 
 ARMADILLO=-larmadillo
@@ -19,15 +19,15 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
 
 # INCLUDES
-INCEIGEN=-I/usr/include/eigen3
-#INCEIGEN=-I$(BASE_PATH)/applications/eigen
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I$(BASE_PATH)/applications/eigen
 INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
 $(info =============== Library paths ==============)
-$(info MKL      : $(MKLHOME))
+$(info MKL      : $(MKLROOT))
 $(info EIGEN    : $(INCEIGEN))
 
 $(info )
