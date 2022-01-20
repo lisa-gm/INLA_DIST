@@ -13,7 +13,7 @@
 
 #include "Solver.cpp"
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 
 
 #define WORKTAG 1
@@ -27,7 +27,7 @@ class Model {
 		int n;
 		int theta_size;
 
-		Vector theta;
+		Vect theta;
 		double* theta_array;
 
 		double f_theta;
@@ -61,14 +61,16 @@ class Model {
 			}
 
 			// map to eigen vector format
-			theta = Eigen::Map<Vector>(theta_array,theta_size);
+			theta = Eigen::Map<Vect>(theta_array,theta_size);
 
 			cout << "received theta in model : " << theta.transpose() << endl;
 
 			f_theta = solver->factorize(theta);
 			// number1 += 3;
 
-			sleep(1);
+			std::cout << "In model with rank : " << rank << ", received : " << f_theta << std::endl;
+
+			//sleep(1);
 		    printf("Process %d received number %f from process 0\n", rank, theta(0));
 
 	   		MPI_Send(&f_theta, 1, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD);

@@ -27,8 +27,8 @@ class PostTheta {
 		int num_requests_send;
 		int num_requests_recv;
 
-		Vector theta;
-		Vector theta_loc;
+		Vect theta;
+		Vect theta_loc;
 		double* theta_loc_array;
 
 		double f_theta;
@@ -45,54 +45,61 @@ class PostTheta {
 		}
 
 		// set up such that number of processes and n NOT the same. 
-		double combined_eval(Vector theta){
-
-			int sum = 1;
+		double combined_eval(Vect theta){
 
 			cout << "different theta evaluations." << endl;
 			double f_theta_list[n];
 
 			//double number[n];
 
+			#if 1
 
-			VectorXi counter_list = VectorXi::LinSpaced(n,1,n);
+			int sum = 1;
+
+			int num_jobs = 5;
+			VectorXi counter_list = VectorXi::LinSpaced(num_jobs,1,num_jobs);
 			std::cout << "counter_list = " << counter_list.transpose() << std::endl;
 
 			bool work_left = true;
 
-			#if 0
-
-
 			while(work_left == true){
 
-				k = min(counter_list.size(), num_workers);
-				std::cout << "k = " << k << std::endl;
+				k = min((int)counter_list.size(), num_workers);
+				std::cout << "num workers = " << num_workers << ", dim(counter_list) = " << counter_list.size() << ", k = " << k << std::endl;
 
 				MPI_Request request_send[k];
+				MPI_Status  status_send[k];
 				num_requests_send = 0;
 
 				MPI_Request request_recv[k];
+				MPI_Status  status_recv[k];
 				num_requests_recv = 0;
 
 			
 				for(int i=0; i<k; i++){
-					Vector theta_loc = theta+counter_list[i]*Vector::Ones(theta.size());
+					Vect theta_loc = theta+counter_list[i]*Vect::Ones(theta.size());
 					theta_loc_array = theta_loc.data();
 
-					//MPI_ISend(theta_loc_array, theta_loc.size(), MPI_DOUBLE, i, 0, MPI_COMM_WORLD, request_send+num_request);	
-					std::cout << "num requests : " << num_requests_send << std::endl;
-					num_request_send++;			
+					MPI_Isend(theta_loc_array, theta_loc.size(), MPI_DOUBLE, i+1, 0, MPI_COMM_WORLD, request_send+num_requests_send);	
+					//std::cout << "num requests : " << num_requests_send << std::endl;
+					num_requests_send++;			
 				}
 
 				for(int i=0; i<k; i++){
 					std::cout << "counter_list[" << i << "] = " << counter_list[i] << std::endl;
-					//MPI_Irecv(&f_theta_list[counter_list[i]], 1, MPI_DOUBLE, i, 0, MPI_COMM_WORLD, \
-			             requests+num_requests);
+					MPI_Irecv(&f_theta_list[counter_list[i]], 1, MPI_DOUBLE, i+1, 0, MPI_COMM_WORLD, \
+			             request_recv+num_requests_recv);
 					num_requests_recv++;
 				}
 
-				// MPI_Waitall(num_requests, requests, statuses);
-				counter_list = counter_list.tail(counter_list.size()-k); 
+				MPI_Waitall(num_requests_send, request_send, status_send);
+				MPI_Waitall(num_requests_recv, request_recv, status_recv);
+
+				//MPI_Waitall(num_requests, request, statuses);
+				
+				VectorXi temp = counter_list.tail(counter_list.size()-k); 
+				counter_list.resize(counter_list.size()-k);				
+				counter_list = temp;
 				std::cout << "counter list : " << counter_list.transpose() << std::endl;
 
 				if(counter_list.size() == 0){
@@ -108,9 +115,11 @@ class PostTheta {
 
 
 			#if 0
+
+			std::cout << "In PostTheta, n = " << n << std::endl;
 			
 			for(int i=0; i<n; i++){
-				Vector theta_loc = theta+i*Vector::Ones(theta.size());
+				Vect theta_loc = theta+i*Vect::Ones(theta.size());
 				theta_loc_array = theta_loc.data();
 
 				MPI_Send(theta_loc_array, theta_loc.size(), MPI_DOUBLE, i+1, 0, MPI_COMM_WORLD);

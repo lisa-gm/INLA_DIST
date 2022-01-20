@@ -8,7 +8,7 @@
 
 #include <Eigen/Core>
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 
 using namespace std;
 
@@ -16,7 +16,7 @@ using namespace std;
 class Solver {
 	private:
 		int n;
-		Vector theta;
+		Vect theta;
 		double f_theta;
 
 	public: 
@@ -24,7 +24,8 @@ class Solver {
 			cout << "Solver constructor." << endl;
 		}
 
-		double factorize(Vector theta){
+		double factorize(Vect theta){
+			std::cout << "in solver.factorise()" << std::endl;
 			f_theta = 2*theta(0);
 
 			return f_theta;

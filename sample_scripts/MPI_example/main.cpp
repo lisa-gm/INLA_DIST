@@ -11,7 +11,7 @@
 
 #include <Eigen/Core>
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 
 
 //#include <likwid-marker.h>
@@ -36,10 +36,11 @@ int main(int argc, char* argv[])
 	// Get the total number ranks in this communicator
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-	int n = size-1;
+	int n = size - 1;
+	//int n = 5;
 
-	Vector theta(4);
-	theta = 3*Vector::Ones(4);
+	Vect theta(4);
+	theta = 3*Vect::Ones(4);
 
 	#if 0
 	if(rank == 0){
@@ -61,8 +62,8 @@ int main(int argc, char* argv[])
 		double *theta_array = (double*)malloc(theta.size() * sizeof(double));
 		MPI_Recv(theta_array, theta.size(), MPI_DOUBLE, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 
-		Vector theta2(theta.size());
-		theta2 = Eigen::Map<Vector>(theta_array,theta.size());
+		Vect theta2(theta.size());
+		theta2 = Eigen::Map<Vect>(theta_array,theta.size());
 
 		cout << "theta2 : " << theta2.transpose() << endl;
 
@@ -89,7 +90,7 @@ int main(int argc, char* argv[])
 		PostTheta* fun;
 		fun = new PostTheta(n);
 
-		int iter = 2;
+		int iter = 1;
 		BFGS solver(iter);
 
 		solver.minimize(fun, theta);
@@ -98,10 +99,10 @@ int main(int argc, char* argv[])
 		// TODO: can i send a null?
 		double* theta_array = theta.data();
 		for(int i=0; i<n; i++){
+			std::cout << "Sending out DIETAGS to rank " << i+1 << std::endl;
 			MPI_Send(theta_array, theta.size(), MPI_DOUBLE, i+1, 2, MPI_COMM_WORLD);
 		}
 		
-
 	}
 
 
