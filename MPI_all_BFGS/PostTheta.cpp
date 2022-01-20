@@ -557,7 +557,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
     double time_omp_task_hess = - omp_get_wtime();
 
     // compute f(theta) only once.
-	if(MPI_rank == task_to_rank_list(0)){
+	if(MPI_rank == task_to_rank_list[0]){
 		Vect mu_tmp(n);
 		//double f_theta = f_eval(theta);
 		double f_theta = eval_post_theta(theta, mu_tmp);
@@ -576,7 +576,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         if(i == j){
 
         	// compute f(theta+eps_i)
-            if(MPI_rank == task_to_rank_list(counter)){ 
+            if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i = theta+epsId.col(i);
 	            //f_i_i(0,i) = f_eval(theta_forw_i);
@@ -585,7 +585,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
             counter++;
 
         	// compute f(theta-eps_i)
-            if(MPI_rank == task_to_rank_list(counter)){ 
+            if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
 	            Vect theta_back_i = theta-epsId.col(i);
 	            //f_i_i(2,i) = f_eval(theta_back_i);
@@ -600,7 +600,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         } else if(j > i) {
 
         	// compute f(theta+eps_i+eps_j)
-            if(MPI_rank == task_to_rank_list(counter)){             
+            if(MPI_rank == task_to_rank_list[counter]){             
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i_j 	   = theta+epsId.col(i)+epsId.col(j);
 	            //f_i_j(0,k) = f_eval(theta_forw_i_j);
@@ -609,7 +609,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
             counter++;
 
         	// compute f(theta+eps_i-eps_j)
-            if(MPI_rank == task_to_rank_list(counter)){ 
+            if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i_back_j = theta+epsId.col(i)-epsId.col(j);
 	            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
@@ -618,7 +618,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
             counter++;
 
         	// compute f(theta-eps_i+eps_j)
-            if(MPI_rank == task_to_rank_list(counter)){ 
+            if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
 	            Vect theta_back_i_forw_j = theta-epsId.col(i)+epsId.col(j);
 	            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
@@ -627,7 +627,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
             counter++;
 
         	// compute f(theta-eps_i-eps_j)
-            if(MPI_rank == task_to_rank_list(counter)){ 
+            if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
 	            Vect theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
 	            //f_i_j(3,k) = f_eval(theta_back_i_j);
