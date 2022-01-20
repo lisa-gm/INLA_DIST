@@ -70,7 +70,7 @@ class RGFSolver: public Solver {
          * @param[inout]    sol solution of the system.
          * @param[inout]    log_det log determinant of Q.
          */ 
-		void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det);
+		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
 
         /**
          * @brief selected inversion of the diagonal elements of Q.
@@ -78,7 +78,7 @@ class RGFSolver: public Solver {
          * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
          * @note is there some way to potentially reuse Cholesky factor that is already on CPU?
          */
-      	void selected_inversion(SpMat& Q, Vector& inv_diag);
+      	void selected_inversion(SpMat& Q, Vect& inv_diag);
 
       	// will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)
         // OR not? Eigen function is probably fine, most likely also using lapack.

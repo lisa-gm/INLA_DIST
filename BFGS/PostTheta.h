@@ -21,7 +21,10 @@
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
-#include "RGFSolver.h"
+
+//#include "RGFSolver.h"
+#include "RGFSolver_dummy.h"
+
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
@@ -31,7 +34,7 @@ using namespace std;
 
 // typedef Eigen::Matrix<double, Dynamic, Dynamic> Mat;
 typedef Eigen::SparseMatrix<double> SpMat;
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 
 
  /**
@@ -66,8 +69,8 @@ class PostTheta{
 	int fct_count;      /**< count total number of function evaluations 	*/
 	int iter_count;		/**< count total number of operator() call        	*/
 
-    VectorXd y; 			 /**<  vector of observations y. has length no. 		*/
-    Vector theta_prior_param; /**<  vector with prior values. Constructs normal
+    Vect y; 			 /**<  vector of observations y. has length no. 		*/
+    Vect theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */
 
     // either Ax or B used
@@ -90,8 +93,8 @@ class PostTheta{
     SpMat M2;			/**< stiffness matrix time.							*/
 
     double yTy;			/**< compute t(y)*y once. */
-    Vector mu;			/**< conditional mean */
-    Vector t_grad;		/**< gradient of theta */
+    Vect mu;			/**< conditional mean */
+    Vect t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
 
 	public:
@@ -105,7 +108,7 @@ class PostTheta{
      * @param[in] y_  vector with observations.
      * \note B = B_ or is its own copy?
      */	
-	PostTheta(int ns, int nt, int nb, int no, MatrixXd B, VectorXd y, Vector theta_prior, string solver_type);
+	PostTheta(int ns, int nt, int nb, int no, MatrixXd B, Vect y, Vect theta_prior, string solver_type);
 	/**
      * @brief constructor for spatial model (order 2).
      * @param[in] ns_ number of spatial grid points per time step.
@@ -118,7 +121,7 @@ class PostTheta{
      * @param[in] g1_ stiffness matrix.
      * @param[in] g2_ defined as : g1 * c0^-1 * g1
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, Vector theta_prior, string solver_type);
+	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, Vect theta_prior, string solver_type);
 
 	/**
      * @brief constructor for spatial temporal model.
@@ -137,7 +140,7 @@ class PostTheta{
      * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
      * @param[in] M2_ stiffness matrix time.
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, VectorXd y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vector theta_prior, string solver_type); 
+	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vect theta_prior, string solver_type); 
 
 	/**
      * @brief structure required by BFGS solver, requires : theta, gradient theta
@@ -146,7 +149,7 @@ class PostTheta{
 	 * then split into another e.g. 8 threads, when calling PARDISO to factorise the system.
 	 * --> somehow introduce additional parallelism to compute f(theta), possible to do in parallel
 	 */
-    double operator()(Vector& theta, Vector& grad);
+    double operator()(Vect& theta, Vect& grad);
 
     int get_fct_count();
 
@@ -185,13 +188,13 @@ class PostTheta{
      * @param [in]    theta hyperparameter vector
      * @param [inout] mu vector of the conditional mean
      */	
-	void get_mu(Vector& theta, Vector& mu);
+	void get_mu(Vect& theta, Vect& mu);
 
 	/**
      * @brief returns current gradient of theta.
      * @return gradient_theta
      */	
-	Vector get_grad();
+	Vect get_grad();
 
 	/**
      * @brief Compute Covariance matrix of hyperparameters theta, at theta.
@@ -200,11 +203,11 @@ class PostTheta{
      * @param [in] theta hyperparameter Vector
      * @return cov covariance matrix of the hyperparameters
      */	
-	MatrixXd get_Covariance(Vector& theta, double eps);
+	MatrixXd get_Covariance(Vect& theta, double eps);
 
-	MatrixXd get_Cov_interpret_param(Vector& interpret_theta, double eps);
+	MatrixXd get_Cov_interpret_param(Vect& interpret_theta, double eps);
 
-	double f_eval(Vector& theta);
+	double f_eval(Vect& theta);
 
 	/**
      * @brief Compute the marginal variances of the latent parameters at theta. 
@@ -212,7 +215,7 @@ class PostTheta{
  	 * @param[in]  	 Vector theta.
  	 * @param[inout] Vector with marginals of f.
      */	
-	void get_marginals_f(Vector& theta, Vector& vars);
+	void get_marginals_f(Vect& theta, Vect& vars);
 
 	/**
      * @brief computes the hessian at theta using second order finite difference.
@@ -221,9 +224,9 @@ class PostTheta{
  	 * @return Dense Matrix with Hessian. 
  	 * \todo not yet parallelised .... 
      */	
-	MatrixXd hess_eval(Vector& theta, double eps);
+	MatrixXd hess_eval(Vect& theta, double eps);
 
-	MatrixXd hess_eval_interpret_theta(Vector& interpret_theta, double eps);
+	MatrixXd hess_eval_interpret_theta(Vect& interpret_theta, double eps);
 
 	/**
      * @brief check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small)
@@ -240,7 +243,7 @@ class PostTheta{
  	 * @param[inout] mu vector of the conditional mean
  	 * @return 		 f(theta) value
      */
-	double eval_post_theta(Vector& theta, Vector& mu);
+	double eval_post_theta(Vect& theta, Vect& mu);
 
 	/**
      * @brief evaluate log prior using original theta value
@@ -259,7 +262,7 @@ class PostTheta{
  	 * @param[in] theta_interpret current theta value in interpretable scale
  	 * @details complicated prior. check appropriate references for details.
      */	
-	void eval_log_pc_prior(double& log_sum, Vector& lambda, Vector& theta_interpret);
+	void eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& theta_interpret);
 
 	/**
 	 * @brief evaluate log prior of random effects
@@ -267,7 +270,7 @@ class PostTheta{
 		 * @param[inout] log_det inserts log determinant.
 		 * \todo construct spatial matrix (at the moment this is happening twice. FIX)
 	 */	
-	void eval_log_det_Qu(Vector& theta, double &log_det);
+	void eval_log_det_Qu(Vect& theta, double &log_det);
 
 	/**
      * @brief compute log likelihood : log_det tau*no and value -theta*yTy
@@ -275,35 +278,35 @@ class PostTheta{
  	 * @param[inout] log_det inserts log determinant of log likelihood.
  	 * @param[inout] val inserts the value of -theta*yTy
      */	
-	void eval_likelihood(Vector& theta, double &log_det, double &val);
+	void eval_likelihood(Vect& theta, double &log_det, double &val);
 	
 	/**
      * @brief spatial model : SPDE discretisation -- matrix construction
      * @param[in] theta current theta vector
  	 * @param[inout] Qs fills spatial precision matrix
      */
-	void construct_Q_spatial(Vector& theta, SpMat& Qs);
+	void construct_Q_spatial(Vect& theta, SpMat& Qs);
 
 	/**
      * @brief spatial temporal model : SPDE discretisation. DEMF(1,2,1) model.
      * @param[in] theta current theta vector
  	 * @param[inout] Qst fills spatial-temporal precision matrix
      */
-	void construct_Q_spat_temp(Vector& theta, SpMat& Qst);
+	void construct_Q_spat_temp(Vect& theta, SpMat& Qst);
 
 	/** @brief construct precision matrix. 
 	 * Calls spatial, spatial-temporal, etc.
      * @param[in] theta current theta vector
  	 * @param[inout] Q fills precision matrix
      */
-	void construct_Q(Vector& theta, SpMat& Q);
+	void construct_Q(Vect& theta, SpMat& Q);
 
 	/** @brief Assemble right-handside. 
      * @param[in] theta current theta vector
  	 * @param[inout] rhs right-handside
  	 * /todo Could compute Ax^T*y once, and only multiply with appropriate exp_theta.
      */	
-	void construct_b(Vector& theta, Vector &rhs);
+	void construct_b(Vect& theta, Vect &rhs);
 
 	/** @brief Evaluate denominator: conditional probability of Qx|y
      * @param[in] theta current theta vector
@@ -313,7 +316,7 @@ class PostTheta{
  	 * @param[inout] rhs construct right-handside
  	 * @param[inout] mu insert mean of latent parameters
      */
-	void eval_denominator(Vector& theta, double& log_det, double& val, SpMat& Q, Vector& rhs, Vector& mu);
+	void eval_denominator(Vect& theta, double& log_det, double& val, SpMat& Q, Vect& rhs, Vect& mu);
 
 	// ============================================================================================ //
 	// FINITE DIFFERENCE GRADIENT EVALUATION
@@ -325,7 +328,7 @@ class PostTheta{
  	 * @param[inout] grad inserts gradient 
  	 * \todo don't actually need gradient?
      */
-	void eval_gradient(Vector& theta, double f_theta, Vector& mu, Vector& grad);
+	void eval_gradient(Vect& theta, double f_theta, Vect& mu, Vect& grad);
 
 	 /**
      * @brief class destructor. Frees memory allocated by PostTheta class.

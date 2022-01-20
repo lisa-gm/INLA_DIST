@@ -25,23 +25,23 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	log_det = 0;
 }
 
-void RGFSolver::factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det) {
+void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
 
 	#ifdef PRINT_MSG
 	std::cout << "in dummy RGF FACTORIZE_SOLVE()." << std::endl;
 	#endif
 
 	log_det = 0;
-  	sol = Vector::Ones(n);
+  	sol = Vect::Ones(n);
 
 }
 
 // IMPLEMENT IN A WAY SUCH THAT FACTORISATION WILL BE PERFORMED AGAIN
 // FOR NOW: cannot rely on factorisation to be there.
-void RGFSolver::selected_inversion(SpMat& Q, Vector& inv_diag) {
+void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 
 	std::cout << "in dummy RGF SELECTED_INVERSION()." << std::endl;
-	inv_diag = Vector::Ones(n);
+	inv_diag = Vect::Ones(n);
 
 }
 
