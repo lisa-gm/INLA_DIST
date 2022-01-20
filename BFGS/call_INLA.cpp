@@ -23,14 +23,13 @@
 //#include "PardisoSolver.h"
 //#include "RGFSolver.h"
 
+//#include <likwid.h>
 //#include <likwid-marker.h>
 
 
-
-using Eigen::VectorXd;
 using Eigen::MatrixXd;
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 
 
 using namespace LBFGSpp;
@@ -57,14 +56,14 @@ int main(int argc, char* argv[])
     int no = atoi(argv[2]);
 
     Eigen::MatrixXd B(no, nb);
-    Vector b(nb);
-    Vector y(no);
+    Vect b(nb);
+    Vect y(no);
 
     double tau = 0.5;
     generate_ex_regression(nb, no, tau, &B, &b, &y); 
     
     // Initial guess
-    Vector theta(1);
+    Vect theta(1);
     theta[0] = 3;
     
     
@@ -136,7 +135,7 @@ int main(int argc, char* argv[])
     // data component / fixed effects
     MatrixXd B;
     SpMat Ax; 
-    Vector y;
+    Vect y;
 
     if(ns == 0 && nt == 0){
 
@@ -253,9 +252,10 @@ int main(int argc, char* argv[])
 
     /* ----------------------- initialise random theta -------------------------------- */
 
-    Vector theta(dim_th);
-    Vector theta_prior_param(dim_th);
-    Vector theta_original(dim_th);       // only relevant for synthetic dataset
+    Vect theta(dim_th);
+    Vect theta_prior_param(dim_th);
+    Vect theta_prior(dim_th);
+    Vect theta_original(dim_th);       // only relevant for synthetic dataset
 
     int n;
 
@@ -299,14 +299,16 @@ int main(int argc, char* argv[])
 
         // =========== temperature data set =============== //
         /*std::cout << "using TEMPERATURE DATASET" << std::endl; 
-        theta_prior << -0.294769, -5.670050, -3.452297,  5.627084;       // EU only (solution from INLA)
+        theta_prior << -1.3862944,  0.8139294, -0.3465736, -1.3862944;       // EU only (solution from INLA)
+        // using PC prior, choose lambda  
+        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;*/
         //theta_original << 5, -10, 2.5, 1;
-        std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
+        /*std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         theta << -0.2, -2, -2, 3;
         std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;*/
     }
 
-    Vector b(nb);
+    Vect b(nb);
 
     // ============================ set up BFGS solver ======================== //
 
@@ -380,7 +382,7 @@ int main(int argc, char* argv[])
     /*int fct_count = fun->get_fct_count();
     std::cout << "function counts thread zero  : " << fct_count << std::endl;*/
 
-    Vector grad = fun->get_grad();
+    Vect grad = fun->get_grad();
     std::cout << "grad                         :" << grad.transpose() << std::endl;
 
     /*std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
@@ -394,26 +396,26 @@ int main(int argc, char* argv[])
     MatrixXd cov = fun->get_Covariance(temp, eps);
     std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
 
-    std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
+    //std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
     std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
 
     // convert between different theta parametrisations
     if(dim_th == 4){
-        double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
-        std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        //double prior_sigU; double prior_ranS; double prior_ranT;
+        //fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
+        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
         fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranT, ranS, sigU);
-        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranT << " " << ranS << " " << sigU << std::endl;
+        //std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranT << " " << ranS << " " << sigU << std::endl;
     }
 
     #endif
 
-    #if 0
+    #if 1
 
-    Vector theta_max(dim_th);
+    Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
     theta_max = theta;
@@ -442,18 +444,18 @@ int main(int argc, char* argv[])
 
     eps = 0.005;
     //cov = fun->get_Covariance(theta_max, sqrt(eps));
-    cov = fun->get_Covariance(theta_max, eps);
-    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
+    //cov = fun->get_Covariance(theta_max, eps);
+    //std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
 
     /*eps = 0.001;
     cov = fun->get_Covariance(theta_max, eps);
-    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
+    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
     std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
-    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+    std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;*/
 
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
-    Vector interpret_theta(4);
+    Vect interpret_theta(4);
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
     std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
@@ -465,14 +467,14 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
 
-    Vector mu(n);
+    Vect mu(n);
     fun->get_mu(theta, mu);
     std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
     
     // when the range of u is large the variance of b0 is large.
-    Vector marg(n);
+    Vect marg(n);
     fun->get_marginals_f(theta, marg);
     std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
     std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;

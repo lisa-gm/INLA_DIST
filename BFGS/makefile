@@ -1,4 +1,3 @@
-
 MKLROOT?=$(shell echo $$MKLROOT)
 
 ############# RGF ################
@@ -92,6 +91,3 @@ clean:
 
 #rm -f librgf.so
 #rm -f librgf.a
-
-
-

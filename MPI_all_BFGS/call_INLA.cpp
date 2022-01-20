@@ -11,29 +11,19 @@
 
 //#include <likwid.h>
 
-
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
 
 #include <armadillo>
-
 #include <LBFGS.h>
 
-//#include <optional>
 
 #include "PostTheta.h"
 #include "../read_write_functions.cpp"
 
-//#include "PardisoSolver.h"
-//#include "RGFSolver.h"
-
-
-
-
 using Eigen::MatrixXd;
 typedef Eigen::VectorXd Vect;
-
 
 using namespace LBFGSpp;
 
@@ -59,7 +49,21 @@ int main(int argc, char* argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
     // Get the total number ranks in this communicator
-    MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
+    MPI_Comm_size(MPI_COMM_WORLD, &MPI_size); 
+
+    int threads_level1 = omp_get_max_threads();
+    int threads_level2;
+
+    #pragma omp parallel
+    {  
+    threads_level2 = omp_get_max_threads();
+    }
+    
+    if(MPI_rank == 0){
+        printf("total no MPI ranks  : %d\n", MPI_size);
+        printf("OMP threads level 1 : %d\n", threads_level1);
+        printf("OMP threads level 2 : %d\n", threads_level2);
+    }  
     
     #if 0
     // #include "generate_regression_data.cpp"

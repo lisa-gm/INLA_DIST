@@ -12,7 +12,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 typedef Eigen::SparseMatrix<double> SpMat;
 
 using namespace std;
@@ -29,8 +29,8 @@ class Solver {
 		// pure virtual function providing interface framework.
 		virtual void symbolic_factorization(SpMat& Q, int& init) = 0;
 		virtual void factorize(SpMat& Q, double& log_det) = 0;
-		virtual void factorize_solve(SpMat& Q, Vector& rhs, Vector& sol, double &log_det) = 0;
-		virtual void selected_inversion(SpMat&Q, Vector& inv_diag) = 0;
+		virtual void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) = 0;
+		virtual void selected_inversion(SpMat&Q, Vect& inv_diag) = 0;
 
 		// "simple inversion" function for small matrices. exists already in pardiso.
         virtual ~Solver(){                      
@@ -43,8 +43,8 @@ class Solver {
    		double log_det;		/**< log determinant of Q 					  */
 
 		SpMat Q; 			/**< sparse precision matrix Q. Eigen format. */
-		Vector rhs;			/**< right-hand side, solving Q*sol = rhs     */
-		Vector sol;			/**< solution vector, solving Q*sol = rhs     */
+		Vect rhs;			/**< right-hand side, solving Q*sol = rhs     */
+		Vect sol;			/**< solution vector, solving Q*sol = rhs     */
 };
 
 
