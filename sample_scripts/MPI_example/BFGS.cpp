@@ -7,7 +7,7 @@
 
 #include <Eigen/Core>
 
-typedef Eigen::VectorXd Vector;
+typedef Eigen::VectorXd Vect;
 
 using namespace std;
 
@@ -17,7 +17,7 @@ using namespace std;
 class BFGS {
 	private:
 		int n;
-		Vector theta;
+		Vect theta;
 		double f_theta;
 		PostTheta* fun;
 		int iter;
@@ -27,14 +27,14 @@ class BFGS {
 			cout << "constructor BFGS." << endl;
 		}
 
-		void minimize(PostTheta* fun, Vector theta){
+		void minimize(PostTheta* fun, Vect theta){
 			cout << "in minimize function." << endl;
 
 			for(int i=0; i<iter; i++){
 				cout << "\niter : " << i << endl;
 				f_theta = fun->combined_eval(theta);
 				cout << "f_theta : " << f_theta << endl;
-				theta = f_theta*Vector::Ones(theta.size());
+				theta = f_theta*Vect::Ones(theta.size());
 			}
 		}
 
