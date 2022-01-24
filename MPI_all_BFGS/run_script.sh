@@ -1,5 +1,8 @@
 # hard code example to see if code runs
 
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/hpc/ihpc/ihpc060h
+
 # Spatial model toy dataset
 #ns=490
 #nt=0
@@ -35,8 +38,8 @@ data_type=synthetic
 # k=7
 
 #solver_type=$1
-solver_type=PARDISO
-#solver_type=RGF
+#solver_type=PARDISO
+solver_type=RGF
 	
 export PARDISOLICMESSAGE=1
 export OMP_NESTED=TRUE
@@ -58,15 +61,15 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 #export MKL_NUM_THREADS=1
 #echo "OMP_NUM_THREADS = ${omp_threads}"
 
-folder_path=/home/x_gaedkelb/b_INLA/data/${data_type}/ns${ns}_nt${nt}
+folder_path=${BASE_PATH}/b_INLA/data/${data_type}/ns${ns}_nt${nt}
 #folder_path=/home/x_gaedkelb/b_INLA/data/${data_type}/ns${ns}_nt${nt}
 #folder_path=/home/x_gaedkelb/b_INLA/data/spatial_toy_ex
 #folder_path=/home/x_gaedkelb/b_INLA/data
 
 
 
-echo "likwid-mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-mpirun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>${folder_path}/output_${solver_type}_${ns}_${nt}.txt
+echo "mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
+srun ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>${folder_path}/output_${solver_type}_${ns}_${nt}.txt
 #likwid-mpirun -np ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>${folder_path}/output_${solver_type}_${ns}_${nt}.txt
 
 ##likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}

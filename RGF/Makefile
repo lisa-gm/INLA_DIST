@@ -10,7 +10,8 @@ include ./make.inc
 DEBUG       = #-O1 -g #-fsanitize=address,signed-integer-overflow #-Wall
 
 # for mainEigen
-INCEIGEN=-I/usr/include/eigen3
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I/home/hpc/ihpc/ihpc060h/applications/eigen
 
 ARMADILLO=-larmadillo
 

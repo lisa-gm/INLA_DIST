@@ -1,6 +1,9 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/hpc/ihpc/ihpc060h
+
 ############# RGF ################
 
 MKLHOME       = $(MKLROOT)/lib/intel64
@@ -13,8 +16,9 @@ RGF_PATH      = ../RGF
 include $(RGF_PATH)/make.inc
 #############################################################################################################
 
-CXX=mpic++
-CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
+#CXX=mpic++    # kaust
+CXX=mpicxx     # FAU
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
 
 DEBUG= # -g -Wall
 
@@ -30,8 +34,9 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
-INCEIGEN=-I/usr/include/eigen3
-INCBFGS=-I/home/x_gaedkelb/applications/LBFGSpp/include
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
@@ -44,6 +49,7 @@ RGF_CU_FILES   = $(RGF_PATH)/CWC_utility.o
 
 $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))
+$(info CUDA     : $(CUDAHOME))
 $(info MAGMA    : $(MAGMA))
 $(info EIGEN    : $(INCEIGEN))
 $(info RGF      : $(RGF_PATH))
@@ -80,7 +86,7 @@ call_INLA.o: call_INLA.cpp
 	$(CXX) -c $< $(CXXFLAGS) $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCLUDES) $(RGF_INCLUDEDIR) -o $@ 
 
 %.o : %.cpp %.h
-	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@ 
+	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) $(RGF_INCLUDEDIR) -o $@ 
 
 #RGF/librgf.a:
 #	$(MAKE) -C RGF
