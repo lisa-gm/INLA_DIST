@@ -328,7 +328,7 @@ int main(int argc, char* argv[])
     // is this sufficiently bullet proof?!
     param.delta = 1e-1;
     // maximum line search iterations
-    param.max_iterations = 1;
+    param.max_iterations = 30;
 
 
     // Create solver and function object
@@ -413,7 +413,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
 
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
@@ -467,7 +467,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
 
     Vect mu(n);
     fun->get_mu(theta, mu);

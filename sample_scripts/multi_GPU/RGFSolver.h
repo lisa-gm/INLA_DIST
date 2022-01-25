@@ -4,7 +4,7 @@
 #include "cublas_v2.h"  // to use cudaSetDevice() function to multiple GPUs
 #include "Solver.h"
 
-#define PRINT_TIMES
+//#define PRINT_TIMES
 
 #if 0
 typedef CPX T;

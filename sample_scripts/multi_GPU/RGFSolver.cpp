@@ -5,9 +5,9 @@
 
 RGFSolver::RGFSolver(int tid, size_t ns, size_t nt, size_t nb, size_t no) : tid_t(tid), ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
    	
-   	//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
    	std::cout << "constructing RGF solver." << std::endl;
-   	//#endif
+#endif
 
 	// tie each class to one GPU
 	/*int noGPUs;
@@ -238,8 +238,22 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 // FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 
-	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
+        #ifdef PRINT_MSG
+        std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
+        #endif
 
+        // tie each class to one GPU
+        int noGPUs;
+        cudaGetDeviceCount(&noGPUs);
+        //std::cout << "after get device count" << std::endl;
+        //std::cout << "available GPUs : " << noGPUs << std::endl;
+        // allocate devices as numThreads mod noGPUs
+        int tid = omp_get_thread_num();
+        int GPU_rank = tid % noGPUs;
+        cudaSetDevice(GPU_rank);
+        std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+
+	//std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
 
 	#ifdef PRINT_MSG
 	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
