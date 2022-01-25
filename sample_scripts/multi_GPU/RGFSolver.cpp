@@ -10,7 +10,7 @@ RGFSolver::RGFSolver(int tid, size_t ns, size_t nt, size_t nb, size_t no) : tid_
    	//#endif
 
 	// tie each class to one GPU
-	int noGPUs;
+	/*int noGPUs;
 	cudaGetDeviceCount(&noGPUs);
 	std::cout << "after get device count" << std::endl;
 	std::cout << "available GPUs : " << noGPUs << std::endl;
@@ -18,7 +18,7 @@ RGFSolver::RGFSolver(int tid, size_t ns, size_t nt, size_t nb, size_t no) : tid_
 	//int tid = omp_get_thread_num();
 	int GPU_rank = tid % noGPUs;
 	cudaSetDevice(GPU_rank);
-	std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+	std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;*/
 
    	n = ns_t*nt_t + nb_t;
 
@@ -33,20 +33,29 @@ void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 // NOTE: this function is written to factorize prior! Assumes tridiagonal structure.
 void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
-        // tie each class to one GPU
-        int noGPUs;
-        cudaGetDeviceCount(&noGPUs);
-        //std::cout << "after get device count" << std::endl;
-        //std::cout << "available GPUs : " << noGPUs << std::endl;
-        // allocate devices as numThreads mod noGPUs
-        int tid = omp_get_thread_num();
-	int GPU_rank = tid % noGPUs;
-        cudaSetDevice(GPU_rank);
-        //std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
-
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE()." << std::endl;
-	#endif
+#endif
+
+#ifdef PRINT_TIMES
+	double t_det_GPU = -omp_get_wtime();
+#endif
+
+    // tie each class to one GPU
+    int noGPUs;
+    cudaGetDeviceCount(&noGPUs);
+    //std::cout << "after get device count" << std::endl;
+    //std::cout << "available GPUs : " << noGPUs << std::endl;
+    // allocate devices as numThreads mod noGPUs
+    int tid = omp_get_thread_num();
+	int GPU_rank = tid % noGPUs;
+    cudaSetDevice(GPU_rank);
+    //std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+
+#ifdef PRINT_TIMES
+    t_det_GPU += omp_get_wtime();
+    std::cout << "time determine GPU : " << t_det_GPU << std::endl;
+#endif 
 
 	// check if n and Q.size() match
     if((n - nb_t) != Q.rows()){

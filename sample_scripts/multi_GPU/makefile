@@ -10,12 +10,12 @@ SCAHOME       = $(MKLHOME)
 RGF_PATH      = ../../RGF
 include $(RGF_PATH)/make.inc
 #############################################################################################################
-#BASE_PATH=/home/x_gaedkelb
-BASE_PATH=/home/hpc/ihpc/ihpc060h
+BASE_PATH=/home/x_gaedkelb
+#BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 
 CXX=g++
-CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
 LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
@@ -29,8 +29,8 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
-#INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCEIGEN=-I/usr/include/eigen3
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen
 INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
@@ -45,7 +45,6 @@ RGF_CU_FILES   = $(RGF_PATH)/CWC_utility.o
 $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))
 $(info EIGEN    : $(INCEIGEN))
-$(info CUDAINC  : $(INCCUD))
 $(info CUDA     : $(CUDA))
 $(info MAGMA    : $(MAGMA))
 $(info RGF      : $(RGF_PATH))

@@ -1,56 +1,23 @@
 # hard code example to see if code runs
 
-#BASE_PATH=/home/x_gaedkelb
-BASE_PATH=/home/hpc/ihpc/ihpc060h
-
-# Spatial model toy dataset
-#ns=490
-#nt=0
-#nb=1
-#no=200
+BASE_PATH=/home/x_gaedkelb
+#BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 # synthetic dataset
 ns=492
 #nt=16
-nt=100
+nt=200
 #nb=2
 nb=6
 #no=7872
-no=98400
+no=196800
 
-#ns=1002
-#nt=25
-#nb=2
-#no=25050
-
-# regression model
-#ns=0
-#nt=0
-#nb=3
-#no=100
 
 #ns=$1
 #nt=$2
 #nb=$3
 #no=$4
 
-#ns=1002
-#nt=16
-#nb=2
-#no=188242
-
-# temperature datasets
-#ns=42
-#ns=436
-#nt=0
-#nt=16
-#nt=52
-#nt=20
-#nb=6
-#no=12873
-#no=4057
-#no=12873
-#no=5148
 
 data_type=synthetic
 #data_type=temperature
@@ -63,7 +30,6 @@ k=7
 solver_type=RGF
 	
 export PARDISOLICMESSAGE=1
-
 export OMP_NESTED=TRUE
 
 # TO KEEP IN MIND:
@@ -72,7 +38,7 @@ export OMP_NESTED=TRUE
 
 # nested parallelism : 
 # 1st number : 8 because dim(theta)=4, forward & backward difference in gradient
-l1t=2
+l1t=1
 # 2nd number : Pardiso will be run with this many threads for each linear system
 l2t=1
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 
@@ -89,7 +55,7 @@ folder_path=${BASE_PATH}/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 #folder_path=/home/x_gaedkelb/b_INLA/data
 
 
-
 echo "./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-srun ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>output_${solver_type}.txt
+./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>output_${solver_type}.txt
+#srun ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>output_${solver_type}.txt
 ##likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}

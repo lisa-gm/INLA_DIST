@@ -22,12 +22,12 @@
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
 
-//#include "RGFSolver.h"
-#include "RGFSolver_dummy.h"
+#include "RGFSolver.h"
+//#include "RGFSolver_dummy.h"
 
 
 //#define PRINT_MSG
-//#define PRINT_TIMES
+#define PRINT_TIMES
 
 using namespace Eigen;
 using namespace std;
@@ -93,6 +93,8 @@ class PostTheta{
     SpMat M2;			/**< stiffness matrix time.							*/
 
     double yTy;			/**< compute t(y)*y once. */
+    Vect BTy;			/**< compute t(B)*y only once, needed in dem rhs    */
+    Vect AxTy;          /**< compute t(Ax)*y only once, needed in dem rhs   */
     Vect mu;			/**< conditional mean */
     Vect t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/

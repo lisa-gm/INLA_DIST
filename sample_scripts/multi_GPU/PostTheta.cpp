@@ -9,6 +9,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	ns     = 0;
 	n      = nb;
 	yTy    = y.dot(y);
+	BTy    = B.transpose()*y;
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -66,6 +67,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	n           = nb + ns;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 	yTy         = y.dot(y);
+	AxTy        = Ax.transpose()*y;
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -121,6 +123,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	n           = nb + ns*nt;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 	yTy         = y.dot(y);
+	AxTy        = Ax.transpose()*y;
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -839,9 +842,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	double log_prior_sum;
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "prior : " << prior << std::endl;
-	#endif
+#endif
 
 	if(prior == "gaussian" || dim_th != 4){
 		// evaluate gaussian prior
@@ -871,9 +874,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		exit(1);
 	}
 
-	#ifdef PRINT_MSG
-		std::cout << "log prior sum : " << log_prior_sum << std::endl;
-	#endif
+#ifdef PRINT_MSG
+	std::cout << "log prior sum : " << log_prior_sum << std::endl;
+#endif
 
 		// =============== evaluate prior of random effects : need log determinant ================= //
 
@@ -882,15 +885,25 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// How long does the assembly of Qu take? Should this be passed on to the 
 	// denominator to be reused?
 
+
+#ifdef PRINT_TIMES
+	double t_log_det_Qu = -omp_get_wtime();
+#endif
+
 	double log_det_Qu = 0;
 
 	if(ns > 0 ){
 		eval_log_det_Qu(theta, log_det_Qu);
 	}
 
-	#ifdef PRINT_MSG
-		std::cout << "log det Qu : "  << log_det_Qu << std::endl;
-	#endif
+#ifdef PRINT_TIMES
+	t_log_det_Qu += omp_get_wtime();
+	std::cout << "time eval log det Qu : " << t_log_det_Qu << std::endl;
+#endif
+
+#ifdef PRINT_MSG
+	std::cout << "log det Qu : "  << log_det_Qu << std::endl;
+#endif
 
 		// =============== evaluate likelihood ================= //
 
@@ -912,11 +925,22 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	SpMat Q(n, n);
 	Vect rhs(n);
 
+#ifdef PRINT_TIMES
+	double t_eval_denom = -omp_get_wtime();
+#endif
+
  	eval_denominator(theta, log_det_d, val_d, Q, rhs, mu);
-	#ifdef PRINT_MSG
+
+#ifdef PRINT_TIMES
+ 	t_eval_denom += omp_get_wtime();
+	std::cout << "time eval denom Q  : " << t_eval_denom << std::endl;
+#endif
+
+
+#ifdef PRINT_MSG
 		std::cout << "log det d : " << log_det_d << std::endl;
 		std::cout << "val d     : " <<  val_d << std::endl;
-	#endif
+#endif
 
 		// =============== add everything together ================= //
   	double val = -1 * (log_prior_sum + log_det_Qu + log_det_l + val_l - (log_det_d + val_d));
@@ -962,6 +986,10 @@ void PostTheta::eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& interpret
 
 void PostTheta::eval_log_det_Qu(Vect& theta, double &log_det){
 
+#ifdef PRINT_TIMES
+	double t_construct_Qu = -omp_get_wtime();
+#endif 
+
 	SpMat Qu(nu, nu);
 	if(nt > 1){
 		construct_Q_spat_temp(theta, Qu);
@@ -969,8 +997,20 @@ void PostTheta::eval_log_det_Qu(Vect& theta, double &log_det){
 		construct_Q_spatial(theta, Qu);
 	}
 
+#ifdef PRINT_TIMES
+	t_construct_Qu += omp_get_wtime();
+	std::cout << "time construct Qu : " << t_construct_Qu << std::endl;
+
+	double t_factorize_Qu = -omp_get_wtime();
+#endif
+
 	int tid = omp_get_thread_num();
 	solverQst[tid]->factorize(Qu, log_det);
+
+#ifdef PRINT_TIMES
+	t_factorize_Qu += omp_get_wtime();
+	std::cout << "time factorize Qu : " << t_factorize_Qu << std::endl;
+#endif
 
 	#ifdef PRINT_MSG
 		std::cout << "log det Qu : " << log_det << std::endl;
@@ -1147,36 +1187,55 @@ void PostTheta::construct_b(Vect& theta, Vect &rhs){
 	double exp_theta = exp(theta[0]);
 
 	if(ns == 0){
-		rhs = exp_theta*B.transpose()*y;
+		rhs = exp_theta*BTy;
 	} else {
-		rhs = exp_theta*Ax.transpose()*y;
+		rhs = exp_theta*AxTy;
 	}
 }
 
 
 void PostTheta::eval_denominator(Vect& theta, double& log_det, double& val, SpMat& Q, Vect& rhs, Vect& mu){
 
+
+#ifdef PRINT_TIMES
+	double t_construct_Q = -omp_get_wtime();
+#endif
+
 	// construct Q_x|y,
 	construct_Q(theta, Q);
 	//Q->setIdentity();
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_TIMES
+	t_construct_Q += omp_get_wtime();
+	std::cout << "time construct Q : " << t_construct_Q << std::endl;
+#endif
+
+#ifdef PRINT_MSG
 		printf("\nin eval denominator after construct_Q call.");
-	#endif
+#endif
 
 	//  construct b_xey
 	construct_b(theta, rhs);
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		printf("\nin eval denominator after construct_b call.");
-	#endif
+#endif
 
 	// solve linear system
 	// returns vector mu, which is of the same size as rhs
 	//solve_cholmod(Q, rhs, mu, log_det);
 
+#ifdef PRINT_TIMES
+	double t_factorize_Q = -omp_get_wtime();
+#endif
+
 	int tid = omp_get_thread_num();
 	solverQ[tid]->factorize_solve(Q, rhs, mu, log_det);
+
+#ifdef PRINT_TIMES
+	t_factorize_Q += omp_get_wtime();
+	std::cout << "time factorize Q : " << t_factorize_Q << std::endl;
+#endif
 
 	log_det = 0.5 * (log_det);
 	

@@ -14,8 +14,6 @@ typedef double T;
 #define assign_T(val) val
 #endif
 
-//extern "C" double 
-
  /**
  * @brief creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system.
  * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
