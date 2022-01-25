@@ -22,9 +22,23 @@ void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 // NOTE: this function is written to factorize prior! Assumes tridiagonal structure.
 void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE()." << std::endl;
-	#endif
+#endif
+
+	// assign GPU
+    int noGPUs;
+    cudaGetDeviceCount(&noGPUs);
+#ifdef PRINT_MSG
+    std::cout << "available GPUs : " << noGPUs << std::endl;
+#endif
+    // allocate devices as numThreads mod noGPUs
+    int tid = omp_get_thread_num();
+	int GPU_rank = tid % noGPUs;
+    cudaSetDevice(GPU_rank);
+#ifdef PRINT_MSG
+    std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+#endif
 
 	// check if n and Q.size() match
     if((n - nb_t) != Q.rows()){
@@ -95,9 +109,23 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
-	#endif
+#endif
+
+	// assign GPU
+    int noGPUs;
+    cudaGetDeviceCount(&noGPUs);
+#ifdef PRINT_MSG
+    std::cout << "available GPUs : " << noGPUs << std::endl;
+#endif
+    // allocate devices as numThreads mod noGPUs
+    int tid = omp_get_thread_num();
+	int GPU_rank = tid % noGPUs;
+    cudaSetDevice(GPU_rank);
+#ifdef PRINT_MSG
+    std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+#endif
 
 	// check if n and Q.size() match
     if(n != Q.rows()){
@@ -196,12 +224,23 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 // FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 
+#ifdef PRINT_MSG
 	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
+#endif
 
-
-	#ifdef PRINT_MSG
-	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
-	#endif
+	// tie to one GPU
+    int noGPUs;
+    cudaGetDeviceCount(&noGPUs);
+#ifdef PRINT_MSG
+    std::cout << "available GPUs : " << noGPUs << std::endl;
+#endif
+    // allocate devices as numThreads mod noGPUs
+    int tid = omp_get_thread_num();
+	int GPU_rank = tid % noGPUs;
+    cudaSetDevice(GPU_rank);
+#ifdef PRINT_MSG
+    std::cout << "tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+#endif
 
 	// check if n and Q.size() match
     if(n != Q.rows()){

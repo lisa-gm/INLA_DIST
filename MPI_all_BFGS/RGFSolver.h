@@ -1,6 +1,8 @@
 #ifndef RGFSOLVER_H
 #define RGFSOLVER_H
 
+#include "mpi.h"
+
 #include "Solver.h"
 
 #if 0
@@ -23,6 +25,11 @@ typedef double T;
 class RGFSolver: public Solver {
 
     private:
+
+        int MPI_size;
+        int MPI_rank;
+
+        int threads_level1;
 
         /* matrix size */
         unsigned int n;                  /**< size of the matrix */
