@@ -13,7 +13,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
     threads_level1 = omp_get_max_threads();
-    std::cout << "threads level 1 : " << threads_level1 << std::endl;
+    //std::cout << "threads level 1 : " << threads_level1 << std::endl;
 
    	n = ns_t*nt_t + nb_t;
 
@@ -35,17 +35,16 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	// assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "available GPUs : " << noGPUs << std::endl;
-//#endif
+#endif
     // allocate devices as numThreads mod noGPUs
     int counter = threads_level1*MPI_rank + omp_get_thread_num();
 	int GPU_rank = counter % noGPUs;
     cudaSetDevice(GPU_rank);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
-
-//#endif
+#endif
 
 	// check if n and Q.size() match
     if((n - nb_t) != Q.rows()){
@@ -123,17 +122,17 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 	// assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "available GPUs : " << noGPUs << std::endl;
-//#endif
+#endif
     // allocate devices as numThreads mod noGPUs
     int tid = omp_get_thread_num();
     int counter = threads_level1*MPI_rank + tid;
 	int GPU_rank = counter % noGPUs;
     cudaSetDevice(GPU_rank);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
-//#endif
+#endif
 
 	// check if n and Q.size() match
     if(n != Q.rows()){
@@ -240,17 +239,17 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 	// assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "available GPUs : " << noGPUs << std::endl;
-//#endif
+#endif
     // allocate devices as numThreads mod noGPUs
     int tid = omp_get_thread_num();
     int counter = threads_level1*MPI_rank + tid;
 	int GPU_rank = counter % noGPUs;
     cudaSetDevice(GPU_rank);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
-//#endif
+#endif
 
 	// check if n and Q.size() match
     if(n != Q.rows()){
@@ -299,21 +298,23 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 	double flops_factorize = solver->factorize();
 	t_factorise = get_time(t_factorise);
 
+#ifdef PRINT_TIMES
   	printf("RGF factorise time: %lg\n",t_factorise);
+#endif
 
 	t_inv = get_time(0.0);
   	double flops_inv = solver->RGFdiag(invDiag);
   	t_inv = get_time(t_inv);
 
-  	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
   	printf("flops factorise:      %f\n", flops_factorize);
   	printf("flops inv      :      %f\n", flops_inv);
-  	#endif
+#endif
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 	printf("RGF factorise time: %lg\n",t_factorise);
   	printf("RGF sel inv time  : %lg\n",t_inv);
-  	#endif
+#endif
 
   	// fill Eigen vector
   	for (i = 0; i < n; i++){
