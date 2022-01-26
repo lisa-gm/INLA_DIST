@@ -81,10 +81,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
    	threads_level2 = omp_get_max_threads();
     }
 	
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		printf("threads level 1 : %d\n", threads_level1);
 		printf("threads level 2 : %d\n", threads_level2);
 	}
+#endif
 
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
@@ -142,10 +144,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
    	threads_level2 = omp_get_max_threads();
     }
 	
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		printf("threads level 1 : %d\n", threads_level1);
 		printf("threads level 2 : %d\n", threads_level2);
 	}
+#endif
 
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
@@ -696,9 +700,11 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
  	}*/
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		std::cout << "hessian       : \n" << hess << std::endl;
 	}
+#endif
 
 	// check that matrix positive definite otherwise use only diagonal
 	//std::cout << "positive definite check disabled." << std::endl;
@@ -895,14 +901,14 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
     	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
     #endif
 
- 	if(MPI_rank == 0){
- 		std::cout << "time hess = " << time_omp_task_hess << std::endl;
- 	}
-
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
+
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){
+		 std::cout << "time hess = " << time_omp_task_hess << std::endl;
 		std::cout << "hessian       : \n" << hess << std::endl;
 	}
+#endif
 
 	// check that matrix positive definite otherwise use only diagonal
 	//std::cout << "positive definite check disabled." << std::endl;

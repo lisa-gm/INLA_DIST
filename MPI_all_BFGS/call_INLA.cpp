@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
+
 #include "mpi.h"
 
 //#include <likwid.h>
@@ -58,11 +60,15 @@ int main(int argc, char* argv[])
     {  
     threads_level2 = omp_get_max_threads();
     }
+
+    int noGPUs;
+    cudaGetDeviceCount(&noGPUs);
     
     if(MPI_rank == 0){
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
+        printf("available GPUs      : %d\n\n", noGPUs);
     }  
     
     #if 0
@@ -104,9 +110,11 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
+#ifdef PRINT_MSG
     if(MPI_rank == 0){
         std::cout << "reading in example. " << std::endl;
     }
+#endif
 
     size_t ns = atoi(argv[1]);
     size_t nt = atoi(argv[2]);
@@ -337,8 +345,8 @@ int main(int argc, char* argv[])
             std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         }
         //theta << 1.4, -5.9,  1,  3.7; 
-        theta << 1, -3, 1, 3;
-        //theta << 0.5, -1, 2, 2;
+        //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
+        theta << 1, -3, 0.5, 1.5;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }
@@ -437,7 +445,7 @@ int main(int argc, char* argv[])
 
     if(MPI_rank == 0){
         std::cout << niter << " iterations" << std::endl;
-        std::cout << "BFGS solver time             : " << time_bfgs << " sec" << std::endl;
+        //std::cout << "time BFGS solver             : " << time_bfgs << " sec" << std::endl;
 
         std::cout << "\nf(x)                         : " << fx << std::endl;
     }
@@ -480,7 +488,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
 
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
@@ -502,28 +510,24 @@ int main(int argc, char* argv[])
     std::cout << Cov_INLA << std::endl;*/
 
     // in what parametrisation are INLA's results ... ?? 
-    double eps;
+    double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    /*eps = 0.01;
-    cov = fun->get_Covariance(theta_max, eps);
-    std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
+    #if 0
+    double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
     //cov = fun->get_Covariance(theta_max, sqrt(eps));
     cov = fun->get_Covariance(theta_max, eps);
-   
-   #if 0
-   if(MPI_rank == 0){
-       std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
 
-        /*eps = 0.001;
-        cov = fun->get_Covariance(theta_max, eps);
-        std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
-        std::cout << "estimated variances theta    :  " << cov.diagonal().transpose() << std::endl;
-        std::cout << "estimated standard dev theta :  " << cov.cwiseSqrt().diagonal().transpose() << std::endl;
+    t_get_covariance += omp_get_wtime();
+
+    if(MPI_rank ==0){
+        std::cout << "covariance                   : \n" << cov << std::endl;
+        std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
     }
     #endif
+
 
     #if 1
     //convert to interpretable parameters
@@ -531,37 +535,53 @@ int main(int argc, char* argv[])
     Vect interpret_theta(4);
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
-    
+   
+#ifdef PRINT_MSG 
     if(MPI_rank == 0){
         std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
     }
-    #endif
+#endif
 
-    #if 1
+    double t_get_covariance = -omp_get_wtime();
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
+    t_get_covariance += omp_get_wtime();
+
 
     if(MPI_rank == 0){
-        std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;
+        std::cout << "\ncovariance interpr. param.  : \n" << cov << std::endl;
+        //std::cout << "time get covariance         : " << t_get_covariance << " sec" << std::endl;
     }
     #endif
 
+    double t_get_fixed_eff;
 
     if(MPI_rank == 0){
+        t_get_fixed_eff = - omp_get_wtime();
+        
         Vect mu(n);
         fun->get_mu(theta, mu);
-        std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << "\n" << std::endl;
+
+        t_get_fixed_eff += omp_get_wtime();
+        std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
+        //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
     }
 
     #endif
 
   
-    #if 0
+    #if 1
 
+    double t_get_marginals;
 
     // when the range of u is large the variance of b0 is large.
     if(MPI_rank == 0){
+
+        t_get_marginals = -omp_get_wtime();
+
         Vect marg(n);
         fun->get_marginals_f(theta, marg);
+
+        t_get_marginals += omp_get_wtime();
 
         std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
@@ -570,6 +590,9 @@ int main(int argc, char* argv[])
 
     total_time +=omp_get_wtime();
     if(MPI_rank == 0){
+        std::cout << "\ntime BFGS solver             : " << time_bfgs << " sec" << std::endl;
+        std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
+        std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
         std::cout << "total time                   : " << total_time << std::endl;
     }
 

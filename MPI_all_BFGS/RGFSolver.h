@@ -5,6 +5,7 @@
 
 #include "Solver.h"
 
+
 #if 0
 typedef CPX T;
 #define assign_T(val) CPX(val, 0.0)
@@ -12,6 +13,7 @@ typedef CPX T;
 typedef double T;
 #define assign_T(val) val
 #endif
+
 
 //extern "C" double 
 
