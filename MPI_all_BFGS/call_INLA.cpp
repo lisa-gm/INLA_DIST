@@ -7,7 +7,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+//#define RGF
+
+#ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
+#endif
 
 #include "mpi.h"
 
@@ -60,15 +64,18 @@ int main(int argc, char* argv[])
     {  
     threads_level2 = omp_get_max_threads();
     }
-
-    int noGPUs;
-    cudaGetDeviceCount(&noGPUs);
-    
+   
     if(MPI_rank == 0){
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
-        printf("available GPUs      : %d\n\n", noGPUs);
+#ifdef RGF
+	int noGPUs;
+	cudaGetDeviceCount(&noGPUs);
+	printf("available GPUs      : %d\n\n", noGPUs);
+#else
+	printf("RGF dummy version");
+#endif
     }  
     
     #if 0
