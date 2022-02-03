@@ -7,11 +7,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-//#define RGF
+#define RGF
 
 #ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
+
+#define WRITE_LOG
 
 #include "mpi.h"
 
@@ -38,7 +40,7 @@ using namespace LBFGSpp;
 int main(int argc, char* argv[])
 {
     // start timer for overall runtime
-    double total_time = -omp_get_wtime();
+    double t_total = -omp_get_wtime();
 
     /* ======================= SET UP MPI ============================= */
     // Unique rank is assigned to each process in a communicator
@@ -64,13 +66,15 @@ int main(int argc, char* argv[])
     {  
     threads_level2 = omp_get_max_threads();
     }
+
+    // overwrite in case RGF is used
+    int noGPUs = 0;
    
     if(MPI_rank == 0){
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
 #ifdef RGF
-	int noGPUs;
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n\n", noGPUs);
 #else
@@ -307,9 +311,10 @@ int main(int argc, char* argv[])
 
     Vect theta(dim_th);
     Vect theta_prior_param(dim_th);
-    Vect theta_original(dim_th);
+    Vect theta_original(dim_th); theta_original.setZero();
 
     int n;
+    std::string data_type;
 
     // initialise theta
     if(ns == 0 && nt == 0){
@@ -337,6 +342,7 @@ int main(int argc, char* argv[])
 
     } else {
         n = ns*nt + nb;
+        data_type = "synthetic";
 
         // =========== synthetic data set =============== //
         if(MPI_rank == 0){ 
@@ -353,14 +359,15 @@ int main(int argc, char* argv[])
         }
         //theta << 1.4, -5.9,  1,  3.7; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
-        theta << 1, -3, 0.5, 1.5;
+        theta << 1, -3, 0.8, 1.5;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }
 
         // =========== temperature data set =============== //
-        
-        /*if(MPI_rank == 0){
+        /*data_type = "temperature";
+
+        if(MPI_rank == 0){
             std::cout << "using TEMPERATURE DATASET" << std::endl; 
         }
         // initial theta
@@ -561,11 +568,11 @@ int main(int argc, char* argv[])
     #endif
 
     double t_get_fixed_eff;
+    Vect mu(n);
 
     if(MPI_rank == 0){
         t_get_fixed_eff = - omp_get_wtime();
         
-        Vect mu(n);
         fun->get_mu(theta, mu);
 
         t_get_fixed_eff += omp_get_wtime();
@@ -579,13 +586,14 @@ int main(int argc, char* argv[])
     #if 1
 
     double t_get_marginals;
+    Vect marg(n);
+
 
     // when the range of u is large the variance of b0 is large.
     if(MPI_rank == 0){
 
         t_get_marginals = -omp_get_wtime();
 
-        Vect marg(n);
         fun->get_marginals_f(theta, marg);
 
         t_get_marginals += omp_get_wtime();
@@ -595,13 +603,60 @@ int main(int argc, char* argv[])
     }
     #endif
 
-    total_time +=omp_get_wtime();
+    t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         std::cout << "\ntime BFGS solver             : " << time_bfgs << " sec" << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
-        std::cout << "total time                   : " << total_time << std::endl;
+        std::cout << "total time                   : " << t_total << std::endl;
     }
+
+
+    // ======================== write LOG file ===================== //
+    // mpi_size, no_threads level 1, level 2, solver_type
+    // ns, nt, nb, no, synthetic/real, theta_prior, theta_original (set all zero in real case), in both 
+    // parametrisations?
+    // theta_max, interpret_param_theta_max
+    // mean fixed effects
+    // var/std fixed effects
+    // no of iterations BFGS
+    // runtimes: BFGS, time per iteration, covariance (hessian), partial inversion, total
+
+#ifdef WRITE_LOG
+    if(MPI_rank == 0){
+
+        // add time stamp to not overwrite?
+        std::string log_file_name = base_path + "/log_"+ solver_type + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
+        std::ofstream log_file(log_file_name);
+        log_file << "mpi_size\t" << MPI_size << std::endl;
+        log_file << "threads_l1\t" << threads_level1 << std::endl;
+        log_file << "threads_l2\t" << threads_level2 << std::endl;
+        log_file << "noGPUs\t" << noGPUs << std::endl;
+        log_file << "solver_type\t" << solver_type << std::endl;
+        log_file << "datatype\t" << data_type << std::endl;
+        log_file << "ns\t" << ns << std::endl;
+        log_file << "nt\t" << nt << std::endl;
+        log_file << "num_fixed\t" << nb << std::endl;
+        log_file << "num_obs\t" << no << std::endl;
+        log_file << "theta_prior_param\t" << theta_prior_param.transpose() << std::endl;
+        log_file << "theta_original\t" << theta_original.transpose() << std::endl;
+        log_file << "theta_max\t" << theta_max.transpose() << std::endl;
+        log_file << "interpret_param_theta_max\t" << interpret_theta.transpose() << std::endl;
+        log_file << "mean_fixed_eff\t" << mu.tail(nb).transpose() << std::endl;
+        log_file << "var_fixed_eff\t" << marg.tail(nb).transpose() << std::endl;        
+        log_file << "time_bfgs\t" << time_bfgs << std::endl;
+        log_file << "noIter\t" << niter << std::endl; 
+        log_file << "time_Iter\t" << time_bfgs/niter << std::endl;
+        log_file << "time_Cov\t" << t_get_covariance << std::endl;               
+        log_file << "time_MargFE\t" << t_get_marginals <<  std::endl;
+        log_file << "t_total\t" << t_total << std::endl;
+
+  log_file.close(); 
+
+    }
+
+#endif
+
 
     delete fun;
 
