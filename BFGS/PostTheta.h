@@ -93,6 +93,8 @@ class PostTheta{
     SpMat M2;			/**< stiffness matrix time.							*/
 
     double yTy;			/**< compute t(y)*y once. */
+    Vect BTy; 			/**< compute t(B)*y once. regression model only */
+    Vect AxTy;			/**< compute t(Ax)*y once. spat/spat temp model */
     Vect mu;			/**< conditional mean */
     Vect t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/

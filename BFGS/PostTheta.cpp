@@ -9,6 +9,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	ns     = 0;
 	n      = nb;
 	yTy    = y.dot(y);
+	BTy	   = B.transpose()*y;
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -66,6 +67,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	n           = nb + ns;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 	yTy         = y.dot(y);
+	AxTy		= Ax.transpose()*y;
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -121,6 +123,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	n           = nb + ns*nt;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 	yTy         = y.dot(y);
+	AxTy		= Ax.transpose()*y;
+
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -166,6 +170,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+
 }
 
 /* operator() does exactly two things. 
@@ -181,13 +186,13 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 double PostTheta::operator()(Vect& theta, Vect& grad){
 
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "\niteration : " << iter_count << std::endl;
-	#endif
+#endif
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 		std::cout << "\niteration : " << iter_count << std::endl;
-	#endif
+#endif
 
 	iter_count += 1; 
 
@@ -1147,9 +1152,9 @@ void PostTheta::construct_b(Vect& theta, Vect &rhs){
 	double exp_theta = exp(theta[0]);
 
 	if(ns == 0){
-		rhs = exp_theta*B.transpose()*y;
+		rhs = exp_theta*BTy;
 	} else {
-		rhs = exp_theta*Ax.transpose()*y;
+		rhs = exp_theta*AxTy;
 	}
 }
 
