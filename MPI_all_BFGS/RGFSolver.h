@@ -5,6 +5,9 @@
 
 #include "Solver.h"
 
+#define PRINT_MSG
+//#define PRINT_TIMES
+
 
 #if 0
 typedef CPX T;

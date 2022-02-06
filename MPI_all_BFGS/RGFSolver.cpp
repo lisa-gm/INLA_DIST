@@ -53,9 +53,9 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
         exit(1);
     }
 
-    #ifdef PRINT_MSG
+#ifdef PRINT_MSG
     	std::cout << "Q in RGFSolver.cpp : \n" << Q.block(0,0,10,10) << std::endl;
-    #endif
+#endif
 
 	// only take lower triangular part of A
     SpMat Q_lower = Q.triangularView<Lower>(); 
@@ -90,6 +90,10 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 	// SET nb_t to zero : this function is for precision matrix of prior!
 	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, 0);
 
+#ifdef PRINT_MSG
+    printf("Calling RGF solver in RGF factorize now.\n");
+#endif
+
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
 	double flops_factorize = solver->factorize();
@@ -97,13 +101,13 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 	log_det = solver->logDet();
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
-	#endif
+#endif
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 	printf("RGF factorise time: %lg\n",t_factorise);
-	#endif
+#endif
 
 	delete solver;
 	delete[] ia;
@@ -174,6 +178,10 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 
 	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, nb_t);
 
+#ifdef PRINT_MSG
+    printf("Calling RGF solver in RGF factorize_solver now.\n");
+#endif
+
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
 	double flops_factorize = solver->factorize();
@@ -181,9 +189,9 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 
 	log_det = solver->logDet();
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
-	#endif
+#endif
 
 	T *b;
   	T *x;
@@ -201,22 +209,21 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
   	double flops_solve = solver->solve(x, b, 1);
   	t_solve = get_time(t_solve);
 
-  	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
   	//printf("flops solve:     %f\n", flops_solve);
 	printf("Residual norm: %e\n", solver->residualNorm(x, b));
 	printf("Residual norm normalized: %e\n", solver->residualNormNormalized(x, b));
-	#endif
+#endif
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 	printf("RGF factorise time: %lg\n",t_factorise);
   	printf("RGF solve     time: %lg\n",t_solve);
-  	#endif
+#endif
 
   	// assign b to correct format
   	for (i = 0; i < n; i++){
 	    sol[i] = x[i];
   	}	
-
 
   	delete solver;
 
@@ -231,10 +238,9 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 // FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 
-
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
-	#endif
+#endif
 
 	// assign GPU
     int noGPUs;

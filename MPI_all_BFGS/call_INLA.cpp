@@ -348,6 +348,9 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }     
+        // sigma.e (noise observations), sigma.u, range s, range t
+        //theta_original_param << 0.5, 4, 1, 10;
+        // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
         theta_original << 1.4, -5.9,  1,  3.7;  // here exact solution, here sigma.u = 4
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
         //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
