@@ -359,7 +359,7 @@ int main(int argc, char* argv[])
         }
         //theta << 1.4, -5.9,  1,  3.7; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
-        theta << 1, -3, 0.8, 1.5;
+        theta << 2, -3, 1.5, 5;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }
@@ -642,9 +642,8 @@ int main(int argc, char* argv[])
         log_file << "theta_original\t" << theta_original.transpose() << std::endl;
         log_file << "theta_max\t" << theta_max.transpose() << std::endl;
         log_file << "interpret_param_theta_max\t" << interpret_theta.transpose() << std::endl;
-        log_file << "mean_fixed_eff\t" << mu.tail(nb).transpose() << std::endl;
-        log_file << "var_fixed_eff\t" << marg.tail(nb).transpose() << std::endl;        
-        log_file << "time_bfgs\t" << time_bfgs << std::endl;
+	log_file << "mean_fixed_eff\t" << mu.tail(nb).transpose() << std::endl;
+        log_file << "std_dev_fixed_eff\t" << marg.tail(nb).cwiseSqrt().transpose() << std::endl;          log_file << "time_bfgs\t" << time_bfgs << std::endl;
         log_file << "noIter\t" << niter << std::endl; 
         log_file << "time_Iter\t" << time_bfgs/niter << std::endl;
         log_file << "time_Cov\t" << t_get_covariance << std::endl;               
