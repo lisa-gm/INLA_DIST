@@ -8,7 +8,6 @@
 #define PRINT_MSG
 //#define PRINT_TIMES
 
-
 #if 0
 typedef CPX T;
 #define assign_T(val) CPX(val, 0.0)
@@ -17,8 +16,6 @@ typedef double T;
 #define assign_T(val) val
 #endif
 
-
-//extern "C" double 
 
  /**
  * @brief creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system.

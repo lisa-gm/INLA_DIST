@@ -5,9 +5,9 @@
 
 RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
    	
-   	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
    	std::cout << "constructing RGF solver." << std::endl;
-   	#endif
+#endif
 
    	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -28,9 +28,9 @@ void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 // NOTE: this function is written to factorize prior! Assumes tridiagonal structure.
 void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE()." << std::endl;
-	#endif
+#endif
 
 	// assign GPU
     int noGPUs;
@@ -119,9 +119,9 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
-	#endif
+#endif
 
 	// assign GPU
     int noGPUs;
