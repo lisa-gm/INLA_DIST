@@ -47,9 +47,9 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
         exit(1);
     }
 
-    #ifdef PRINT_MSG
+#ifdef PRINT_MSG
     	std::cout << "Q in RGFSolver.cpp : \n" << Q.block(0,0,10,10) << std::endl;
-    #endif
+#endif
 
 	// only take lower triangular part of A
     SpMat Q_lower = Q.triangularView<Lower>(); 
