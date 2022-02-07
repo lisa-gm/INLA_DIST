@@ -8,6 +8,8 @@
 #include "Utilities.H"
 #include "CWC_utility.H"
 
+//#define PRINT_MSG
+
 template <class T>
 class RGF{
 	
@@ -255,6 +257,10 @@ double RGF<T>::FirstStageFactor()
        init_supernode(blockDense_dev, matrix_nt);
     }
 
+#ifdef PRINT_MSG
+    std::cout << "calling first Cholesky factorization now" << std::endl;
+#endif
+
     // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
@@ -269,10 +275,19 @@ double RGF<T>::FirstStageFactor()
     }
 
     copy_supernode_to_host(blockR_dev, IB);
-    
+
+#ifdef PRINT_MSG
+	std::cout << "entering loop block factorization loop now" << std::endl;	
+#endif  
+
     //rj IB = 1; IB < NBlock; IB++
     for (IB = 1; IB < matrix_nt-1; IB++)
     {
+
+#ifdef PRINT_MSG
+       	std::cout << "IB = " << IB << std::endl;
+#endif
+
        NR  = Bmax[IB]-Bmin[IB];
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
@@ -367,6 +382,10 @@ double RGF<T>::FirstStageFactor()
 
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
 
+#ifdef PRINT_MSG
+       std::cout << "after complete Cholesky factorization" << std::endl;
+#endif
+
        copy_supernode_to_host(blockDense_dev, IB);
     }
 
@@ -389,6 +408,10 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
 
     // counting FLOPS
     double flops = 0;
+
+#ifdef PRINT_MSG
+    std::cout <<"calling first block solver in second stage factor now" << std::endl;
+#endif
 
     //rj dtrsm LLNN MF[0,0] rhs[0]
     // solve for first diagonal block (using solve for tridiagonal matrix), ie. x_0 = D^-0*b_0
@@ -472,6 +495,11 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
    // compute D^T_0 x_0 = y_0
     //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
     c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+
+#ifdef PRINT_MSG
+    std::cout << "after forward-backword solve in 2nd stage factor" << std::endl;
+#endif
+
     flops += 2.0 * NR * NR * nrhs;
 
     return flops;
