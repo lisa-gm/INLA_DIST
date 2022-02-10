@@ -8,7 +8,7 @@
 #include "Utilities.H"
 #include "CWC_utility.H"
 
-//#define PRINT_MSG
+#define PRINT_MSG
 
 template <class T>
 class RGF{
