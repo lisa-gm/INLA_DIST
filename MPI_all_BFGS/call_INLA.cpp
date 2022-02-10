@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define RGF
+//#define RGF
 
 #ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
