@@ -316,11 +316,11 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	MPI_Allreduce(f_temp_list_loc.data(), f_temp_list.data(), no_f_eval, MPI_DOUBLE, MPI_SUM,
               MPI_COMM_WORLD);
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		std::cout << "f temp list : " << f_temp_list.transpose() << std::endl;
 	}
-	#endif
+#endif
 
 	// now write them into appropriate forward / backward buffer
 	double f_theta = f_temp_list(0);
@@ -330,7 +330,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			//std::cout << "theta   : " << theta.transpose() << ", f_theta : " << f_theta << std::endl;
+			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
+			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			*/
 		}
 	}
 
@@ -339,12 +342,12 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	timespent_fct_eval += omp_get_wtime();
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 		if(MPI_rank == 0){
 			std::cout << "time spent evaluation f(theta)         : " << timespent_f_theta_eval << std::endl;
 			std::cout << "time spent for all funct. evaluations  : " << timespent_fct_eval << std::endl;
 		}
-	#endif 
+#endif 
 
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
