@@ -822,6 +822,10 @@ inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode)
    size_t rows = mf_block_lda(supernode, supernode);
    size_t cols = supernode_lc - supernode_fc;
 
+#ifdef PRINT_MSG
+   std::cout << "size rows*cols = " << rows*cols << std::endl;
+#endif
+
    memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T));
 }
 
