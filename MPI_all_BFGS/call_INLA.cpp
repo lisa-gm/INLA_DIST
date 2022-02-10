@@ -75,7 +75,8 @@ int main(int argc, char* argv[])
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
 #ifdef RGF
-	cudaGetDeviceCount(&noGPUs);
+	//cudaGetDeviceCount(&noGPUs);
+	noGPUs = 2;
 	printf("available GPUs      : %d\n\n", noGPUs);
 #else
 	printf("RGF dummy version");
