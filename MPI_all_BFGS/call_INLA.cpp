@@ -440,6 +440,13 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
     }
 
+    if(MPI_rank == 0){
+        Vect theta_interpret_initial(dim_th);
+        theta_interpret_initial[0] = theta[0];
+        fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
+        std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
+    }
+
     #if 1
     double fx;
 
