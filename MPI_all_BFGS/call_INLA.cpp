@@ -13,7 +13,7 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
-#define WRITE_LOG
+//#define WRITE_LOG
 
 #include "mpi.h"
 
@@ -517,11 +517,10 @@ int main(int argc, char* argv[])
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    theta_max = theta;
-    //theta_max << 1.382388, -5.626002,  1.156931,  3.644319;
+    //theta_max = theta;
+    theta_max << 1.391313, -5.913299,  1.076161,  3.642337;
     //theta_max << 1.331607, -5.893736,  1.001546,  3.743028;
-    //theta_max << 1.299205, -5.590766,  0.943657,  3.746657;
-    //theta_max << 1.4608052, -5.8996978,  0.6805342,  3.8358287; 
+
 
     /*std::cout << "Estimated Covariance Matrix INLA : " << std::endl;
     MatrixXd Cov_INLA(4,4);
