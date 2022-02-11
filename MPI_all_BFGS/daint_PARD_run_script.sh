@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH --job-name=call_INLA_MPI           #Your Job Name
+#SBATCH --job-name=call_INLA_MPI_omp4           #Your Job Name
 #SBATCH --nodes=9                       #Number of Nodes desired e.g 1 node
 #SBATCH --ntasks-per-node=1              #MPI task per node
 #SBATCH --cpus-per-task=32               # 16 cores per process
-#SBATCH --time=00:01:00                 #Walltime: Duration for the Job to run HH:MM:SS
+#SBATCH --time=00:09:00                 #Walltime: Duration for the Job to run HH:MM:SS
 #SBATCH --account=u0
 #SBATCH --constraint=mc
 #SBATCH --exclusive
@@ -30,12 +30,12 @@ num_ranks=9
 
 #ns=1002
 ns=492
-nt=16
-#nt=250
+#nt=16
+nt=200
 #nb=2
-nb=2
-no=7872
-#no=2001000
+nb=6
+#no=7872
+no=$((2*${ns}*${nt}))
 
 #solver_type=$1
 solver_type=PARDISO
@@ -46,6 +46,7 @@ data_type=synthetic
 	
 export PARDISOLICMESSAGE=1
 export OMP_NESTED=TRUE
+export OMP_MAX_ACTIVE_LEVELS=2
 
 # LAUNCH 10 MPI processes with x threads each. 8 or 16 threads for larger matrices seems appropriate.
 # SEEMS 
@@ -55,7 +56,7 @@ export OMP_NESTED=TRUE
 # -n : how many processes per node
 # --cpus-per-task=64 : how many threads per task
 l1t=2
-l2t=16
+l2t=4
 
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 
 # significant increase in performance for pardiso until 16 threads, 32 only slightly faster
@@ -65,11 +66,11 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 #export MKL_NUM_THREADS=1
 #echo "OMP_NUM_THREADS = ${omp_threads}"
 
-#folder_path=/users/lgaedkem/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
-folder_path=/users/lgaedkem/b_INLA/data/${data_type}/ns${ns}_nt${nt}
+folder_path=/users/lgaedkem/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
+#folder_path=/users/lgaedkem/b_INLA/data/${data_type}/ns${ns}_nt${nt}
 
 # CAREFUL : needs to be AT LEAST 11 (main + 10 workers, 10 because of hessian, for BFGS only 9 are required)
 echo "srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-srun ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_PARDISO_output_ns${ns}_nt${nt}_nb${nb}.txt
+srun ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} #>INLA_PARDISO_output_ns${ns}_nt${nt}_nb${nb}.txt &
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 
