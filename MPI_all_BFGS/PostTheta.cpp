@@ -511,7 +511,16 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 
-	solverQ->selected_inversion(Q, vars);
+	std::cout << "before if statement, num threads : " << omp_get_max_threads() << std::endl;
+
+	// nested parallelism, want to call this with 1 thread of omp level 1
+	#pragma omp parallel
+	#pragma omp single
+	{
+		std::cout << "inside if statement, num threads : " << omp_get_max_threads() << std::endl;
+		solverQ->selected_inversion(Q, vars);
+	}
+
 	
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
