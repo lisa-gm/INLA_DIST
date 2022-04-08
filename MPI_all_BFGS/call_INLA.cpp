@@ -13,7 +13,7 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
-#define WRITE_LOG
+//#define WRITE_LOG
 
 #include "mpi.h"
 
@@ -75,8 +75,8 @@ int main(int argc, char* argv[])
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
 #ifdef RGF
-	//cudaGetDeviceCount(&noGPUs);
-	noGPUs = 2;
+	cudaGetDeviceCount(&noGPUs);
+	//noGPUs = 2;
 	printf("available GPUs      : %d\n\n", noGPUs);
 #else
 	printf("RGF dummy version");
@@ -159,6 +159,12 @@ int main(int argc, char* argv[])
 
     if(MPI_rank == 0){
         std::cout << "Solver : " << solver_type << std::endl;
+    }
+
+    if(MPI_rank == 0){
+        // required memory on CPU to store Cholesky factor
+        double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(T) / pow(10.0,9.0);
+        printf("Memory Usage of Cholesky factor on CPU = %f GB\n\n", mem_gb);
     }
 
     /* ---------------- read in matrices ---------------- */
@@ -447,7 +453,7 @@ int main(int argc, char* argv[])
         std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
     }
 
-    #if 1
+    #if 0
     double fx;
 
     //Vect grad_test(dim_th);
@@ -513,7 +519,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
 
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
@@ -594,12 +600,12 @@ int main(int argc, char* argv[])
     #endif
 
   
-    #if 1
+    #if 0
 
     double t_get_marginals;
     Vect marg(n);
 
-
+    //theta << 1.391313, -5.913299,  1.076161,  3.642337;
     // when the range of u is large the variance of b0 is large.
     if(MPI_rank == 0){
 
@@ -613,14 +619,15 @@ int main(int argc, char* argv[])
         std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
     }
     #endif
-
-    t_total +=omp_get_wtime();
+	
+    
+    /*t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         std::cout << "\ntime BFGS solver             : " << time_bfgs << " sec" << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
         std::cout << "total time                   : " << t_total << std::endl;
-    }
+    }*/
 
 
     // ======================== write LOG file ===================== //

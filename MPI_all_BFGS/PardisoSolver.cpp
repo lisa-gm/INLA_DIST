@@ -405,6 +405,8 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
         std::cout << "init = " << init << std::endl;
     #endif
 
+    msglvl = 1;
+
     if(init == 0){
         symbolic_factorization(Q, init);
     }
