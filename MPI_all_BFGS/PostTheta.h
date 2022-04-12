@@ -13,7 +13,6 @@
 #include <omp.h>
 #include "mpi.h"
 
-
 // std::setwd print out
 #include <iomanip>
 
@@ -26,7 +25,7 @@
 //#include "RGFSolver.h"
 #include "RGFSolver_dummy.h"
 
-//#define SMART_GRAD
+#define SMART_GRAD
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
@@ -108,9 +107,9 @@ class PostTheta{
     int MPI_rank;       /**< personal mpi rank                              */
 
 #ifdef SMART_GRAD
-    bool Xdiff_initialized; /**< flag in smart gradient    					*/
-    VectorXd x_prev;
-    MatrixXd X_diff;
+    bool thetaDiff_initialized; /**< flag in smart gradient    					*/
+    VectorXd theta_prev;
+    MatrixXd ThetaDiff;
 #endif
 
 	public:
@@ -167,7 +166,7 @@ class PostTheta{
 	 */
     double operator()(Vect& theta, Vect& grad);
 
-    void computeG(Vect& x, MatrixXd& G);
+    void computeG(Vect& theta, MatrixXd& G);
 
     int get_fct_count();
 

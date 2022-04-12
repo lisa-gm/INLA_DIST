@@ -7,7 +7,7 @@ MKLROOT?=$(shell echo $$MKLROOT)
 BASE_PATH=/users/lgaedkem
 
 CXX=CC     #mpic++
-CXXFLAGS=-lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
 LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_ibex 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)

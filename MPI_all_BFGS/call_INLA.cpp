@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-#define DATA_SYNTHETIC
-//#define DATA_TEMPERATURE
+//#define DATA_SYNTHETIC
+#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF
@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
     }
 
     // overwrite in case RGF is used
-    int noGPUs = 0;
+    int noGPUs;
    
     if(MPI_rank == 0){
         printf("total no MPI ranks  : %d\n", MPI_size);
@@ -84,6 +84,7 @@ int main(int argc, char* argv[])
 	printf("available GPUs      : %d\n\n", noGPUs);
 #else
 	printf("RGF dummy version\n");
+    noGPUs = 0;
 #endif
     }  
     
@@ -163,6 +164,12 @@ int main(int argc, char* argv[])
 
     if(MPI_rank == 0){
         std::cout << "Solver : " << solver_type << std::endl;
+    }
+
+    if(MPI_rank == 0){
+        // required memory on CPU to store Cholesky factor
+        double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(T) / pow(10.0,9.0);
+        printf("Memory Usage of each Cholesky factor on CPU = %f GB\n\n", mem_gb);
     }
 
     /* ---------------- read in matrices ---------------- */
@@ -314,7 +321,8 @@ int main(int argc, char* argv[])
 
     /* ----------------------- initialise random theta -------------------------------- */
 
-    Vect theta(dim_th);
+    Vect theta(dim_th);             // define initial guess in model parametrization
+    Vect theta_param(dim_th);       // or in interpretable parametrization
     Vect theta_prior_param(dim_th);
     Vect theta_original(dim_th); theta_original.setZero();
 
@@ -374,19 +382,19 @@ int main(int argc, char* argv[])
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }
 
-#elif DATA_TEMPERATURE
+#elif defined(DATA_TEMPERATURE)
 
         // =========== temperature data set =============== //
-        /*data_type = "temperature";
+        data_type = "temperature";
 
         if(MPI_rank == 0){
             std::cout << "using TEMPERATURE DATASET" << std::endl; 
         }
-        //theta_param << 4, 0, 0, 0;    // -> converges to wrong solution
-        //theta_param << 4, 1, 1, 1;
+        //theta << 4, 4, 4, 4;    // -> converges to wrong solution
+        theta_param << 4, 0, 0, 0;
         //theta_param << -1.045, 8.917, 8.868, 3.541;
         // theta solution : -0.962555  6.309191 -8.195620 -7.203450
-        theta << 1, 8, -5, -5;   // -> works!
+        //theta << 1, 8, -5, -5;   // -> works!
         //theta << 2, 8, -4, -4; // -> works!
         //theta << 2, 8, -2, -2; // doesn't work!
 
@@ -395,7 +403,7 @@ int main(int argc, char* argv[])
 
         //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << -0.2, -2, -2, 3;
-        if(MPI_rank == 0){
+        /*if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }*/
 
@@ -425,7 +433,7 @@ int main(int argc, char* argv[])
     // TODO: stepsize too small? seems like it almost always accepts step first step.    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
     //param.delta = 1e-2;
-    param.delta = 1e-1;
+    param.delta = 1e-6;
     // maximum line search iterations
     param.max_iterations = 30;
 
@@ -458,12 +466,19 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
     }
 
+    theta[0] = theta_param[0];
+    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    if(MPI_rank == 0){
+        std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+    }
+
     if(MPI_rank == 0){
         Vect theta_interpret_initial(dim_th);
         theta_interpret_initial[0] = theta[0];
         fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
         std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
     }
+
 
     #if 1
     double fx;
@@ -616,7 +631,7 @@ int main(int argc, char* argv[])
     double t_get_marginals;
     Vect marg(n);
 
-
+    //theta << 1.391313, -5913299,  1.076161,  3.642337;
     // when the range of u is large the variance of b0 is large.
     if(MPI_rank == 0){
 
@@ -630,9 +645,12 @@ int main(int argc, char* argv[])
         std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
     }
     #endif
-
+	
+    
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
+        // total number of post_theta_eval() calls 
+        //std::cout << "\ntotal number fn calls        : " << fun->get_fct_count() << std::endl;
         std::cout << "\ntime BFGS solver             : " << time_bfgs << " sec" << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;

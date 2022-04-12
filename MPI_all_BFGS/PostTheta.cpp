@@ -56,10 +56,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 
 #ifdef SMART_GRAD
-	Xdiff_initialized = false;
-#ifdef PRINT_MSG
-	std::cout << "using smart gradient." << std::endl;
-#endif
+	thetaDiff_initialized = false;
+	if(MPI_rank == 0){
+		std::cout << "Smart gradient enabled." << std::endl;
+	}
+#else
+	if(MPI_rank == 0){
+		std::cout << "Regular FD gradient enabled." << std::endl;
+	}
 #endif
 
 }
@@ -128,10 +132,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 
 #ifdef SMART_GRAD
-	Xdiff_initialized = false;
-#ifdef PRINT_MSG
-	std::cout << "using smart gradient." << std::endl;
-#endif
+	thetaDiff_initialized = false;
+	if(MPI_rank == 0){
+		std::cout << "Smart gradient enabled." << std::endl;
+	}
+#else
+	if(MPI_rank == 0){
+		std::cout << "Regular FD gradient enabled." << std::endl;
+	}
 #endif
 
 
@@ -205,10 +213,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 
 #ifdef SMART_GRAD
-	Xdiff_initialized = false;
-#ifdef PRINT_MSG
-	std::cout << "using smart gradient." << std::endl;
-#endif
+	thetaDiff_initialized = false;
+	if(MPI_rank == 0){
+		std::cout << "Smart gradient enabled." << std::endl;
+	}
+#else
+	if(MPI_rank == 0){
+		std::cout << "Regular FD gradient enabled." << std::endl;
+	}
 #endif
 
 }
@@ -241,22 +253,19 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	// configure finite difference approximation (along coordinate axes or smart gradient)
 	double eps = 0.005;
-	MatrixXd epsId_mat(dim_th, dim_th); 
+	// projection matrix G, either Identity or other orthonormal basis (from computeG function)
 	MatrixXd G(dim_th, dim_th);
 
 #ifdef SMART_GRAD
-	computeG(theta, epsId_mat);
-	epsId_mat = eps*epsId_mat;
-
+	computeG(theta, G);
 #else
-	epsId_mat = eps*epsId_mat.setIdentity();
-	//std::cout << "epsId_mat : " << epsId_mat << std::endl;
+	G = MatrixXd::Identity(dim_th, dim_th);
 #endif
 
 
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
-		std::cout << "epsId_mat : \n" << epsId_mat << std::endl;
+		std::cout << "G : \n" << G << std::endl;
 	}
 #endif
 
@@ -318,7 +327,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 				Vect theta_forw(dim_th);
 				Vect mu_dummy(n);
 
-				theta_forw = theta + epsId_mat.col(k);
+				theta_forw = theta + eps*G.col(k);
 				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy);
 			} // end MPI if
 		
@@ -336,7 +345,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 				Vect theta_backw(dim_th);
 				Vect mu_dummy(n);
 
-				theta_backw = theta - epsId_mat.col(k);
+				theta_backw = theta - eps*G.col(k);
 				f_temp_list_loc(i) = eval_post_theta(theta_backw, mu_dummy);
 			} // end MPI if
 		}
@@ -370,11 +379,11 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	if(f_theta < min_f_theta){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
-			std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
+			//std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			*/
+			
 		}
 	}
 
@@ -393,7 +402,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #ifdef SMART_GRAD
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
 	// multiply with G^-T
-    grad = epsId_mat.transpose().fullPivLu().solve(grad);
+    grad = G.transpose().fullPivLu().solve(grad);
 #else
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
@@ -409,50 +418,49 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 #ifdef SMART_GRAD
 // compute transformation of derivative directions smart gradient
-void PostTheta::computeG(VectorXd& x, MatrixXd& G){
+void PostTheta::computeG(Vect& theta, MatrixXd& G){
 
-	int n = x.size();
+	//int n = theta.size();
 
-    // construct/update X_diff matrix
+    // construct/update ThetaDiff matrix
     // go to else in first call otherwise true
-    if(Xdiff_initialized == true){
+    if(thetaDiff_initialized == true){
 
         VectorXd temp_col(n);
-        for(int i=n-1; i>0; i--){
-            temp_col = X_diff.col(i-1);
-            X_diff.col(i) = temp_col;
+        for(int i=dim_th-1; i>0; i--){
+            temp_col = ThetaDiff.col(i-1);
+            ThetaDiff.col(i) = temp_col;
         }
 
-        X_diff.col(0) = x - x_prev;
-        //std::cout << "X_diff = \n" << X_diff << std::endl;
+        ThetaDiff.col(0) = theta - theta_prev;
+        //std::cout << "theta_diff = \n" << ThetaDiff << std::endl;
 
         // add small noise term to diagonal, in case columns are linearly dependent
         double eps = 10e-6;
-        X_diff = X_diff + eps*MatrixXd::Identity(n,n);
+        ThetaDiff = ThetaDiff + eps*MatrixXd::Identity(dim_th,dim_th);
 
     } else {
-        X_diff = MatrixXd::Identity(n,n);
-        //std::cout << "X_diff = \n" << X_diff << std::endl;
+        ThetaDiff = MatrixXd::Identity(dim_th,dim_th);
+        //std::cout << "ThetaDiff = \n" << ThetaDiff << std::endl;
 
-        Xdiff_initialized = true;
+        thetaDiff_initialized = true;
     }
 
 #ifdef PRINT_MSG
     if(MPI_rank == 0){
-    	std::cout << "X_diff = \n" << X_diff << std::endl;
+    	std::cout << "theta_diff = \n" << ThetaDiff << std::endl;
     }
 #endif
 
     // store current iterate
-    x_prev = x;
+    theta_prev = theta;
 
     // do modified GRAM-SCHMIDT-ORTHONORMALIZATION
-    G.Zero(n, n);
-    MatrixXd R = Eigen::MatrixXd::Zero(n, n);
+    G.Zero(dim_th, dim_th);
+    MatrixXd R = Eigen::MatrixXd::Zero(dim_th, dim_th);
 
-
-    for(int k=0; k<n; k++){
-        G.col(k) = X_diff.col(k);
+    for(int k=0; k<dim_th; k++){
+        G.col(k) = ThetaDiff.col(k);
         for(int i = 0; i<k; i++){
             R(i,k) = G.col(i).transpose()*G.col(k);
             G.col(k) = G.col(k) - R(i,k)*G.col(i);
@@ -463,8 +471,8 @@ void PostTheta::computeG(VectorXd& x, MatrixXd& G){
 
 #ifdef PRINT_MSG
     if(MPI_rank == 0){
-    	// check if X_diff = G*R
-    	//std::cout << "norm(X_diff - G*R) = " << (X_diff - G*R).norm() << std::endl;
+    	// check if ThetaDiff = G*R
+    	//std::cout << "norm(ThetaDiff - G*R) = " << (ThetaDiff - G*R).norm() << std::endl;
     	std::cout << "G = \n" << G << std::endl;
     }
 #endif
@@ -474,6 +482,7 @@ void PostTheta::computeG(VectorXd& x, MatrixXd& G){
 #endif
 
 
+// need to write this for MPI ... all gather .. sum.
 int PostTheta::get_fct_count(){
 	return(fct_count);
 }
