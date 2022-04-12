@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-//#define DATA_SYNTHETIC
-#define DATA_TEMPERATURE
+#define DATA_SYNTHETIC
+//#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF
@@ -391,7 +391,9 @@ int main(int argc, char* argv[])
             std::cout << "using TEMPERATURE DATASET" << std::endl; 
         }
         //theta << 4, 4, 4, 4;    // -> converges to wrong solution
-        theta_param << 4, 0, 0, 0;
+        //theta_param << 4, 0, 0, 0;
+        //theta_param << -5.967, 0.234, 0.547, 0.547;
+        theta_param << -1.545, 2.358, 4.960, 4.940;
         //theta_param << -1.045, 8.917, 8.868, 3.541;
         // theta solution : -0.962555  6.309191 -8.195620 -7.203450
         //theta << 1, 8, -5, -5;   // -> works!
@@ -427,15 +429,16 @@ int main(int argc, char* argv[])
     param.epsilon = 1e-1;
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
-    param.epsilon_rel = 1e-1;
+    // stops if grad.norm() < eps_rel*x.norm() 
+    param.epsilon_rel = 1e-3;
     // in the past ... steps
     param.past = 1;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
     //param.delta = 1e-2;
-    param.delta = 1e-6;
+    param.delta = 1e-2;
     // maximum line search iterations
-    param.max_iterations = 30;
+    param.max_iterations = 200;
 
 
     // Create solver and function object
@@ -466,11 +469,13 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
     }
 
+#ifdef DATA_TEMPERATURE
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     if(MPI_rank == 0){
         std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
     }
+#endif
 
     if(MPI_rank == 0){
         Vect theta_interpret_initial(dim_th);
@@ -570,7 +575,7 @@ int main(int argc, char* argv[])
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 0
+    #if 1
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -586,7 +591,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 1
+    #if 0
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);

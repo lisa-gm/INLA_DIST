@@ -254,10 +254,11 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	// configure finite difference approximation (along coordinate axes or smart gradient)
 	double eps = 0.005;
 	// projection matrix G, either Identity or other orthonormal basis (from computeG function)
-	MatrixXd G(dim_th, dim_th);
+	//G = MatrixXd::Identity(dim_th, dim_th);
 
 #ifdef SMART_GRAD
-	computeG(theta, G);
+	// changing G here, however G needs to be available Hessian later
+	computeG(theta);
 #else
 	G = MatrixXd::Identity(dim_th, dim_th);
 #endif
@@ -379,11 +380,11 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	if(f_theta < min_f_theta){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
-			//std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			Vect theta_interpret(4); theta_interpret[0] = theta[0];
+			std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			
+			*/
 		}
 	}
 
@@ -418,7 +419,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 #ifdef SMART_GRAD
 // compute transformation of derivative directions smart gradient
-void PostTheta::computeG(Vect& theta, MatrixXd& G){
+void PostTheta::computeG(Vect& theta){
 
 	//int n = theta.size();
 
@@ -437,6 +438,8 @@ void PostTheta::computeG(Vect& theta, MatrixXd& G){
 
         // add small noise term to diagonal, in case columns are linearly dependent
         double eps = 10e-6;
+        // this additional eps term is being carried around through iterations, 
+        // as the columns are just shifted ... 
         ThetaDiff = ThetaDiff + eps*MatrixXd::Identity(dim_th,dim_th);
 
     } else {
@@ -456,7 +459,7 @@ void PostTheta::computeG(Vect& theta, MatrixXd& G){
     theta_prev = theta;
 
     // do modified GRAM-SCHMIDT-ORTHONORMALIZATION
-    G.Zero(dim_th, dim_th);
+    G = MatrixXd::Zero(dim_th, dim_th);
     MatrixXd R = Eigen::MatrixXd::Zero(dim_th, dim_th);
 
     for(int k=0; k<dim_th; k++){
@@ -661,11 +664,22 @@ rewritten.
 */
 MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
-	//double eps = 0.005;
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "G : \n" << G << std::endl;
+	}
+#endif
 
+	//double eps = 0.005;
 	int dim_th = theta.size();
-	MatrixXd epsId(dim_th, dim_th); 
-	epsId = eps*epsId.setIdentity();
+
+	MatrixXd epsG(dim_th, dim_th); 
+
+#ifdef SMART_GRAD
+	epsG = eps*G;
+#else
+	epsG = eps*MatrixXd::Identity(dim_th, dim_th);
+#endif
 
 	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);
 
@@ -723,7 +737,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         	// compute f(theta+eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect theta_forw_i = theta+epsId.col(i);
+	            Vect theta_forw_i = theta+epsG.col(i);
 	            //f_i_i(0,i) = f_eval(theta_forw_i);
 	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
             }
@@ -732,7 +746,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         	// compute f(theta-eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect theta_back_i = theta-epsId.col(i);
+	            Vect theta_back_i = theta-epsG.col(i);
 	            //f_i_i(2,i) = f_eval(theta_back_i);
 	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp);
             }
@@ -747,7 +761,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         	// compute f(theta+eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){             
 	            Vect mu_tmp(n);
-	            Vect theta_forw_i_j 	   = theta+epsId.col(i)+epsId.col(j);
+	            Vect theta_forw_i_j 	   = theta+epsG.col(i)+epsG.col(j);
 	            //f_i_j(0,k) = f_eval(theta_forw_i_j);
 	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
             }
@@ -756,7 +770,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         	// compute f(theta+eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect theta_forw_i_back_j = theta+epsId.col(i)-epsId.col(j);
+	            Vect theta_forw_i_back_j = theta+epsG.col(i)-epsG.col(j);
 	            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
 	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
             }
@@ -765,7 +779,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         	// compute f(theta-eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect theta_back_i_forw_j = theta-epsId.col(i)+epsId.col(j);
+	            Vect theta_back_i_forw_j = theta-epsG.col(i)+epsG.col(j);
 	            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
 	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
             }
@@ -774,7 +788,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         	// compute f(theta-eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect theta_back_i_j 	   = theta-epsId.col(i)-epsId.col(j);
+	            Vect theta_back_i_j 	   = theta-epsG.col(i)-epsG.col(j);
 	            //f_i_j(3,k) = f_eval(theta_back_i_j);
 	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
             }
@@ -836,11 +850,12 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
     	}
 #endif
 
- 	/*if(MPI_rank == 0){
- 		std::cout << "time hess = " << time_omp_task_hess << std::endl;
- 	}*/
-
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
+
+#ifdef SMART_GRAD
+	hess = G.transpose().fullPivLu().solve(hess)*G.transpose();
+#endif
+
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		std::cout << "hessian       : \n" << hess << std::endl;
@@ -859,9 +874,21 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
 	//double eps = 0.005;
 
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "G : \n" << G << std::endl;
+	}
+#endif
+
 	int dim_th = interpret_theta.size();
-	MatrixXd epsId(dim_th, dim_th); 
-	epsId = eps*epsId.setIdentity();
+
+	MatrixXd epsG(dim_th, dim_th); 
+
+#ifdef SMART_GRAD
+	epsG = eps*G;
+#else
+	epsG = eps*MatrixXd::Identity(dim_th, dim_th);
+#endif
 
 	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);
 
@@ -920,7 +947,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         	// compute f(theta+eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-            	Vect interpret_theta_forw_i = interpret_theta+epsId.col(i);
+            	Vect interpret_theta_forw_i = interpret_theta+epsG.col(i);
             	Vect theta_forw_i(4);
 				theta_forw_i[0] = interpret_theta_forw_i[0];
 				convert_interpret2theta(interpret_theta_forw_i[1], interpret_theta_forw_i[2], interpret_theta_forw_i[3], theta_forw_i[1], theta_forw_i[2], theta_forw_i[3]);
@@ -931,7 +958,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         	// compute f(theta-eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-				Vect interpret_theta_back_i = interpret_theta-epsId.col(i);
+				Vect interpret_theta_back_i = interpret_theta-epsG.col(i);
             	Vect theta_back_i(4);
 				theta_back_i[0] = interpret_theta_back_i[0];
 				convert_interpret2theta(interpret_theta_back_i[1], interpret_theta_back_i[2], interpret_theta_back_i[3], theta_back_i[1], theta_back_i[2], theta_back_i[3]);
@@ -947,7 +974,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         	// compute f(theta+eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){             
 	            Vect mu_tmp(n);
-				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsId.col(i)+epsId.col(j);
+				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsG.col(i)+epsG.col(j);
             	Vect theta_forw_i_j(4);
 				theta_forw_i_j[0] = interpret_theta_forw_i_j[0];
 				convert_interpret2theta(interpret_theta_forw_i_j[1], interpret_theta_forw_i_j[2], interpret_theta_forw_i_j[3], theta_forw_i_j[1], theta_forw_i_j[2], theta_forw_i_j[3]);
@@ -958,7 +985,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         	// compute f(theta+eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsId.col(i)-epsId.col(j);
+	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsG.col(i)-epsG.col(j);
             	Vect theta_forw_i_back_j(4);
 				theta_forw_i_back_j[0] = interpret_theta_forw_i_back_j[0];
 				convert_interpret2theta(interpret_theta_forw_i_back_j[1], interpret_theta_forw_i_back_j[2], interpret_theta_forw_i_back_j[3], theta_forw_i_back_j[1], theta_forw_i_back_j[2], theta_forw_i_back_j[3]);
@@ -969,7 +996,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         	// compute f(theta-eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsId.col(i)+epsId.col(j);
+	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsG.col(i)+epsG.col(j);
             	Vect theta_back_i_forw_j(4);
 				theta_back_i_forw_j[0] = interpret_theta_back_i_forw_j[0];
 				convert_interpret2theta(interpret_theta_back_i_forw_j[1], interpret_theta_back_i_forw_j[2], interpret_theta_back_i_forw_j[3], theta_back_i_forw_j[1], theta_back_i_forw_j[2], theta_back_i_forw_j[3]);
@@ -980,7 +1007,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         	// compute f(theta-eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            Vect mu_tmp(n);
-            	Vect interpret_theta_back_i_j 	   = interpret_theta-epsId.col(i)-epsId.col(j);
+            	Vect interpret_theta_back_i_j 	   = interpret_theta-epsG.col(i)-epsG.col(j);
             	Vect theta_back_i_j(4);
 				theta_back_i_j[0] = interpret_theta_back_i_j[0];
 				convert_interpret2theta(interpret_theta_back_i_j[1], interpret_theta_back_i_j[2], interpret_theta_back_i_j[3], theta_back_i_j[1], theta_back_i_j[2], theta_back_i_j[3]);
@@ -1043,6 +1070,10 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
     #endif
 
 	MatrixXd hess = hessUpper.selfadjointView<Upper>();
+
+#ifdef SMART_GRAD
+	hess = G.transpose().fullPivLu().solve(hess)*G.transpose();
+#endif
 
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){

@@ -106,8 +106,12 @@ class PostTheta{
     int MPI_size;       /**< number of mpi ranks                            */
     int MPI_rank;       /**< personal mpi rank                              */
 
+    MatrixXd G; 		/**< orthonormal basis for finite difference stencil 
+    						  is Identity if smart gradient disabled 		*/
+
+
 #ifdef SMART_GRAD
-    bool thetaDiff_initialized; /**< flag in smart gradient    					*/
+    bool thetaDiff_initialized; /**< flag in smart gradient    				*/
     VectorXd theta_prev;
     MatrixXd ThetaDiff;
 #endif
@@ -166,7 +170,11 @@ class PostTheta{
 	 */
     double operator()(Vect& theta, Vect& grad);
 
-    void computeG(Vect& theta, MatrixXd& G);
+	/**
+	 * @brief overwriting G every time, not explicitly listed, better way to do this? needs to be 
+	 * stored after every iteration for smart hessian ... 		
+	 */
+    void computeG(Vect& theta);
 
     int get_fct_count();
 
