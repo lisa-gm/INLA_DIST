@@ -1,8 +1,8 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
-#BASE_PATH=/home/x_gaedkelb
-BASE_PATH=/home/hpc/ihpc/ihpc060h
+BASE_PATH=/home/x_gaedkelb
+#BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 ############# RGF ################
 
@@ -34,8 +34,8 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
-#INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCEIGEN=-I/usr/include/eigen3
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen
 INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
@@ -49,6 +49,7 @@ RGF_CU_FILES   = $(RGF_PATH)/CWC_utility.o
 
 $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))
+$(info BFGS     : $(INCBFGS))
 $(info CUDA     : $(CUDAHOME))
 $(info MAGMA    : $(MAGMA))
 $(info EIGEN    : $(INCEIGEN))

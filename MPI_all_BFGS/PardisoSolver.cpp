@@ -265,7 +265,7 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
         symbolic_factorization(Q, init);
     }
 
-// check if n and Q.size() match
+    // check if n and Q.size() match
     if(n != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
         printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());

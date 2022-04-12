@@ -54,6 +54,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+
+#ifdef SMART_GRAD
+	Xdiff_initialized = false;
+#ifdef PRINT_MSG
+	std::cout << "using smart gradient." << std::endl;
+#endif
+#endif
+
 }
 
 
@@ -118,6 +126,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+
+#ifdef SMART_GRAD
+	Xdiff_initialized = false;
+#ifdef PRINT_MSG
+	std::cout << "using smart gradient." << std::endl;
+#endif
+#endif
+
 
 }
 
@@ -188,6 +204,13 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	fct_count          = 0;
 	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
 
+#ifdef SMART_GRAD
+	Xdiff_initialized = false;
+#ifdef PRINT_MSG
+	std::cout << "using smart gradient." << std::endl;
+#endif
+#endif
+
 }
 
 /* operator() does exactly two things. 
@@ -216,10 +239,28 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	int dim_th = theta.size();
 
+	// configure finite difference approximation (along coordinate axes or smart gradient)
 	double eps = 0.005;
 	MatrixXd epsId_mat(dim_th, dim_th); 
+	MatrixXd G(dim_th, dim_th);
+
+#ifdef SMART_GRAD
+	computeG(theta, epsId_mat);
+	epsId_mat = eps*epsId_mat;
+
+#else
 	epsId_mat = eps*epsId_mat.setIdentity();
 	//std::cout << "epsId_mat : " << epsId_mat << std::endl;
+#endif
+
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "epsId_mat : \n" << epsId_mat << std::endl;
+	}
+#endif
+
+
 
 	// initialise local f_value lists
 	Vect f_temp_list_loc(no_f_eval); f_temp_list_loc.setZero();
@@ -349,15 +390,88 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		}
 #endif 
 
+#ifdef SMART_GRAD
+	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
+	// multiply with G^-T
+    grad = epsId_mat.transpose().fullPivLu().solve(grad);
+#else
 	// compute finite difference in each direction
 	grad = 1.0/(2.0*eps)*(f_forw - f_backw);
-	//std::cout << "grad  : " << grad.transpose() << std::endl;
+#endif
 
 	t_grad = grad;
+	//std::cout << "grad : " << grad.transpose() << std::endl;
 
 	return f_theta;
 
 }
+
+
+#ifdef SMART_GRAD
+// compute transformation of derivative directions smart gradient
+void PostTheta::computeG(VectorXd& x, MatrixXd& G){
+
+	int n = x.size();
+
+    // construct/update X_diff matrix
+    // go to else in first call otherwise true
+    if(Xdiff_initialized == true){
+
+        VectorXd temp_col(n);
+        for(int i=n-1; i>0; i--){
+            temp_col = X_diff.col(i-1);
+            X_diff.col(i) = temp_col;
+        }
+
+        X_diff.col(0) = x - x_prev;
+        //std::cout << "X_diff = \n" << X_diff << std::endl;
+
+        // add small noise term to diagonal, in case columns are linearly dependent
+        double eps = 10e-6;
+        X_diff = X_diff + eps*MatrixXd::Identity(n,n);
+
+    } else {
+        X_diff = MatrixXd::Identity(n,n);
+        //std::cout << "X_diff = \n" << X_diff << std::endl;
+
+        Xdiff_initialized = true;
+    }
+
+#ifdef PRINT_MSG
+    if(MPI_rank == 0){
+    	std::cout << "X_diff = \n" << X_diff << std::endl;
+    }
+#endif
+
+    // store current iterate
+    x_prev = x;
+
+    // do modified GRAM-SCHMIDT-ORTHONORMALIZATION
+    G.Zero(n, n);
+    MatrixXd R = Eigen::MatrixXd::Zero(n, n);
+
+
+    for(int k=0; k<n; k++){
+        G.col(k) = X_diff.col(k);
+        for(int i = 0; i<k; i++){
+            R(i,k) = G.col(i).transpose()*G.col(k);
+            G.col(k) = G.col(k) - R(i,k)*G.col(i);
+        }
+        R(k,k) = G.col(k).norm();
+        G.col(k) = G.col(k)/R(k,k);
+    }
+
+#ifdef PRINT_MSG
+    if(MPI_rank == 0){
+    	// check if X_diff = G*R
+    	//std::cout << "norm(X_diff - G*R) = " << (X_diff - G*R).norm() << std::endl;
+    	std::cout << "G = \n" << G << std::endl;
+    }
+#endif
+
+}
+
+#endif
 
 
 int PostTheta::get_fct_count(){
@@ -511,16 +625,12 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 
-	std::cout << "before if statement, num threads : " << omp_get_max_threads() << std::endl;
-
 	// nested parallelism, want to call this with 1 thread of omp level 1
 	#pragma omp parallel
 	#pragma omp single
 	{
-		std::cout << "inside if statement, num threads : " << omp_get_max_threads() << std::endl;
 		solverQ->selected_inversion(Q, vars);
 	}
-
 	
 	#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
@@ -535,7 +645,11 @@ double PostTheta::f_eval(Vect& theta){
 	return(pow(theta[0],3)*pow(theta[1],2)*theta[2] + pow(theta[3],3));
 }
 
-
+/* Parallelisation here is a bit of a mess, as I haven't found a "natural" way to combine
+the parallel structure of MPI process + nested parallelism with the number of function
+evaluations required here. For none Gaussian data this probably needs to be completely 
+rewritten.
+*/
 MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 	//double eps = 0.005;
@@ -578,6 +692,8 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
     // compute f(theta) only once.
 	if(MPI_rank == task_to_rank_list[0]){
+
+		
 		Vect mu_tmp(n);
 		//double f_theta = f_eval(theta);
 		double f_theta = eval_post_theta(theta, mu_tmp);

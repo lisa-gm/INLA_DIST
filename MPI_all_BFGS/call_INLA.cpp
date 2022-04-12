@@ -7,7 +7,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-//#define RGF
+// choose one of the two
+#define DATA_SYNTHETIC
+//#define DATA_TEMPERATURE
+
+// enable RGF solver or not
+#define RGF
 
 #ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -75,11 +80,10 @@ int main(int argc, char* argv[])
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
 #ifdef RGF
-	//cudaGetDeviceCount(&noGPUs);
-	noGPUs = 2;
+	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n\n", noGPUs);
 #else
-	printf("RGF dummy version");
+	printf("RGF dummy version\n");
 #endif
     }  
     
@@ -343,6 +347,8 @@ int main(int argc, char* argv[])
 
     } else {
         n = ns*nt + nb;
+
+#ifdef DATA_SYNTHETIC
         data_type = "synthetic";
 
         // =========== synthetic data set =============== //
@@ -368,16 +374,21 @@ int main(int argc, char* argv[])
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }
 
+#elif DATA_TEMPERATURE
+
         // =========== temperature data set =============== //
         /*data_type = "temperature";
 
         if(MPI_rank == 0){
             std::cout << "using TEMPERATURE DATASET" << std::endl; 
         }
-        // initial theta
-        theta << -1.3862944,  0.8139294, -0.3465736, -1.3862944;       // EU only (solution from INLA)
-;       // EU only (solution from INLA)
-        //theta_original << 5, -10, 2.5, 1;
+        //theta_param << 4, 0, 0, 0;    // -> converges to wrong solution
+        //theta_param << 4, 1, 1, 1;
+        //theta_param << -1.045, 8.917, 8.868, 3.541;
+        // theta solution : -0.962555  6.309191 -8.195620 -7.203450
+        theta << 1, 8, -5, -5;   // -> works!
+        //theta << 2, 8, -4, -4; // -> works!
+        //theta << 2, 8, -2, -2; // doesn't work!
 
         // using PC prior, choose lambda  
         theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
@@ -387,6 +398,13 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }*/
+
+#else 
+        std::cerr << "\nUnknown datatype! Choose synthetic or temperature dataset!" << std::endl;
+        exit(1);
+
+#endif
+
     }
 
     Vect b(nb);
@@ -608,7 +626,7 @@ int main(int argc, char* argv[])
 
         t_get_marginals += omp_get_wtime();
 
-        std::cout << "est. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
+        std::cout << "\nest. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
     }
     #endif

@@ -26,6 +26,8 @@
 //#include "RGFSolver.h"
 #include "RGFSolver_dummy.h"
 
+//#define SMART_GRAD
+
 //#define PRINT_MSG
 //#define PRINT_TIMES
 
@@ -100,13 +102,16 @@ class PostTheta{
     Vect t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
 
-
-
     int no_f_eval;      /**< number of function evaluations per iteration   */
 
     int MPI_size;       /**< number of mpi ranks                            */
     int MPI_rank;       /**< personal mpi rank                              */
 
+#ifdef SMART_GRAD
+    bool Xdiff_initialized; /**< flag in smart gradient    					*/
+    VectorXd x_prev;
+    MatrixXd X_diff;
+#endif
 
 	public:
 	 /**
@@ -161,6 +166,8 @@ class PostTheta{
 	 * --> somehow introduce additional parallelism to compute f(theta), possible to do in parallel
 	 */
     double operator()(Vect& theta, Vect& grad);
+
+    void computeG(Vect& x, MatrixXd& G);
 
     int get_fct_count();
 
