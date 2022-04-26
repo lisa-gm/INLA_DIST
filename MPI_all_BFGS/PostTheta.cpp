@@ -283,18 +283,16 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	// create list that assigns each of the no_f_eval = 2*dim_th+1 function evaluations to a rank
 	// if e.g. 9 tasks and mpi_size = 3, then task 1: rank 0, task 2: rank 1, task 3: rank 2, task 4: rank 0, etc.
 	ArrayXi task_to_rank_list(no_f_eval);
-	int divd = ceil(no_f_eval / double(MPI_size));
-	//std::cout << "div : " << div << std::endl;
 
 	for(int i=0; i<no_f_eval; i++){
-		task_to_rank_list[i] = i / divd;
+		task_to_rank_list[i] = i % MPI_size;
 	}
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){  
 		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
 	}
-	#endif
+#endif
 
 	// ===================================== compute f(theta) ===================================== //
 	if(MPI_rank == task_to_rank_list[0])
@@ -310,7 +308,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	} // end if MPI
 
 	// ===================================== compute grad f(theta) ============================== //
-	divd = ceil(no_f_eval / double(2));
+	// fill f_temp_list_loc such that first entry f(theta), next dim_th forward difference, last 
+	// dim_th backward difference -> each process has their own copy, rest zero (important), then combine
+	int divd = ceil(no_f_eval / double(2));
 
 	for(int i=1; i<no_f_eval; i++){
 
@@ -320,10 +320,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 			{
 				int k = i-1; 
 
-				#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
 					std::cout << "i : " << i << " and k : " << k << std::endl;
-				#endif
+#endif
 
 				Vect theta_forw(dim_th);
 				Vect mu_dummy(n);
@@ -338,10 +338,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 			{				
 				int k = i-1-dim_th; // backward difference in the k-th direction
 
-				#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 					std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
 					//std::cout << "i : " << i << " and k : " << k << std::endl;
-				#endif
+#endif
 
 				Vect theta_backw(dim_th);
 				Vect mu_dummy(n);
@@ -354,9 +354,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	// ================== MPI Waitall & MPI All_Gather ====================== //
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	std::cout << "rank : " << MPI_rank << ", res : " << f_temp_list_loc.transpose() << std::endl;
-	#endif
+#endif
 
 	// wait for all processes to finish
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -380,6 +380,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	if(f_theta < min_f_theta){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
+			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
 			std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
@@ -487,7 +488,20 @@ void PostTheta::computeG(Vect& theta){
 
 // need to write this for MPI ... all gather .. sum.
 int PostTheta::get_fct_count(){
-	return(fct_count);
+
+	// sum over fct counts of all processes 
+	int total_fn_count;
+	MPI_Reduce(&fct_count, &total_fn_count, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+	// send total number to all processes, not so important
+	MPI_Bcast(&total_fn_count, 1, MPI_INT, 0, MPI_COMM_WORLD); 
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "number of fn calls : " << total_fn_count << ", function calls rank " << MPI_rank << " : " << fct_count << std::endl;
+	}
+#endif
+
+	return(total_fn_count);
 }
 
 // ============================================================================================ //
@@ -672,13 +686,26 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 	//double eps = 0.005;
 	int dim_th = theta.size();
-
-	MatrixXd epsG(dim_th, dim_th); 
-
+ 	MatrixXd epsG(dim_th, dim_th);
+   
 #ifdef SMART_GRAD
-	epsG = eps*G;
+	if(thetaDiff_initialized == true){
+		epsG = eps*G;
+	} else {
+		if(MPI_rank == 0){
+			std::cout << "G not initialised! Using canonic basis!" << std::endl;
+		}
+		G = MatrixXd::Identity(dim_th, dim_th);
+		epsG = eps*G;
+	}
 #else
-	epsG = eps*MatrixXd::Identity(dim_th, dim_th);
+	MatrixXd G = MatrixXd::Identity(dim_th, dim_th);
+	epsG = eps*G;
+#endif
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0)
+		std::cout << "epsG = \n" << epsG << std::endl;
 #endif
 
 	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);
@@ -881,13 +908,26 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 #endif
 
 	int dim_th = interpret_theta.size();
-
-	MatrixXd epsG(dim_th, dim_th); 
-
+	MatrixXd epsG(dim_th, dim_th);
+   
 #ifdef SMART_GRAD
-	epsG = eps*G;
+	if(thetaDiff_initialized == true){
+		epsG = eps*G;
+	} else {
+		if(MPI_rank == 0){
+			std::cout << "G not initialised! Using canonic basis!" << std::endl;
+		}
+		G = MatrixXd::Identity(dim_th, dim_th);
+		epsG = eps*G;
+	}
 #else
-	epsG = eps*MatrixXd::Identity(dim_th, dim_th);
+	MatrixXd G = MatrixXd::Identity(dim_th, dim_th);
+	epsG = eps*G;
+#endif
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0)
+		std::cout << "epsG = \n" << epsG << std::endl;
 #endif
 
 	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);

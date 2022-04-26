@@ -156,6 +156,7 @@ int main(int argc, char* argv[])
     std::string base_path = argv[5];    
 
     std::string solver_type = argv[6];
+
     // check if solver type is neither PARDISO nor RGF :
     if(solver_type.compare("PARDISO") != 0 && solver_type.compare("RGF") != 0){
         std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
@@ -166,7 +167,7 @@ int main(int argc, char* argv[])
         std::cout << "Solver : " << solver_type << std::endl;
     }
 
-    if(MPI_rank == 0){
+    if(MPI_rank == 0 && solver_type.compare("RGF") == 0){
         // required memory on CPU to store Cholesky factor
         double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(T) / pow(10.0,9.0);
         printf("Memory Usage of each Cholesky factor on CPU = %f GB\n\n", mem_gb);
@@ -377,10 +378,12 @@ int main(int argc, char* argv[])
         }
         //theta << 1.4, -5.9,  1,  3.7; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
-        theta << 2, -3, 1.5, 5;
+        //theta_param << 4, 0, 0, 0;
+        theta_param << 4,4,4,4;
+        /*theta << 2, -3, 1.5, 5;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }
+        }*/
 
 #elif defined(DATA_TEMPERATURE)
 
@@ -432,11 +435,11 @@ int main(int argc, char* argv[])
     // stops if grad.norm() < eps_rel*x.norm() 
     param.epsilon_rel = 1e-3;
     // in the past ... steps
-    param.past = 1;
+    param.past = 2;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
     //param.delta = 1e-2;
-    param.delta = 1e-2;
+    param.delta = 1e-3;
     // maximum line search iterations
     param.max_iterations = 200;
 
@@ -469,13 +472,13 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
     }
 
-#ifdef DATA_TEMPERATURE
+//#ifdef DATA_TEMPERATURE
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     if(MPI_rank == 0){
         std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
     }
-#endif
+//#endif
 
     if(MPI_rank == 0){
         Vect theta_interpret_initial(dim_th);
@@ -500,14 +503,17 @@ int main(int argc, char* argv[])
     //LIKWID_MARKER_THREADINIT;
 
     double time_bfgs = -omp_get_wtime();
-    int niter = solver.minimize(*fun, theta, fx);
+    int niter = solver.minimize(*fun, theta, fx, MPI_rank);
 
     //LIKWID_MARKER_CLOSE;
 
     time_bfgs += omp_get_wtime();
 
+    // get number of function evaluations.
+    int fn_calls = fun->get_fct_count();
+
     if(MPI_rank == 0){
-        std::cout << niter << " iterations" << std::endl;
+        std::cout << niter << " iterations and " << fn_calls << " fn calls." << std::endl;
         //std::cout << "time BFGS solver             : " << time_bfgs << " sec" << std::endl;
 
         std::cout << "\nf(x)                         : " << fx << std::endl;
@@ -540,8 +546,8 @@ int main(int argc, char* argv[])
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
         double prior_sigU; double prior_ranS; double prior_ranT;
-        //fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
-        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
+        std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
@@ -556,8 +562,8 @@ int main(int argc, char* argv[])
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    //theta_max = theta;
-    theta_max << 1.391313, -5.913299,  1.076161,  3.642337;
+    theta_max = theta;
+    //theta_max << 1.391313, -5.913299,  1.076161,  3.642337;
     //theta_max << 1.331607, -5.893736,  1.001546,  3.743028;
 
 
@@ -575,7 +581,7 @@ int main(int argc, char* argv[])
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 1
+    #if 0
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -591,7 +597,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 0
+    #if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -651,7 +657,7 @@ int main(int argc, char* argv[])
     }
     #endif
 	
-    
+    #if 1
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 
@@ -661,6 +667,7 @@ int main(int argc, char* argv[])
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
         std::cout << "total time                   : " << t_total << std::endl;
     }
+    #endif
 
 
     // ======================== write LOG file ===================== //
