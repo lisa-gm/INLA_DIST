@@ -10,7 +10,7 @@ CXX=CC     #mpic++
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
-LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_ibex 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_new 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 
 ARMADILLO=-larmadillo
@@ -21,7 +21,7 @@ LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
 #INCEIGEN=-I/usr/include/eigen3
 INCEIGEN=-I$(BASE_PATH)/applications/eigen
 
-INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
+INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
