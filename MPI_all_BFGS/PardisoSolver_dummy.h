@@ -1,10 +1,9 @@
-#ifndef PARDIDSO_SOLVER_H
-#define PARDIDSO_SOLVER_H
+#ifndef PARDIDSO_SOLVER_DUMMY_H
+#define PARDIDSO_SOLVER_DUMMY_H
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <iomanip>
 
 #include <fstream>
 #include <iostream>
@@ -23,18 +22,6 @@ typedef Eigen::SparseMatrix<double> SpMat;
 
 using namespace Eigen;
 
-
-/* PARDISO prototype. */
-extern "C" void pardisoinit (void   *, int    *,   int *, int *, double *, int *);
-extern "C" void pardiso     (void   *, int    *,   int *, int *,    int *, int *, 
-                            double *, int    *,    int *, int *,   int *, int *,
-                            int *, double *, double *, int *, double *);
-extern "C" void pardiso_chkmatrix  (int *, int *, double *, int *, int *, int *);
-extern "C" void pardiso_chkvec     (int *, int *, double *, int *);
-extern "C" void pardiso_printstats (int *, int *, double *, int *, int *, int *,
-                            double *, int *);
-
-
  /**
  * @brief creates solver class using pardiso for factorising, solving and selectively inverting linear system.
  * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
@@ -52,35 +39,6 @@ private:
     long unsigned int nnz;       /**< number of nonzeros */
 
     SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
-
-    int* ia;                /**< CSR format. row indices. */
-    int* ja;                /**< CSR format. col pointers. */
-    double* a;              /**< CSR format. values. */
-
-    double* b;              /**< right-hand side. */
-    double* x;              /**< placeholder for solution. */
-
-    void *pt[64];           /**< Internal solver memory pointer pt */
-
-    /* Pardiso control parameters. */
-    int      iparm[64];
-    double   dparm[64];
-    int      maxfct, mnum, phase, error, msglvl, solver;
-
-    int      num_procs;     /**< Number of processors. */
-
-    /* Auxiliary variables. */
-    int      i;
-    int      k;
-    long unsigned int l;
-
-    double   ddum;              /**< Double dummy */
-    int      idum;              /**< Integer dummy. */
-
-    int     mtype;              /**< matrix type */
-    int     nrhs;               /**< number of rhs. */
-    int     init;               /**< flag that indicates if symbolic factorisation already performed. */
-
 
 
 public:

@@ -14,8 +14,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	yTy    = y.dot(y);
 	BTy    = B.transpose()*y;
 
+
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
+		printf("Eigen -- number of threads used : %d\n", Eigen::nbThreads( ));
 	#endif
 
 	min_f_theta        = 1e10;			// initialise min_f_theta, min_theta
@@ -80,10 +82,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 	yTy         = y.dot(y);
 	AxTy		= Ax.transpose()*y;
+	AxTAx       = Ax.transpose()*Ax;
+
 
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
+		printf("Eigen -- number of threads used : %d\n", Eigen::nbThreads( ));
+
 	#endif
 
 	// set up PardisoSolver class in constructor 
@@ -157,9 +163,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 	yTy         = y.dot(y);
 	AxTy		= Ax.transpose()*y;
+	AxTAx       = Ax.transpose()*Ax;
+
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
+		printf("Eigen -- number of threads used : %d\n", Eigen::nbThreads( ));
 	#endif
 
 	// set up PardisoSolver class in constructor 
@@ -413,6 +422,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	t_grad = grad;
 	//std::cout << "grad : " << grad.transpose() << std::endl;
 
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){  
+        //std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
+        std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+    }
+#endif
+
 	return f_theta;
 
 }
@@ -472,6 +488,14 @@ void PostTheta::computeG(Vect& theta){
         R(k,k) = G.col(k).norm();
         G.col(k) = G.col(k)/R(k,k);
     }
+
+#ifdef PRINT_MSG
+    if(MPI_rank == 0){  
+            std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
+            std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+    }
+#endif
+
 
 #ifdef PRINT_MSG
     if(MPI_rank == 0){
@@ -1258,6 +1282,11 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	#pragma omp task
 	{
+
+	/*if(ns > 0 ){
+		eval_log_det_Qu(theta, log_det_Qu);
+	}*/
+
 	// =============== evaluate denominator ================= //
 	// denominator :
 	// log_det(Q.x|y), mu, t(mu)*Q.x|y*mu
@@ -1279,9 +1308,14 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// =============== add everything together ================= //
   	double val = -1 * (log_prior_sum + log_det_Qu + log_det_l + val_l - (log_det_d + val_d));
 
-  	#ifdef PRINT_MSG
-  		std::cout << "f theta : " << val << std::endl;
-  	#endif
+#ifdef PRINT_MSG
+  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
+  	std::cout << " " << std::fixed << std::setprecision(12);
+  	std::cout << log_prior_sum << " ";
+  	std::cout << log_det_Qu << " " << log_det_l << " " << val_l << " " << log_det_d << " " << val_d << " " << val << std::endl;
+
+  	//std::cout << "f theta : " << val << std::endl;
+#endif
 
   	return val;
 }
@@ -1481,7 +1515,7 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
 		#endif
 
-		Q =  Qx + exp_theta0 * Ax.transpose() * Ax;
+		Q =  Qx + exp_theta0 * AxTAx;
 
 		#ifdef PRINT_MSG
 			std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;

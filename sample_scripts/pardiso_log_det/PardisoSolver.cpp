@@ -35,20 +35,22 @@ PardisoSolver::PardisoSolver(int MPI_rank){
         threads_level2 = omp_get_max_threads();
     }
 
-    #ifdef PRINT_OMP
+    //#ifdef PRINT_OMP
         if(omp_get_thread_num() == 0 && MPI_rank == 0){
             //char* var = getenv("OMP_NUM_THREADS");
             //std::cout << "OMP_NUM_THREADS = " << var << std::endl;
             std::cout << "Pardiso will be called with " << threads_level2 << " threads per solver. " << std::endl;
         }
         // printf("Thread rank: %d out of %d threads.\n", omp_get_thread_num(), omp_get_num_threads());
-    #endif
+    //#endif
 
     //iparm[2]  = num_procs;
 
     // make sure that this is called inside upper level parallel region 
     // to get number of threads on the second level 
-    iparm[2] = threads_level2;
+    //iparm[2] = threads_level2;
+    iparm[2] = 8;
+
 
     iparm[33] = 1;      /* always returns the same result, even when executed in parallel,
                            becomes a problem when doing multiple solves at once */
@@ -137,6 +139,11 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
     /* -------------------------------------------------------------------- */
     phase = 11; 
 
+    //iparm[1] = 0;   // minimum degree-reordering -> DETERMINISTIC!!!
+    //std::cout << "iparm[2] = " << iparm[1] << std::endl;
+
+    double t_sym_fact = - omp_get_wtime();
+
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
      &n, a, ia, ja, &idum, &nrhs,
          iparm, &msglvl, &ddum, &ddum, &error, dparm);
@@ -145,6 +152,9 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
         printf("\nERROR during symbolic factorization: %d", error);
         exit(1);
     }
+
+    t_sym_fact += omp_get_wtime();
+    std::cout << "time symbolic factorise : " << t_sym_fact << std::endl;
 
     #ifdef PRINT_PAR
         printf("\nReordering completed ... ");
@@ -185,7 +195,7 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
     // check if nnz and Q_lower.nonZeros match
     if(nnz != Q_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
     }
 
     int* ia; 
@@ -246,6 +256,8 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
     phase = 22;
     iparm[32] = 1; /* compute determinant */
 
+    double t_factorise = - omp_get_wtime();
+
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
@@ -254,13 +266,13 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
         printf("\nERROR during numerical factorization: %d", error);
         exit(2);
     }
+
+    t_factorise += omp_get_wtime();
+    std::cout << "time factorise : " << t_factorise << std::endl;
     //printf("\nFactorization completed ...\n");
 
+    std::cout << std::fixed << std::setprecision(12) << "in factorize. log det       : " << dparm[32] << std::endl;
     log_det = dparm[32];
-
-#ifdef PRINT_MSG
-    std::cout << std::fixed << std::setprecision(12) << "in factorize. log det : " << dparm[32] << ", 0.5*log_det : " << 0.5*dparm[32] << std::endl;
-#endif
 
     delete[] ia;
     delete[] ja;
@@ -292,7 +304,7 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     // check if nnz and Q_lower.nonZeros match
     if(nnz != Q_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
     }
 
     int* ia; 
@@ -376,6 +388,8 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     phase = 22;
     iparm[32] = 1; /* compute determinant */
 
+    double t_factorise = - omp_get_wtime();
+
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
@@ -384,12 +398,11 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
         printf("\nERROR during numerical factorization: %d", error);
         exit(2);
     }
+
+    t_factorise += omp_get_wtime();
     //printf("\nFactorization completed ...\n");
 
-#ifdef PRINT_MSG
-    std::cout << "in factorize solve. log det : " << std::setprecision(12) << dparm[32] << ", 0.5*log_det : " << 0.5*dparm[32] << std::endl;
-#endif
-    
+    std::cout << "in factorize solve. log det : " << std::fixed << std::setprecision(12) << dparm[32] << std::endl;
     log_det = dparm[32];
 
     /* -------------------------------------------------------------------- */    
@@ -399,6 +412,8 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
 
     iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
    
+    double t_solve = - omp_get_wtime();
+
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, b, x, &error,  dparm);
@@ -407,6 +422,9 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
         printf("\nERROR during solution: %d", error);
         exit(3);
     }
+
+    t_solve += omp_get_wtime();
+    std::cout << "time factorise : " << t_factorise << ", time solve : " << t_solve << std::endl;
     
     //printf("\nSolve completed ... ");
     for (i = 0; i < n; i++) {
@@ -449,7 +467,7 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
     // check if nnz and Q_lower.nonZeros match
     if(nnz != Q_lower.nonZeros()){
         printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
-        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+        printf("nnz = %d.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
     }
 
     int* ia; 

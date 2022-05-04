@@ -376,7 +376,7 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         }
-        //theta << 1.4, -5.9,  1,  3.7; 
+        //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
         //theta_param << 4, 0, 0, 0;
         theta_param << 4,4,4,4;
@@ -396,7 +396,7 @@ int main(int argc, char* argv[])
         //theta << 4, 4, 4, 4;    // -> converges to wrong solution
         //theta_param << 4, 0, 0, 0;
         //theta_param << -5.967, 0.234, 0.547, 0.547;
-        theta_param << -1.545, 2.358, 4.960, 4.940;
+        //theta_param << -1.545, 2.358, 4.960, 4.940;
         //theta_param << -1.045, 8.917, 8.868, 3.541;
         // theta solution : -0.962555  6.309191 -8.195620 -7.203450
         //theta << 1, 8, -5, -5;   // -> works!
@@ -443,6 +443,8 @@ int main(int argc, char* argv[])
     // maximum line search iterations
     param.max_iterations = 200;
 
+    //Eigen::setNbThreads(1);
+
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -488,7 +490,57 @@ int main(int argc, char* argv[])
     }
 
 
-    #if 1
+
+#if 0   // for measuring noise
+
+    PostTheta* fun2;
+    fun2 = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
+
+    Vect theta2 = theta;
+
+    Vect mu(n);
+    Vect grad(dim_th);
+
+    /*if(MPI_rank == 0){
+        std::cout << "\ntheta : " << std::right << std::fixed << std::setprecision(4) << theta.transpose() << std::endl;
+    }*/
+
+    for(int i = 0; i<1; i++){
+        if(MPI_rank == 0){
+                double f_theta = fun->eval_post_theta(theta, mu); // gets called by each rank individually
+        }
+        //double f_theta = fun->operator()(theta, grad);  // same for all ranks
+        /*if(MPI_rank == 0){  
+            std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
+            std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+        }*/
+    }
+
+    if(MPI_rank == 0){
+        std::cout << "\n============================================================================\n" << std::endl;
+        std::cout << "theta2 : " << theta2.transpose() << std::endl;
+    }
+
+    for(int i = 0; i<1; i++){
+        if(MPI_rank == 0){
+            double f_theta = fun2->eval_post_theta(theta, mu); // gets called by each rank individually
+        }
+        //double f_theta = fun2->operator()(theta, grad);  // same for all ranks
+        /*if(MPI_rank == 0){  
+            std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
+            std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+        }*/
+    }
+
+#endif
+
+
+
+
+
+
+#if 1
+
     double fx;
 
     //Vect grad_test(dim_th);
@@ -558,7 +610,6 @@ int main(int argc, char* argv[])
     #endif
 
     #if 1
-
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
