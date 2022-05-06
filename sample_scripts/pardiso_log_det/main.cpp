@@ -168,6 +168,24 @@ void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat
 }
 
 
+void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W){
+
+    // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
+    W = D*V;
+    std::cout << "W = " << W << std::endl;
+    // U = W^-1*V^T, W is spd and small
+    // TODO: use proper solver ...
+    MatrixXd U = W.inverse()*V.transpose();
+    //std::cout << "U = " << U << std::endl;
+
+    Vect c = D*sol - e;
+    sol = sol - U.transpose()*c;
+
+    std::cout << "sum(sol) = " << (D*sol).sum() << std::endl;
+
+}
+
+
 /* ===================================================================== */
 
 int main(int argc, char* argv[])
@@ -389,9 +407,68 @@ int main(int argc, char* argv[])
 	rhs = exp_theta*Ax.transpose()*y;
 
     Vect sol(n);
+    Vect sol_constr(n);
 
     // =========================================================================== //
     // initialize solvers
+
+    int MPI_rank = 0;
+
+    Solver* solverQst;
+    Solver* solverQ;
+
+    solverQst = new PardisoSolver(MPI_rank);
+    solverQ   = new PardisoSolver(MPI_rank);
+
+    bool constr = true;
+    int num_constr = 1;
+
+    Vect e = Vect::Zero(num_constr);
+    MatrixXd Dx(num_constr, ns*nt);
+    Dx.row(0) << MatrixXd::Ones(num_constr,ns*nt);
+    MatrixXd V1(ns*nt, num_constr);
+
+    double log_det_Qst;
+    solverQst->factorize_w_constr(Qst, constr, Dx, log_det_Qst, V1);
+
+    MatrixXd W1(num_constr, num_constr);
+    // here sol is equal to zero?
+    Vect mu_x = Vect::Zero(ns*nt);
+    update_mean_constr(Dx, e, mu_x, V1, W1);
+
+    double log_det_Q;
+    MatrixXd Dxy(num_constr,n);
+    Dxy.row(0) << Dx , MatrixXd::Zero(num_constr,nb);
+
+    MatrixXd V2(n,num_constr);
+    solverQ->factorize_solve_w_constr(Q, rhs, constr, Dxy, log_det_Q, sol, V2);
+
+    std::cout << "sol(1:10) = " << sol.head(10).transpose() << std::endl;
+
+    MatrixXd W2(num_constr, num_constr);
+    update_mean_constr(Dxy, e, sol, V2, W2);
+
+    std::cout << "sol(1:10) = " << sol.head(10).transpose() << std::endl;
+    std::cout << "Dxy       = " << Dxy.block(0,0,1,10) << std::endl;
+
+    MatrixXd DxyDxyT = Dxy*Dxy.transpose();
+    // .logDeterminant() is in cholmod module, requires inclusion of all of cholmod ...
+    // W = D*Q^-1*t(D), want log(sqrt(1/det(W)) = - 0.5 * log(det(W)) 
+    double log_det_Q_constr = 0.5 * log_det_Q - 0.5 * log(DxyDxyT.determinant()) - 0.5 * log(W2.determinant());
+    std::cout << "constrained log det = " << log_det_Q_constr << std::endl;
+
+    // to compute remaining terms, if e = 0, this will be zero.
+    Vect DxyMu = Dxy*sol; // => TODO: this is not right ... but what is?
+    double DxyMuWinvDxyMu = DxyMu.transpose()*W2.inverse()*DxyMu;
+    // log(pi(Dx | x) = -0.5 log(|A*A^T|)), why no other term?
+    double val = sol.transpose()*Q*sol + DxyMuWinvDxyMu;
+    std::cout << "constrained val     = " << val << std::endl;
+
+    delete solverQst;
+    delete solverQ;
+
+
+#if 0
 
     for(int j=0; j<5; j++){
         std::cout << "" << std::endl;
@@ -403,7 +480,6 @@ int main(int argc, char* argv[])
 
         solverQ   = new PardisoSolver(MPI_rank);
         solverQst = new PardisoSolver(MPI_rank);
-
 
         for(int i=0; i<2; i++){
             std::cout << "outer iter = " << j << ", inner iter = " << i << std::endl;
@@ -436,6 +512,8 @@ int main(int argc, char* argv[])
         delete solverQst;
         delete solverQ;
     }
+
+#endif
 
     
     
