@@ -22,8 +22,8 @@
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
-//#include "RGFSolver.h"
-#include "RGFSolver_dummy.h"
+#include "RGFSolver.h"
+//#include "RGFSolver_dummy.h"
 
 //#define SMART_GRAD
 
@@ -110,12 +110,20 @@ class PostTheta{
     MatrixXd G; 		/**< orthonormal basis for finite difference stencil 
     						  is Identity if smart gradient disabled 		*/
 
-
 #ifdef SMART_GRAD
     bool thetaDiff_initialized; /**< flag in smart gradient    				*/
     VectorXd theta_prev;
     MatrixXd ThetaDiff;
 #endif
+
+    bool constr;		/**< true if there is a sum to zero constraint      */
+    MatrixXd Dx;         /**< constraint vector, sum to zero constraint      */
+    MatrixXd Dxy;         /**< constraint vector, sum to zero constraint      */
+
+    MatrixXd V;			/**< V = Q^-1 * t(D)	 							*/
+    MatrixXd W;			/**< W = A*V  										*/
+    Vect U;				/**< U = W^-1 * t(V)                                */
+
 
 	public:
 	 /**
@@ -141,7 +149,10 @@ class PostTheta{
      * @param[in] g1_ stiffness matrix.
      * @param[in] g2_ defined as : g1 * c0^-1 * g1
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, Vect theta_prior, string solver_type);
+	PostTheta(int ns, int nt, int nb, int no, 
+		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2,
+		Vect theta_prior, string solver_type, 
+		bool constr, MatrixXd Dx, MatrixXd Dxy);
 
 	/**
      * @brief constructor for spatial temporal model.
@@ -160,7 +171,11 @@ class PostTheta{
      * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
      * @param[in] M2_ stiffness matrix time.
      */	
-	PostTheta(int ns, int nt, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vect theta_prior, string solver_type); 
+	PostTheta(int ns, int nt, int nb, int no, 
+		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
+		SpMat M0, SpMat M1, SpMat M2, 
+		Vect theta_prior, string solver_type, 
+		bool constr, MatrixXd Dx, MatrixXd Dxy); 
 
 	/**
      * @brief structure required by BFGS solver, requires : theta, gradient theta
@@ -290,6 +305,14 @@ class PostTheta{
      */	
 	void eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& theta_interpret);
 
+
+	void generate_test_constraints(int m, int num_constr, MatrixXd& Dx, Vect& e, MatrixXd& Cov, Vect& mu, Vect& rhs);
+
+	void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W, MatrixXd& U, Vect& updated_sol);
+
+	void eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, MatrixXd& D, MatrixXd& W, double& val_log_dens);
+
+
 	/**
 	 * @brief evaluate log prior of random effects
 	 * @param[in] theta current theta vector
@@ -333,6 +356,8 @@ class PostTheta{
  	 * /todo Could compute Ax^T*y once, and only multiply with appropriate exp_theta.
      */	
 	void construct_b(Vect& theta, Vect &rhs);
+
+	void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W);
 
 	/** @brief Evaluate denominator: conditional probability of Qx|y
      * @param[in] theta current theta vector

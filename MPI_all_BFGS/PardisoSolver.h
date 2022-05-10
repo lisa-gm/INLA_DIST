@@ -108,6 +108,7 @@ public:
      */
     void factorize(SpMat& Q, double& log_det);
 
+    void factorize_w_constr(SpMat& Q, bool constr,  MatrixXd& D, double& log_det, MatrixXd& V);
 
     /**
      * @brief factorises and solves matrix in one call (to reuse pardiso objects)
@@ -118,7 +119,8 @@ public:
      */    
     void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
 
-
+    void factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
+    
     /**
      * @brief selected inversion of the diagonal elements of Q.
      * @param[in]       Q precision matrix.

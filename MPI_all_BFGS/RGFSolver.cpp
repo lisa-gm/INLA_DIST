@@ -117,6 +117,12 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 }
 
+
+// TODO ...
+void RGFSolver::factorize_w_constr(SpMat& Q, bool constr,  MatrixXd& D, double& log_det, MatrixXd& V){
+    printf("Please implement me: factorize_w_constr"); 
+}
+
 void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
 
 #ifdef PRINT_MSG
@@ -232,6 +238,11 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
   	delete[] a;
   	delete[] x;
   	delete[] b;
+}
+
+// TODO ...
+void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
+    printf("Please implement me: factorize_w_constr"); 
 }
 
 // IMPLEMENT IN A WAY SUCH THAT FACTORISATION WILL BE PERFORMED AGAIN

@@ -3,7 +3,6 @@
 PardisoSolver::PardisoSolver(int MPI_rank){
 
     mtype  = -2;             /* set to positive semi-definite */
-    nrhs   = 1;              /* Number of right hand sides. */
 
     /* -------------------------------------------------------------------- */
     /* ..  Setup Pardiso control parameters.                                */
@@ -71,6 +70,8 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
     #endif
 
     n = Q.rows();
+    nrhs   = 1;              /* in symbolic factorization only dummy variable */
+
 
     // only take lower triangular part of A
     SpMat Q_lower = Q.triangularView<Lower>(); 
@@ -163,6 +164,8 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
 
 
 void PardisoSolver::factorize(SpMat& Q, double& log_det){
+
+    nrhs   = 1;              /* here only dummy variable */
 
     #ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;
@@ -266,10 +269,158 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
     delete[] ja;
     delete[] a;
 
-}
+} // end factorize function
+
+void PardisoSolver::factorize_w_constr(SpMat& Q, bool constr,  MatrixXd& D, double& log_det, MatrixXd& V){
+
+    int nrhs = D.rows();
+
+    #ifdef PRINT_PAR
+        std::cout << "init = " << init << std::endl;
+    #endif
+
+    if(init == 0){
+        symbolic_factorization(Q, init);
+    }
+
+    // check if n and Q.size() match
+    if(n != Q.rows()){
+        printf("\nInitialised matrix size and current matrix size don't match!\n");
+        printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+        exit(1);
+    }
+
+    // only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+
+    // check if nnz and Q_lower.nonZeros match
+    if(nnz != Q_lower.nonZeros()){
+        printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
+        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+    }
+
+    int* ia; 
+    int* ja;
+    double* a; 
+
+    // allocate memory
+    ia = new int [n+1];
+    ja = new int [nnz];
+    a = new double [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (int i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (int i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    for (int i = 0; i < nnz; ++i){
+        a[i] = Q_lower.valuePtr()[i];
+    }
+
+    double *b;
+    double *x;
+
+    b = new double [nrhs*n];
+    x = new double [nrhs*n];
+
+    // want rows of D to become vector ... 
+    MatrixXd Dt = D.transpose();
+    memcpy(b, Dt.data(), n*nrhs*sizeof(double));
+    
+    // TODO: save work, some already 1-based ... make sure that this is bullet proof.
+    /* -------------------------------------------------------------------- */
+    /* ..  Convert matrix from 0-based C-notation to Fortran 1-based        */
+    /*     notation.                                                        */
+    /* -------------------------------------------------------------------- */
+    
+    for (i = 0; i < n+1; i++) {
+        ia[i] += 1;
+    }
+    for (i = 0; i < nnz; i++) {
+        ja[i] += 1;
+    }      
+
+    /* -------------------------------------------------------------------- */
+    /*  .. pardiso_chk_matrix(...)                                          */
+    /*     Checks the consistency of the given matrix.                      */
+    /*     Use this functionality only for debugging purposes               */
+    /* -------------------------------------------------------------------- */
+
+    pardiso_chkmatrix  (&mtype, &n, a, ia, ja, &error);
+    if (error != 0) {
+        printf("\nERROR in consistency of matrix: %d", error);
+
+        for(i = 0; i < nnz; i++){
+            if(isnan(a[i])){
+                std::cout << "Found NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
+            }
+        }
+
+    exit(1);
+    }
+
+    phase = 22;
+    iparm[32] = 1; /* compute determinant */
+
+    double t_factorise = - omp_get_wtime();
+
+    pardiso (pt, &maxfct, &mnum, &mtype, &phase,
+             &n, a, ia, ja, &idum, &nrhs,
+             iparm, &msglvl, &ddum, &ddum, &error,  dparm);
+   
+    if (error != 0) {
+        printf("\nERROR during numerical factorization: %d", error);
+        exit(2);
+    }
+
+    t_factorise += omp_get_wtime();
+    //std::cout << "time factorise : " << t_factorise << std::endl;
+    //printf("\nFactorization completed ...\n");
+
+#ifdef PRINT_PAR
+    std::cout << std::fixed << std::setprecision(12) << "in factorize. log det       : " << dparm[32] << std::endl;
+    
+#endif
+    log_det = dparm[32];
+
+    /* -------------------------------------------------------------------- */    
+    /* ..  Back substitution and iterative refinement.                      */
+    /* -------------------------------------------------------------------- */    
+    phase = 33;
+
+    iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
+   
+    pardiso (pt, &maxfct, &mnum, &mtype, &phase,
+             &n, a, ia, ja, &idum, &nrhs,
+             iparm, &msglvl, b, x, &error,  dparm);
+   
+    if (error != 0) {
+        printf("\nERROR during solution: %d", error);
+        exit(3);
+    }
+    
+    // map solution back
+    memcpy(V.data(), x, nrhs*n*sizeof(double));
+    std::cout << "norm(Q*V   - t(D) = " << (Q*V - D.transpose()).norm() << std::endl;
+
+    delete[] ia;
+    delete[] ja;
+    delete[] a;
+
+    delete [] b;
+    delete [] x;
+
+} // end factorize_w_constr
 
  
 void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det){
+
+    nrhs   = 1;              /* only one solve necessary */
 
     #ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;
@@ -422,6 +573,187 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     delete[] b;
 
 } // end factorise solve function
+
+
+// perform all solves at the same time
+void PardisoSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
+    
+    if(constr == true){
+        nrhs = Dxy.rows() + 1;  // from constraints + the regular one
+    } else {
+        nrhs = 1;
+    }
+
+    #ifdef PRINT_PAR
+        std::cout << "init = " << init << std::endl;
+    #endif
+
+    if(init == 0){
+        symbolic_factorization(Q, init);
+    }
+
+    // check if n and Q.size() match
+    if(n != Q.rows()){
+        printf("\nInitialised matrix size and current matrix size don't match!\n");
+        printf("n = %d.\nnrows(Q) = %ld.\n", n, Q.rows());
+        exit(1);
+    }
+
+    // only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+
+    // check if nnz and Q_lower.nonZeros match
+    if(nnz != Q_lower.nonZeros()){
+        printf("Initial number of nonzeros and current number of nonzeros don't match!\n");
+        printf("nnz = %ld.\n nnz(Q_lower) = %ld\n", nnz, Q_lower.nonZeros());
+    }
+
+    int* ia; 
+    int* ja;
+    double* a; 
+
+    // allocate memory
+    ia = new int [n+1];
+    ja = new int [nnz];
+    a = new double [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (int i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (int i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    for (int i = 0; i < nnz; ++i){
+        a[i] = Q_lower.valuePtr()[i];
+    }
+
+    b = new double [nrhs*n];
+    x = new double [nrhs*n];
+
+
+    memcpy(b, rhs.data(), n*sizeof(double));
+    
+    if(constr == true){
+        MatrixXd Dt = Dxy.transpose();
+        // Dxy.transpose().data() is not sufficient ... 
+        memcpy(b + n, Dt.data(), n*Dxy.rows()*sizeof(double));
+    }
+
+    /* -------------------------------------------------------------------- */
+    /* ..  pardiso_chkvec(...)                                              */
+    /*     Checks the given vectors for infinite and NaN values             */
+    /*     Input parameters (see PARDISO user manual for a description):    */
+    /*     Use this functionality only for debugging purposes               */
+    /* -------------------------------------------------------------------- */
+
+    pardiso_chkvec (&n, &nrhs, b, &error);
+    if (error != 0) {
+        printf("\nERROR  in right hand side: %d", error);
+        exit(1);
+    }
+
+
+    // TODO: save work, some already 1-based ... make sure that this is bullet proof.
+    /* -------------------------------------------------------------------- */
+    /* ..  Convert matrix from 0-based C-notation to Fortran 1-based        */
+    /*     notation.                                                        */
+    /* -------------------------------------------------------------------- */
+    
+    for (i = 0; i < n+1; i++) {
+        ia[i] += 1;
+    }
+    for (i = 0; i < nnz; i++) {
+        ja[i] += 1;
+    }      
+
+    /* -------------------------------------------------------------------- */
+    /*  .. pardiso_chk_matrix(...)                                          */
+    /*     Checks the consistency of the given matrix.                      */
+    /*     Use this functionality only for debugging purposes               */
+    /* -------------------------------------------------------------------- */
+
+    pardiso_chkmatrix  (&mtype, &n, a, ia, ja, &error);
+    if (error != 0) {
+        printf("\nERROR in consistency of matrix: %d", error);
+
+        for(i = 0; i < nnz; i++){
+            if(isnan(a[i])){
+                std::cout << "In factorize solve!\nFound NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
+            }
+        }
+
+    exit(1);
+    }
+
+    phase = 22;
+    iparm[32] = 1; /* compute determinant */
+
+    pardiso (pt, &maxfct, &mnum, &mtype, &phase,
+             &n, a, ia, ja, &idum, &nrhs,
+             iparm, &msglvl, &ddum, &ddum, &error,  dparm);
+   
+    if (error != 0) {
+        printf("\nERROR during numerical factorization: %d", error);
+        exit(2);
+    }
+    //printf("\nFactorization completed ...\n");
+
+#ifdef PRINT_MSG
+    std::cout << "in factorize solve. log det : " << std::setprecision(12) << dparm[32] << ", 0.5*log_det : " << 0.5*dparm[32] << std::endl;
+#endif
+    
+    log_det = dparm[32];
+
+    /* -------------------------------------------------------------------- */    
+    /* ..  Back substitution and iterative refinement.                      */
+    /* -------------------------------------------------------------------- */    
+    phase = 33;
+
+    iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
+   
+    pardiso (pt, &maxfct, &mnum, &mtype, &phase,
+             &n, a, ia, ja, &idum, &nrhs,
+             iparm, &msglvl, b, x, &error,  dparm);
+   
+    if (error != 0) {
+        printf("\nERROR during solution: %d", error);
+        exit(3);
+    }
+    
+    // map solution back
+    memcpy(sol.data(), x, n*sizeof(double));
+    std::cout << "norm(Q*sol - rhs) = " << (Q*sol - rhs).norm() << std::endl;
+
+
+    if(constr == true){
+        memcpy(V.data(), x+n, n*Dxy.rows()*sizeof(double));
+        std::cout << "norm(Q*V   - t(D) = " << (Q*V   - Dxy.transpose()).norm() << std::endl;
+    }
+
+    // TODO: too inaccurate??
+    /*
+    Vect temp1 = Q*sol;
+    Vect temp2 = Q*V;
+
+    for(int i=0; i<n; i++){
+        std::cout << std::right << std::fixed << temp1[i] << " " << rhs[i] << "       ";
+        std::cout << std::right << std::fixed << temp2[i] << " " << Dxy(0,i) << std::endl;
+    }
+    */
+
+    delete[] ia;
+    delete[] ja;
+    delete[] a;
+
+    delete[] x;
+    delete[] b;
+
+
+} // end factorize solve with constraints
 
 
 void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){

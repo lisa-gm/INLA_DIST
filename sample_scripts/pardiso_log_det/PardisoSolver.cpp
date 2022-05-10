@@ -154,7 +154,10 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
     }
 
     t_sym_fact += omp_get_wtime();
+
+#if PRINT_PAR
     std::cout << "time symbolic factorise : " << t_sym_fact << std::endl;
+#endif
 
     #ifdef PRINT_PAR
         printf("\nReordering completed ... ");
@@ -271,7 +274,10 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
     //std::cout << "time factorise : " << t_factorise << std::endl;
     //printf("\nFactorization completed ...\n");
 
+#ifdef PRINT_PAR
     std::cout << std::fixed << std::setprecision(12) << "in factorize. log det       : " << dparm[32] << std::endl;
+#endif
+
     log_det = dparm[32];
 
     delete[] ia;
@@ -392,7 +398,10 @@ void PardisoSolver::factorize_w_constr(SpMat& Q, bool constr,  MatrixXd& D, doub
     //std::cout << "time factorise : " << t_factorise << std::endl;
     //printf("\nFactorization completed ...\n");
 
+#ifdef PRINT_PAR
     std::cout << std::fixed << std::setprecision(12) << "in factorize. log det       : " << dparm[32] << std::endl;
+    
+#endif
     log_det = dparm[32];
 
     /* -------------------------------------------------------------------- */    
@@ -870,7 +879,7 @@ void PardisoSolver::compute_inverse_pardiso(MatrixXd& Q, MatrixXd& C){
 }
 
 // perform all solves at the same time
-void PardisoSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det_Q, Vect& sol, MatrixXd& V){
+void PardisoSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
     
     if(constr == true){
         nrhs = Dxy.rows() + 1;  // from constraints + the regular one

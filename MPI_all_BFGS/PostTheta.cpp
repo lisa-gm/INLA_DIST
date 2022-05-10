@@ -71,7 +71,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, bool constr_, MatrixXd Dx_, MatrixXd Dxy_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
 	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -152,7 +152,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, bool constr_, MatrixXd Dx_, MatrixXd Dxy_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -1352,6 +1352,71 @@ void PostTheta::eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& interpret
 }
 
 
+// generate constraints with m-dimensional normal for testing 
+void PostTheta::generate_test_constraints(int m, int num_constr, MatrixXd& Dx, Vect& e, MatrixXd& Cov, Vect& mu, Vect& rhs){
+
+    // generate covariance matrix
+    //int m = 12;
+    MatrixXd M = MatrixXd::Random(m,m);
+    Cov = M*M.transpose();
+    MatrixXd Prec = Cov.inverse();
+    //std::cout << "Cov = \n" << Cov << std::endl;
+    //std::cout << "eigenvalues(Cov) = " <<  Cov.eigenvalues().real().transpose() << std::endl;
+    mu = Vect::Random(m,1);
+    //std::cout << "mu = " << mu.transpose() << std::endl;
+
+    rhs = Prec*mu;
+
+    int b = 2;
+    Dx << MatrixXd::Ones(num_constr,m-b), MatrixXd::Zero(num_constr, b);
+    //std::cout << "Dx = " << Dx << std::endl;
+    e = Vect::Zero(num_constr);
+
+}
+
+void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W, MatrixXd& U, Vect& updated_sol){
+
+    // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
+    W = D*V;
+    std::cout << "W = " << W << std::endl;
+    // U = W^-1*V^T, W is spd and small
+    // TODO: use proper solver ...
+    U = W.inverse()*V.transpose();
+    //std::cout << "U = " << U << std::endl;
+
+    Vect c = D*sol - e;
+    updated_sol = sol - U.transpose()*c;
+
+    std::cout << "sum(updated_sol) = " << (D*updated_sol).sum() << std::endl;
+
+}
+
+void PostTheta::eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, MatrixXd& D, MatrixXd& W, double& val_log_dens){
+
+	int rowsQ = Q.rows();
+
+    // log(pi(x)) 
+    std::cout << "log det Q = " << log_det_Q << std::endl;
+    std::cout << "- 0.5*(x_xy-mu_xy).transpose()*Q*(x_xy-mu_xy) = " << - 0.5*(x - mu).transpose()* Q *(x - mu) << std::endl;
+    double log_pi_x    = - 0.5*rowsQ*log(2*M_PI) + 0.5*log_det_Q - 0.5*(x - mu).transpose()* Q *(x - mu);
+    // log(pi(Ax|x)) 
+    MatrixXd DDT = D*D.transpose();
+    // .logDeterminant() is in cholmod module, requires inclusion of all of cholmod ...
+    // W = D*Q^-1*t(D), want log(sqrt(1/det(W)) = - 0.5 * log(det(W)) 
+    double log_pi_Ax_x = - 0.5*log(DDT.determinant());
+    std::cout << "log_pi_Ax_x = " << log_pi_Ax_x << std::endl;
+    // log(pi(Ax)), W1 is covariance matrix
+    double log_pi_Ax   = - 0.5*D.rows()*log(2*M_PI) - 0.5*log(W.determinant()) - 0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu);
+    std::cout << "W = " << W << std::endl;
+    std::cout << "log_pi_Ax = " << log_pi_Ax << ", log(W.determinant()) = " << log(W.determinant()) << "0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) = " << 0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) << std::endl;
+
+    val_log_dens = log_pi_x + log_pi_Ax_x - log_pi_Ax;
+    std::cout << - 0.5*rowsQ*log(2*M_PI) - (- 0.5*D.rows()*log(2*M_PI)) << " " << - 0.5*(rowsQ-D.rows())*log(2*M_PI) << std::endl;
+    std::cout << "log val Bayes cond = " << val_log_dens << std::endl;  
+
+}
+
+
 void PostTheta::eval_log_det_Qu(Vect& theta, double &log_det){
 
 
@@ -1466,6 +1531,23 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 
 		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
+}
+
+void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W){
+
+    // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
+    W = D*V;
+    std::cout << "W = " << W << std::endl;
+    // U = W^-1*V^T, W is spd and small
+    // TODO: use proper solver ...
+    MatrixXd U = W.inverse()*V.transpose();
+    //std::cout << "U = " << U << std::endl;
+
+    Vect c = D*sol - e;
+    sol = sol - U.transpose()*c;
+
+    std::cout << "sum(sol) = " << (D*sol).sum() << std::endl;
+
 }
 
 
@@ -1608,7 +1690,24 @@ void PostTheta::eval_denominator(Vect& theta, double& log_det, double& val, SpMa
 
 	std::cout << "log det d : " << log_det << std::endl;
 	std::cout << "val d     : " << val << std::endl; */
+
+	// perform correction to account for sum-to-zero contraints, see GMRF book p. 38 for details
+	/* in short: evaluate log()
+
+
+	*/
+	if(constr){
+
+		//eval_constraints()
+
+
+	}
 }
+
+/*void PostTheta::eval_constraints(Vect& mu){
+	// solve V = Q^-1 * A^T
+
+}*/
 
 
 PostTheta::~PostTheta(){

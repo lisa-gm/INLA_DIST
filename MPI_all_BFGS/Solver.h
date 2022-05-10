@@ -29,7 +29,9 @@ class Solver {
 		// pure virtual function providing interface framework.
 		virtual void symbolic_factorization(SpMat& Q, int& init) = 0;
 		virtual void factorize(SpMat& Q, double& log_det) = 0;
+		virtual void factorize_w_constr(SpMat& Q, bool constr,  MatrixXd& D, double& log_det, MatrixXd& V) = 0;
 		virtual void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) = 0;
+		virtual void factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V) = 0;
 		virtual void selected_inversion(SpMat&Q, Vect& inv_diag) = 0;
 
 		// "simple inversion" function for small matrices. exists already in pardiso.

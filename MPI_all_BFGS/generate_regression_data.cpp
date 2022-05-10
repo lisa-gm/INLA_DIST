@@ -56,29 +56,30 @@ void rnorm_gen(int no, double mean, double sd,  Eigen::VectorXd * x, int seed){
 
 }
 
-void generate_ex_regression( int nb,  int no, double tau, Eigen::MatrixXd *B, Vector *b, Vector *y){
+void generate_ex_regression( size_t nb,  size_t no, double tau, Eigen::MatrixXd& B, Vector& b, Vector& y){
+    
+    std::cout << "generates random sample" << std::endl;
 
     /* ---------------------- construct random matrix of covariates --------------------- */
-    Vector B_ones(no); B_ones.setOnes();
-
+    
     // require different random seed here than in noise -> otherwise cancels each other out
     // val_l will then equal val_d ... 
     Vector B_random(no*(nb-1));
     rnorm_gen(no, 0.0, 1, &B_random, 2);
 
     Vector B_tmp(no*nb);
-    B_tmp << B_ones, B_random;
-    //std::cout << B_tmp << std::endl;
+    B_tmp << Vector::Ones(no), B_random;
+    std::cout << B_tmp << std::endl;
 
     // TODO: fix this!
     Eigen::Map<Eigen::MatrixXd> tmp(B_tmp.data(), no,nb);
-    *B = tmp;
+    B = tmp;
     //*B(B_tmp.data());
     //Eigen::MatrixXd::Map(*B) = B_tmp.data(); 
     //std::cout << *B << std::endl;
 
     /* -------  construct random solution vector of fixed effects & observations -------- */
-    *b = 2*(Vector::Random(nb) + Vector::Ones(nb)); 
+    b = 2*(Vector::Random(nb) + Vector::Ones(nb)); 
 
     double mean = 0.0;
     double sd = 1/sqrt(exp(tau));
@@ -86,7 +87,9 @@ void generate_ex_regression( int nb,  int no, double tau, Eigen::MatrixXd *B, Ve
 
     rnorm_gen(no, mean, sd, &noise_vec, 4);
 
-    *y = (*B)*(*b) + noise_vec;
+    y = B*b + noise_vec;
+
+    std::cout << "b = " << b.transpose() << std::endl;
 
     /*std::cout << "noise vec " << std::endl;
     std::cout << noise_vec << std::endl; 

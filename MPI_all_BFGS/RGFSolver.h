@@ -69,6 +69,8 @@ class RGFSolver: public Solver {
          */
 		void factorize(SpMat& Q, double& log_det);
 
+        // TODO ...
+        void factorize_w_constr(SpMat& Q, bool constr,  MatrixXd& D, double& log_det, MatrixXd& V);
 
         /**
          * @brief factorises and solves matrix in one call 
@@ -78,6 +80,9 @@ class RGFSolver: public Solver {
          * @param[inout]    log_det log determinant of Q.
          */ 
 		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
+
+        // TODO ...
+        void factorize_solve_w_constr(SpMat& Q, Vect& rhs, bool constr, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
 
         /**
          * @brief selected inversion of the diagonal elements of Q.
