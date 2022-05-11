@@ -42,6 +42,27 @@ typedef Eigen::VectorXd Vect;
 
 using namespace LBFGSpp;
 
+
+void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3, SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Qst){
+
+    double exp_theta1 = exp(theta[1]);
+    double exp_theta2 = exp(theta[2]);
+    double exp_theta3 = exp(theta[3]);
+
+    // g^2 * fem$c0 + fem$g1
+    SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
+
+    // g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
+    SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
+
+    // g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
+    SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
+
+    // assemble overall precision matrix Q.st
+    Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+
+}
+
 /* ===================================================================== */
 
 int main(int argc, char* argv[])
@@ -114,23 +135,23 @@ int main(int argc, char* argv[])
     size_t ns = atoi(argv[1]);
     size_t nt = atoi(argv[2]);
     size_t nb = atoi(argv[3]);
-    //size_t no = atoi(argv[4]);
-    std::string no_s = argv[4];
-    // to be filled later
-    size_t no;
+    size_t no = atoi(argv[4]);
 
-    size_t n = ns*nt + nb;
+    // to be filled later
 
     // set nt = 1 if ns > 0 & nt = 0
     if(ns > 0 && nt == 0){
         nt = 1;
     } 
 
+    size_t n = ns*nt + nb;
+
+
     // also save as string
     std::string ns_s = std::to_string(ns);
     std::string nt_s = std::to_string(nt);
     std::string nb_s = std::to_string(nb);
-    //std::string no_s = std::to_string(no); 
+    std::string no_s = std::to_string(no); 
     std::string n_s  = std::to_string(ns*nt + nb);
 
     std::string base_path = argv[5];    
@@ -174,23 +195,47 @@ int main(int argc, char* argv[])
     SpMat Ax; 
     Vect y;
 
+    int num_constr = 1;
+    bool constr = true;
+    Vect e;
+    MatrixXd Dx;
+    MatrixXd Dxy;
+
+    MatrixXd Prec;
+    Vect b;
+    Vect u;
+    double tau;
+
     if(ns == 0 && nt == 0){
 
         dim_th = 1;
 
         // #include "generate_regression_data.cpp"
+        tau = 0.5;   // is log(precision)
 
-        Eigen::MatrixXd B(no, nb);
-        Vect b(nb);
-        Vect y(no);
+        Dxy.resize(num_constr, nb);
+        Dxy << MatrixXd::Ones(num_constr, nb);
 
-        double tau = 0.5;
-        generate_ex_regression(nb, no, tau, B, b, y); 
-        
-        // Initial guess
-        Vect theta(1);
-        theta[0] = 3;
+        // FOR NOW only SUM-TO-ZERO constraints feasible
+        e.resize(num_constr);
+        e = Vect::Zero(num_constr);
 
+
+        std::cout << "generate constraint regression data." << std::endl;
+        generate_ex_regression_constr(nb, no, tau, Dxy, e, Prec, B, b, y);
+        std::cout << "b = " << b.transpose() << std::endl;
+
+        // compute true UNCONSTRAINED marginal variances as
+        // Q_xy = Q_x + t(B)*Q_e*B, where Q_e = exp(tau)*I  -> how to incorporate constraints?
+        MatrixXd Q_xy_true = Prec + exp(tau)*B.transpose()*B;
+        MatrixXd Cov_xy_true = Q_xy_true.inverse();
+        //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
+        std::cout << "unconstrained variances fixed eff : " << Cov_xy_true.diagonal().transpose() << std::endl;
+
+        // update for constraints
+        MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
+        std::cout << "constrained variances fixed eff   : " << constraint_Cov_xy_true.diagonal().transpose() << std::endl;
+    
         // read in design matrix 
         // files containing B
         /*std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
@@ -204,10 +249,8 @@ int main(int argc, char* argv[])
 
         B = read_matrix(B_file, no, nb);*/
 
-        std::cout << "y : \n"  << y << std::endl;    
-        std::cout << "B : \n" << B << std::endl;
-
-        exit(1);
+        //std::cout << "y : \n"  << y << std::endl;    
+        //std::cout << "B : \n" << B << std::endl;
 
     } else if(ns > 0 && nt == 1){
 
@@ -242,6 +285,34 @@ int main(int argc, char* argv[])
 
         if(MPI_rank == 0){
             std::cout << "total number of observations : " << no << std::endl;
+        }
+
+
+        if(constr == true){
+            // choose true parameters for theta = log precision observations, 
+            Vect theta_original(dim_th);
+            theta_original << 0.5, log(4), log(1);
+            std::cout << "theta_original = " << theta_original.transpose() << std::endl; 
+
+            // assemble Qs ... 
+            MatrixXd Qs = pow(exp(theta_original[1]),2)*(pow(exp(theta_original[2]), 4) * c0 + 2*pow(exp(theta_original[2]),2) * g1 + g2);
+
+            Dx.resize(num_constr, ns);
+            Dx << MatrixXd::Ones(num_constr, ns);
+
+            Dxy.resize(num_constr, n);
+            Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+            // FOR NOW only SUM-TO-ZERO constraints feasible
+            e.resize(num_constr);
+            e = Vect::Zero(num_constr);            
+
+            std::cout << "generate constrained spatial data." << std::endl;
+            generate_ex_spatial_constr(ns, nb, no, theta_original, Qs, Ax, Dx, e, Prec, B, b, u, y);
+
+
+            exit(1);
+
         }
 
         /*std::cout << "g1 : \n" << g1.block(0,0,10,10) << std::endl;
@@ -307,12 +378,64 @@ int main(int argc, char* argv[])
         }    
     }
 
+
+    if(constr == true){
+        // choose true parameters for theta = log precision observations, 
+        Vect theta_original(dim_th);
+        theta_original << 0.5, log(4), log(1), log(10);
+        std::cout << "theta_original = " << theta_original.transpose() << std::endl; 
+
+        // assemble Qst ... 
+        SpMat Qst(ns*nt, ns*nt);
+        construct_Q_spat_temp(theta_original, c0, g1, g2, g3, M0, M1, M2, Qst);
+        MatrixXd Qst_d = MatrixXd(Qst);
+
+        Dx.resize(num_constr, ns*nt);
+        Dx << MatrixXd::Ones(num_constr, ns*nt);
+
+        Dxy.resize(num_constr, n);
+        Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+        // FOR NOW only SUM-TO-ZERO constraints feasible
+        e.resize(num_constr);
+        e = Vect::Zero(num_constr);            
+
+        std::cout << "generate constrained spatial data." << std::endl;
+        generate_ex_spatial_temporal_constr(ns, nt, nb, no, theta_original, Qst_d, Ax, Dx, e, Prec, b, u, y);
+
+        Vect x(n);
+        x << u, b;
+        std::cout << "true x = " << x.transpose() << std::endl;
+
+        // compute true UNCONSTRAINED marginal variances as
+        MatrixXd Q_x(n,n);
+        Q_x << Qst_d, MatrixXd::Zero(ns*nt, nb), MatrixXd::Zero(nb, ns*nt), Prec;
+        std::cout << "Q_x : \n" << Q_x.block(0,0,20,20) << std::endl;
+        std::cout << "Q_x : \n" << Q_x.block(100,100,124,124) << std::endl;
+
+
+
+        // Q_xy = Q_x + t(Ax)*Q_e*Ax, where Q_e = exp(tau)*I  -> how to incorporate constraints?
+        /*MatrixXd Q_xy_true = Q_x + exp(tau)*Ax.transpose()*Ax;
+        MatrixXd Cov_xy_true = Q_xy_true.inverse();
+        //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
+        std::cout << "unconstrained variances fixed eff : " << Cov_xy_true.diagonal().transpose() << std::endl;
+
+        // update for constraints
+        MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
+        std::cout << "constrained variances fixed eff   : " << constraint_Cov_xy_true.diagonal().transpose() << std::endl;*/
+
+
+        exit(1);
+
+        }
+
     // data y
-    std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
+    /*std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
     file_exists(y_file);
     // at this point no is set ... 
     // not a pretty solution. 
-    y = read_matrix(y_file, no, 1);
+    y = read_matrix(y_file, no, 1);*/
 
 
     /* ----------------------- initialise random theta -------------------------------- */
@@ -322,16 +445,17 @@ int main(int argc, char* argv[])
     Vect theta_prior_param(dim_th);
     Vect theta_original(dim_th); theta_original.setZero();
 
-    bool constr = false;
-    MatrixXd Dx(1,ns*nt);
-    MatrixXd Dxy(1, n);
-
     std::string data_type;
 
     // initialise theta
     if(ns == 0 && nt == 0){
+
+        theta_original[0] = tau;
+
         // Initial guess
         theta[0] = 3;
+        theta_prior_param[0] = theta[0];
+
 
         if(MPI_rank == 0){
             std::cout << "initial theta : "  << theta.transpose() << std::endl; 
@@ -341,8 +465,7 @@ int main(int argc, char* argv[])
         //theta << 1, -1, 1;
         //theta << 1, -2, 2;
         //theta_prior << 0, 0, 0;
-
-        std::cout << "using Elias TOY DATASET" << std::endl;
+        //std::cout << "using Elias TOY DATASET" << std::endl;
         // from INLA : log prec Gauss obs, log(Range) for i, log(Stdev) for i     
         //theta_prior << 1.0087220,  -1.0536157, 0.6320466;
         theta_prior_param << 1, -2.3, 2.1;
@@ -441,8 +564,6 @@ int main(int argc, char* argv[])
 
     }
 
-    Vect b(nb);
-
     // ============================ set up BFGS solver ======================== //
 
     // Set up parameters
@@ -462,7 +583,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-2;
     param.delta = 1e-3;
     // maximum line search iterations
-    param.max_iterations = 200;
+    param.max_iterations = 100;
 
     //Eigen::setNbThreads(1);
 
@@ -476,12 +597,17 @@ int main(int argc, char* argv[])
 
     // ============================ set up Posterior of theta ======================== //
 
+    std::cout << "theta_prior_param = " << theta_prior_param.transpose() << std::endl;
+
     //std::optional<PostTheta> fun;
     PostTheta* fun;
 
     if(ns == 0){
         // fun.emplace(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type);
+        if(MPI_rank == 0){
+            std::cout << "Call constructor for regression model." << std::endl;
+        }
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type, constr, Dxy);
     } else if(ns > 0 && nt == 1) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
@@ -495,15 +621,15 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, constr, Dx, Dxy);
     }
 
-//#ifdef DATA_TEMPERATURE
+#ifdef DATA_TEMPERATURE
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     if(MPI_rank == 0){
         std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
     }
-//#endif
+#endif
 
-    if(MPI_rank == 0){
+    if(MPI_rank == 0 && dim_th == 4){
         Vect theta_interpret_initial(dim_th);
         theta_interpret_initial[0] = theta[0];
         fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
@@ -511,50 +637,52 @@ int main(int argc, char* argv[])
     }
 
 
-#if 1 // for testing constraints
+#if 0 // for testing constraints
 
-    int m = 5;
-    int num_constr = 1;
+    //int m = 5;
+    //int num_constr = 1;
 
-    MatrixXd D(num_constr, m);
-    Vect e(num_constr);
-    MatrixXd Cov(m,m);
-    Vect mu_normal(m);
-    Vect rhs_normal(m);
+    //MatrixXd D(num_constr, nb);
+    //Vect e(num_constr);
+    MatrixXd Cov = Prec.inverse();
+    //Vect mu_normal(nb);
+    //mu_normal << 0,0,0,0; //1,2,3,4;
+    Vect mu_normal = b;
+    Vect rhs_normal = Vect::Zero(nb);
 
-    fun->generate_test_constraints(m, num_constr, D, e, Cov, mu_normal, rhs_normal);
-    std::cout << "Cov = \n" << Cov << std::endl;
-    std::cout << "Dx = " << D << ", e = " << e.transpose() << std::endl;
+    //fun->generate_test_constraints(m, num_constr, D, e, Cov, mu_normal, rhs_normal);
+    //std::cout << "Cov = \n" << Cov << std::endl;
+    //std::cout << "Dx = " << Dx << ", e = " << e.transpose() << std::endl;
     std::cout << "mu = " << mu_normal.transpose() << "\nrhs = " << rhs_normal.transpose() << std::endl;
 
-    MatrixXd V = Cov*D.transpose();
+    MatrixXd V = Cov*Dx.transpose();
     MatrixXd W(num_constr, num_constr);
-    MatrixXd U(num_constr, m);
-    Vect constr_mu_normal(m);
+    MatrixXd U(num_constr, nb);
+    Vect constr_mu_normal(nb);
 
-    fun->update_mean_constr(D, e, mu_normal, V, W, U, constr_mu_normal);
-    std::cout << "mu = " << constr_mu_normal.transpose() << std::endl;
+    fun->update_mean_constr(Dx, e, mu_normal, V, W, U, constr_mu_normal);
+    std::cout << "constrained mu = " << constr_mu_normal.transpose() << std::endl;
 
     // constr_mu_st will by definition satisfy Ax = e, hence choose x = constr_mu_xy
-    Vect x_normal = constr_mu_normal;
-    //Vect x_normal = Vect::Zero(m);
+    //Vect x_normal = constr_mu_normal;
+    Vect x_normal = Vect::Zero(nb);
     SpMat Q = Cov.inverse().sparseView();
     double log_det_Q = - log(Cov.determinant());
 
     double val;
 
-    fun->eval_log_dens_constr(x_normal, mu_normal, Q, log_det_Q, D, W, val);
+    fun->eval_log_dens_constr(x_normal, mu_normal, Q, log_det_Q, Dx, W, val);
 
-        // ================================================================================================== //
+    // ================================================================================================== //
     // compute control, can get very inaccurate very quickly as dimension increases !!! pseudo-inverse not numerically stable ...    
     // compute constrained mean and covariance
-    MatrixXd invW = (D*Cov*D.transpose()).inverse();
-    std::cout << "W = " << W << ", W = " << D*Cov*D.transpose() << std::endl;
-    std::cout << "inv(W) = " << W.inverse() << ", invW = " << invW << std::endl;
-    Vect constr_mu_normal2 = mu_normal - Cov*D.transpose()*invW*(D*mu_normal - e);
-    std::cout << "norm(constr_mu_xy - constr_mu_xy2) = " << (constr_mu_normal - constr_mu_normal2).norm() << std::endl;
+    MatrixXd invW = (Dx*Cov*Dx.transpose()).inverse();
+    //std::cout << "W = " << W << ", W = " << Dx*Cov*Dx.transpose() << std::endl;
+    //std::cout << "inv(W) = " << W.inverse() << ", invW = " << invW << std::endl;
+    Vect constr_mu_normal2 = mu_normal - Cov*Dx.transpose()*invW*(Dx*mu_normal - e);
+    //std::cout << "norm(constr_mu_xy - constr_mu_xy2) = " << (constr_mu_normal - constr_mu_normal2).norm() << std::endl;
     //std::cout << "constr_mu = " << constr_mu.transpose() << std::endl;
-    MatrixXd constr_Cov = Cov - Cov*D.transpose()*invW*D*Cov;
+    MatrixXd constr_Cov = Cov - Cov*Dx.transpose()*invW*Dx*Cov;
     //std::cout << "constr_Cov = \n" << constr_Cov << std::endl;
 
     EigenSolver<MatrixXd> es(constr_Cov);
@@ -562,14 +690,14 @@ int main(int argc, char* argv[])
     //cout << "Eigenvectors = " << endl << V << endl;
 
     Vect eivals = es.eigenvalues().real();
-    std::cout << "eigenvalues(constr_Cov) = " <<  eivals.transpose() << std::endl;
+    //std::cout << "eigenvalues(constr_Cov) = " <<  eivals.transpose() << std::endl;
     //std::cout << "V*D*V^T = " << endl << V*eivals.asDiagonal()*V.transpose() << std::endl;
           
     // identify non-zero eigenvalues
     double log_sum = 0;
     double prod = 1;
-    Vect invD = Vect::Zero(m);
-    for(int i=0; i<m; i++){
+    Vect invD = Vect::Zero(nb);
+    for(int i=0; i<nb; i++){
         if(eivals[i] > 1e-7){
             log_sum += log(eivals[i]);
             prod *= eivals[i];
@@ -580,8 +708,8 @@ int main(int argc, char* argv[])
     MatrixXd invD_mat = invD.asDiagonal();
     //std::cout << "invD = " << invD_mat << std::endl;
 
-    printf("sum(eivals)     = %f\n", log(prod));
-    printf("log_sum(eivals) = %f\n", log_sum);
+    //printf("sum(eivals)     = %f\n", log(prod));
+    //printf("log_sum(eivals) = %f\n", log_sum);
 
     // compute log pi(x | Ax = e), evaluated at x, make sure x satisfies condition ...
     //Vect x = Vect::Zero(m);
@@ -592,10 +720,10 @@ int main(int argc, char* argv[])
     std::cout << "(V*eivals.asDiagonal()*V.transpose() - constr_Cov).norm() = " << (EV*eivals.asDiagonal()*EV.transpose() - constr_Cov).norm() << std::endl;
     double temp = (x_normal - constr_mu_normal2).transpose()*pInv*(x_normal - constr_mu_normal2);
     std::cout << "temp = " << temp << std::endl;
-    double log_val = - 0.5*(Cov.rows()-D.rows())*log(2*M_PI) - 0.5*log_sum - 0.5*temp;
-    std::cout << - 0.5*Cov.rows()*log(2*M_PI) - (- 0.5*D.rows()*log(2*M_PI)) << " " << - 0.5*(Cov.rows()-D.rows())*log(2*M_PI) << std::endl;
+    double log_val = - 0.5*(Cov.rows()-Dx.rows())*log(2*M_PI) - 0.5*log_sum - 0.5*temp;
+    std::cout << - 0.5*Cov.rows()*log(2*M_PI) - (- 0.5*Dx.rows()*log(2*M_PI)) << " " << - 0.5*(Cov.rows()-Dx.rows())*log(2*M_PI) << std::endl;
     std::cout << "log val direct = " << log_val << std::endl;
-
+    
 #endif    
 
 
@@ -644,7 +772,7 @@ int main(int argc, char* argv[])
 #endif
 
 
-#if 0
+#if 1
 
     double fx;
 
@@ -681,7 +809,7 @@ int main(int argc, char* argv[])
 
     Vect grad = fun->get_grad();
     if(MPI_rank == 0){
-        std::cout << "grad                         :" << grad.transpose() << std::endl;
+        std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
 
     /*std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
@@ -714,7 +842,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+    #if 1
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -753,7 +881,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 1
+    #if 0
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -788,12 +916,13 @@ int main(int argc, char* argv[])
         t_get_fixed_eff += omp_get_wtime();
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
         //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
+        std::cout << "Dxy*mu : " << Dxy*mu << ", it should be : " << e << std::endl;
     }
 
     #endif
 
   
-    #if 0
+    #if 1
 
     double t_get_marginals;
     Vect marg(n);
@@ -808,8 +937,11 @@ int main(int argc, char* argv[])
 
         t_get_marginals += omp_get_wtime();
 
+
+
         std::cout << "\nest. variances fixed eff.    :  " << marg.tail(nb).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  :  " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
+        //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
     }
     #endif
 	

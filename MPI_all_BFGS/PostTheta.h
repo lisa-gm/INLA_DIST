@@ -116,13 +116,13 @@ class PostTheta{
     MatrixXd ThetaDiff;
 #endif
 
-    bool constr;		/**< true if there is a sum to zero constraint      */
-    MatrixXd Dx;         /**< constraint vector, sum to zero constraint      */
-    MatrixXd Dxy;         /**< constraint vector, sum to zero constraint      */
+    const bool constr;		/**< true if there is a sum to zero constraint      */
+    const MatrixXd Dx;         /**< constraint vector, sum to zero constraint      */
+    const MatrixXd Dxy;         /**< constraint vector, sum to zero constraint      */
 
-    MatrixXd V;			/**< V = Q^-1 * t(D)	 							*/
-    MatrixXd W;			/**< W = A*V  										*/
-    Vect U;				/**< U = W^-1 * t(V)                                */
+    //MatrixXd V;			/**< V = Q^-1 * t(D)	 							*/
+    //MatrixXd W;			/**< W = A*V  										*/
+    //Vect U;				/**< U = W^-1 * t(V)                                */
 
 
 	public:
@@ -136,7 +136,10 @@ class PostTheta{
      * @param[in] y_  vector with observations.
      * \note B = B_ or is its own copy?
      */	
-	PostTheta(int ns, int nt, int nb, int no, MatrixXd B, Vect y, Vect theta_prior, string solver_type);
+	PostTheta(int ns, int nt, int nb, int no, 
+		MatrixXd B, Vect y, 
+		Vect theta_prior, string solver_type,
+		bool constr, MatrixXd Dxy);
 	/**
      * @brief constructor for spatial model (order 2).
      * @param[in] ns_ number of spatial grid points per time step.
@@ -305,12 +308,9 @@ class PostTheta{
      */	
 	void eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& theta_interpret);
 
+	void update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W, MatrixXd& U, Vect& updated_sol);
 
-	void generate_test_constraints(int m, int num_constr, MatrixXd& Dx, Vect& e, MatrixXd& Cov, Vect& mu, Vect& rhs);
-
-	void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W, MatrixXd& U, Vect& updated_sol);
-
-	void eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, MatrixXd& D, MatrixXd& W, double& val_log_dens);
+	void eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, const MatrixXd& D, MatrixXd& W, double& val_log_dens);
 
 
 	/**
