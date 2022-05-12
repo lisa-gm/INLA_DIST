@@ -406,7 +406,7 @@ void PardisoSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_
     
     // map solution back
     memcpy(V.data(), x, nrhs*n*sizeof(double));
-    std::cout << "norm(Q*V   - t(D) = " << (Q*V - D.transpose()).norm() << std::endl;
+    //std::cout << "norm(Q*V   - t(D) = " << (Q*V - D.transpose()).norm() << std::endl;
 
     delete[] ia;
     delete[] ja;

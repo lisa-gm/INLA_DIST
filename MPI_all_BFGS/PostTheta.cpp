@@ -151,7 +151,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 }
 
-
+// constructor for spatial-temporal case
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
@@ -166,10 +166,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	AxTAx       = Ax.transpose()*Ax;
 
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
 		printf("Eigen -- number of threads used : %d\n", Eigen::nbThreads( ));
-	#endif
+#endif
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
@@ -1249,7 +1249,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		// evaluate gaussian prior
 		Vect log_prior_vec(dim_th);
 		for( int i=0; i<dim_th; i++ ){
-			eval_log_gaussian_prior(log_prior_vec[i], &theta[i], &theta_prior_param[i]);
+			eval_log_gaussian_prior_hp(log_prior_vec[i], &theta[i], &theta_prior_param[i]);
 		}
 	    
 		log_prior_sum = log_prior_vec.sum();
@@ -1264,8 +1264,8 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		//Vect lambda(4);
 		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
 		// pc prior(lambda, theta_interpret) -> expects order: sigma s, range t, range s, sigma u (same for lambdas!!)
-		//eval_log_pc_prior(log_prior_sum, lambda, theta_interpret);
-		eval_log_pc_prior(log_prior_sum, theta_prior_param, theta_interpret);
+		//eval_log_pc_prior_hp(log_prior_sum, lambda, theta_interpret);
+		eval_log_pc_prior_hp(log_prior_sum, theta_prior_param, theta_interpret);
 
 
 	} else {
@@ -1285,7 +1285,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// denominator to be reused?
 
 	if(ns > 0 ){
-		eval_log_det_Qu(theta, log_det_Qu);
+		eval_log_prior_lat(theta, log_det_Qu);
 	}
 
 	#ifdef PRINT_MSG
@@ -1341,7 +1341,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 }
 
 
-void PostTheta::eval_log_gaussian_prior(double& log_prior, double* thetai, double* thetai_original){
+void PostTheta::eval_log_gaussian_prior_hp(double& log_prior, double* thetai, double* thetai_original){
 
 	log_prior = -0.5 * (*thetai - *thetai_original) * (*thetai - *thetai_original);
 
@@ -1351,7 +1351,7 @@ void PostTheta::eval_log_gaussian_prior(double& log_prior, double* thetai, doubl
 }
 
 // assume interpret_theta order : sigma.e, range t, range s, sigma.u
-void PostTheta::eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& interpret_theta){
+void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interpret_theta){
 
   double prior_se = log(lambda[0]) - lambda[0] * exp(interpret_theta[0]) + interpret_theta[0];
   //printf("prior se = %f\n", prior_se);
@@ -1415,8 +1415,9 @@ void PostTheta::eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det
 }
 
 
-void PostTheta::eval_log_det_Qu(Vect& theta, double &log_det){
+void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 
+	double log_det;
 
 	double time_construct_Qst = -omp_get_wtime();
 	SpMat Qu(nu, nu);
@@ -1427,10 +1428,42 @@ void PostTheta::eval_log_det_Qu(Vect& theta, double &log_det){
 	}
 	time_construct_Qst += omp_get_wtime();
 
-
 	double time_factorize_Qst = -omp_get_wtime();
-	solverQst->factorize(Qu, log_det);
+
+	if(constr == true){
+		//std::cout << "in eval log det Qu in constr true" << std::endl;
+		MatrixXd V(nu, Dx.rows());
+		solverQst->factorize_w_constr(Qu, Dx, log_det, V);
+		//std::cout << "after factorize_w_constr" << std::endl;
+
+		Vect constr_mu(nu);
+		Vect e = Vect::Zero(1);
+		MatrixXd U(Dx.rows(), nu);
+		MatrixXd W(Dx.rows(), Dx.rows());
+		Vect mu_tmp = Vect::Zero(nu);
+		update_mean_constr(Dx, e, mu_tmp, V, W, U, constr_mu);
+		Vect unconstr_mu = mu_tmp;
+		mu_tmp = constr_mu;
+		//std::cout << "mu = " << mu_tmp.transpose() << std::endl;
+
+		Vect x = Vect::Zero(nu);
+		// multiplication with 0.5 is already included
+		eval_log_dens_constr(x, unconstr_mu, Qu, log_det, Dx, W, val);
+
+	} else{
+
+		solverQst->factorize(Qu, log_det);
+		val = 0.5 * (log_det);
+
+	}
+
 	time_factorize_Qst += omp_get_wtime();
+
+
+#ifdef PRINT_MSG
+	std::cout << "val log prior lat " << val << std::endl;
+#endif
+
 
 #ifdef PRINT_TIMES
 	if(MPI_rank ==0){
@@ -1439,12 +1472,6 @@ void PostTheta::eval_log_det_Qu(Vect& theta, double &log_det){
 	}
 #endif
 
-
-#ifdef PRINT_MSG
-	std::cout << "log det Qu : " << log_det << std::endl;
-#endif
-
-	log_det = 0.5 * (log_det);
 }
 
 // 0.5*theta[0]*t(y - B*b - A*u)*(y - B*b - A*u) => normally assume x = u,b = 0

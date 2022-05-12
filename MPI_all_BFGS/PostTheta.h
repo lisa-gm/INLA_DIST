@@ -290,14 +290,14 @@ class PostTheta{
 	double eval_post_theta(Vect& theta, Vect& mu);
 
 	/**
-     * @brief evaluate log prior using original theta value
+     * @brief evaluate log prior of the hyperparameters using original theta value
      * @param[in] thetai current theta_i value
      * @param[in] thetai_original original theta_i value
  	 * @param[inout] log prior is being updated.
  	 * @details variance / precision of 1 : no normalising constant. 
  	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
      */	
-	void eval_log_gaussian_prior(double& log_prior, double* thetai, double* thetai_original);
+	void eval_log_gaussian_prior_hp(double& log_prior, double* thetai, double* thetai_original);
 
 	/**
      * @brief evaluate log prior using PC prior 
@@ -306,7 +306,7 @@ class PostTheta{
  	 * @param[in] theta_interpret current theta value in interpretable scale
  	 * @details complicated prior. check appropriate references for details.
      */	
-	void eval_log_pc_prior(double& log_sum, Vect& lambda, Vect& theta_interpret);
+	void eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& theta_interpret);
 
 	void update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W, MatrixXd& U, Vect& updated_sol);
 
@@ -319,7 +319,7 @@ class PostTheta{
 		 * @param[inout] log_det inserts log determinant.
 		 * \todo construct spatial matrix (at the moment this is happening twice. FIX)
 	 */	
-	void eval_log_det_Qu(Vect& theta, double &log_det);
+	void eval_log_prior_lat(Vect& theta, double &val);
 
 	/**
      * @brief compute log likelihood : log_det tau*no and value -theta*yTy

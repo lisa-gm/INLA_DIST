@@ -99,12 +99,13 @@ int main(int argc, char* argv[])
     int noGPUs;
    
     if(MPI_rank == 0){
+        printf("\n============== PARALLELISM & NUMERICAL SOLVERS ==============\n");
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
 #ifdef RGF
 	cudaGetDeviceCount(&noGPUs);
-	printf("available GPUs      : %d\n\n", noGPUs);
+	printf("available GPUs      : %d\n", noGPUs);
 #else
 	printf("RGF dummy version\n");
     noGPUs = 0;
@@ -196,7 +197,8 @@ int main(int argc, char* argv[])
     Vect y;
 
     int num_constr = 1;
-    bool constr = true;
+    bool constr = false;
+    //bool constr = true;
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -205,6 +207,9 @@ int main(int argc, char* argv[])
     Vect b;
     Vect u;
     double tau;
+
+    if(MPI_rank == 0)
+        printf("\n==================== MODEL SPECIFICATIONS ===================\n");
 
     if(ns == 0 && nt == 0){
 
@@ -226,13 +231,13 @@ int main(int argc, char* argv[])
         std::cout << "b = " << b.transpose() << std::endl;
 
         // compute true UNCONSTRAINED marginal variances as
-        // Q_xy = Q_x + t(B)*Q_e*B, where Q_e = exp(tau)*I  -> how to incorporate constraints?
+        // Q_xy = Q_x + t(B)*Q_e*B, where Q_e = exp(tau)*I  
         MatrixXd Q_xy_true = Prec + exp(tau)*B.transpose()*B;
-        MatrixXd Cov_xy_true = Q_xy_true.inverse();
+        MatrixXd Cov_xy_true = Q_xy_true.inverse(); // need to call pardiso here to be efficient ...       
         //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
         std::cout << "unconstrained variances fixed eff : " << Cov_xy_true.diagonal().transpose() << std::endl;
 
-        // update for constraints
+        // update for constraints  -> would need a solver if Cov_xy_true not available ...
         MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
         std::cout << "constrained variances fixed eff   : " << constraint_Cov_xy_true.diagonal().transpose() << std::endl;
     
@@ -287,12 +292,12 @@ int main(int argc, char* argv[])
             std::cout << "total number of observations : " << no << std::endl;
         }
 
-
+        // TODO: fix.
         if(constr == true){
             // choose true parameters for theta = log precision observations, 
             Vect theta_original(dim_th);
-            theta_original << 0.5, log(4), log(1);
-            std::cout << "theta_original = " << theta_original.transpose() << std::endl; 
+            theta_original << 0.5, log(4), log(1);  // -> not actually the true parameters!!
+            //std::cout << "theta_original = " << theta_original.transpose() << std::endl; 
 
             // assemble Qs ... 
             MatrixXd Qs = pow(exp(theta_original[1]),2)*(pow(exp(theta_original[2]), 4) * c0 + 2*pow(exp(theta_original[2]),2) * g1 + g2);
@@ -367,9 +372,9 @@ int main(int argc, char* argv[])
         // doesnt work for B
         no = Ax.rows();
 
-        if(MPI_rank == 0){
+        /*if(MPI_rank == 0){
             std::cout << "total number of observations : " << no << std::endl;
-        }
+        }*/
 
     } else {
         if(MPI_rank == 0){
@@ -378,64 +383,14 @@ int main(int argc, char* argv[])
         }    
     }
 
-
-    if(constr == true){
-        // choose true parameters for theta = log precision observations, 
-        Vect theta_original(dim_th);
-        theta_original << 0.5, log(4), log(1), log(10);
-        std::cout << "theta_original = " << theta_original.transpose() << std::endl; 
-
-        // assemble Qst ... 
-        SpMat Qst(ns*nt, ns*nt);
-        construct_Q_spat_temp(theta_original, c0, g1, g2, g3, M0, M1, M2, Qst);
-        MatrixXd Qst_d = MatrixXd(Qst);
-
-        Dx.resize(num_constr, ns*nt);
-        Dx << MatrixXd::Ones(num_constr, ns*nt);
-
-        Dxy.resize(num_constr, n);
-        Dxy << Dx, MatrixXd::Zero(num_constr, nb);
-
-        // FOR NOW only SUM-TO-ZERO constraints feasible
-        e.resize(num_constr);
-        e = Vect::Zero(num_constr);            
-
-        std::cout << "generate constrained spatial data." << std::endl;
-        generate_ex_spatial_temporal_constr(ns, nt, nb, no, theta_original, Qst_d, Ax, Dx, e, Prec, b, u, y);
-
-        Vect x(n);
-        x << u, b;
-        std::cout << "true x = " << x.transpose() << std::endl;
-
-        // compute true UNCONSTRAINED marginal variances as
-        MatrixXd Q_x(n,n);
-        Q_x << Qst_d, MatrixXd::Zero(ns*nt, nb), MatrixXd::Zero(nb, ns*nt), Prec;
-        std::cout << "Q_x : \n" << Q_x.block(0,0,20,20) << std::endl;
-        std::cout << "Q_x : \n" << Q_x.block(100,100,124,124) << std::endl;
-
-
-
-        // Q_xy = Q_x + t(Ax)*Q_e*Ax, where Q_e = exp(tau)*I  -> how to incorporate constraints?
-        /*MatrixXd Q_xy_true = Q_x + exp(tau)*Ax.transpose()*Ax;
-        MatrixXd Cov_xy_true = Q_xy_true.inverse();
-        //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
-        std::cout << "unconstrained variances fixed eff : " << Cov_xy_true.diagonal().transpose() << std::endl;
-
-        // update for constraints
-        MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
-        std::cout << "constrained variances fixed eff   : " << constraint_Cov_xy_true.diagonal().transpose() << std::endl;*/
-
-
-        exit(1);
-
-        }
-
-    // data y
-    /*std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
-    file_exists(y_file);
-    // at this point no is set ... 
-    // not a pretty solution. 
-    y = read_matrix(y_file, no, 1);*/
+    if(constr == false){
+        // data y
+        std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
+        file_exists(y_file);
+        // at this point no is set ... 
+        // not a pretty solution. 
+        y = read_matrix(y_file, no, 1);
+    }
 
 
     /* ----------------------- initialise random theta -------------------------------- */
@@ -477,7 +432,6 @@ int main(int argc, char* argv[])
 
 #ifdef DATA_SYNTHETIC
         data_type = "synthetic";
-        constr = true;  // false
 
         // =========== synthetic data set =============== //
         if(MPI_rank == 0){ 
@@ -492,9 +446,6 @@ int main(int argc, char* argv[])
         // using PC prior, choose lambda  
         theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
-        if(MPI_rank == 0){
-            std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
-        }
         //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
         //theta_param << 4, 0, 0, 0;
@@ -518,6 +469,50 @@ int main(int argc, char* argv[])
             std::cout << "Dxy(-10) : " << Dxy.block(0,n-10, 0, n-1) << std::endl;
 
         }*/
+
+        if(constr == true){
+        // assemble Qst ... 
+        SpMat Qst(ns*nt, ns*nt);
+        construct_Q_spat_temp(theta_original, c0, g1, g2, g3, M0, M1, M2, Qst);
+        MatrixXd Qst_d = MatrixXd(Qst);
+
+        Dx.resize(num_constr, ns*nt);
+        Dx << MatrixXd::Ones(num_constr, ns*nt);
+
+        Dxy.resize(num_constr, n);
+        Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+        // FOR NOW only SUM-TO-ZERO constraints feasible
+        e.resize(num_constr);
+        e = Vect::Zero(num_constr);            
+
+        std::cout << "constrain spatial-temporal data." << std::endl;
+        generate_ex_spatial_temporal_constr(ns, nt, nb, no, theta_original, Qst_d, Ax, Dx, e, Prec, b, u, y);
+
+        Vect x(n);
+        x << u, b;
+        //std::cout << "true x = " << x.transpose() << std::endl;
+
+        // compute true UNCONSTRAINED marginal variances as
+        MatrixXd Q_x(n,n);
+        Q_x << Qst_d, MatrixXd::Zero(ns*nt, nb), MatrixXd::Zero(nb, ns*nt), Prec;
+        //std::cout << "Q_x : \n" << Q_x.block(0,0,20,20) << std::endl;
+        //std::cout << "dim(Q_x) = " << Q_x.rows() << " " << Q_x.cols() << std::endl;
+        //std::cout << "Q_x : \n" << Q_x(127,127) << std::endl; //Q_x.block(110,110,127,127)
+
+        //Q_xy = Q_x + t(Ax)*Q_e*Ax, where Q_e = exp(tau)*I  -> how to incorporate constraints?
+        MatrixXd Q_xy_true = Q_x + exp(theta_original[0])*Ax.transpose()*Ax;
+        MatrixXd Cov_xy_true = Q_xy_true.inverse(); // need to call pardiso here to be efficient ...       
+        //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
+        std::cout << "unconstr. var. fixed eff : " << Cov_xy_true.diagonal().tail(nb).transpose() << std::endl;
+
+        // update for constraints
+        MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
+        std::cout << "constr. var. fixed eff   : " << constraint_Cov_xy_true.diagonal().tail(nb).transpose() << std::endl;
+
+        //exit(1);
+
+        }
 
 #elif defined(DATA_TEMPERATURE)
 
@@ -597,8 +592,6 @@ int main(int argc, char* argv[])
 
     // ============================ set up Posterior of theta ======================== //
 
-    std::cout << "theta_prior_param = " << theta_prior_param.transpose() << std::endl;
-
     //std::optional<PostTheta> fun;
     PostTheta* fun;
 
@@ -621,13 +614,21 @@ int main(int argc, char* argv[])
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, constr, Dx, Dxy);
     }
 
-#ifdef DATA_TEMPERATURE
+    if(MPI_rank == 0)
+        printf("\n======================= HYPERPARAMETERS =====================\n");
+
+    if(MPI_rank == 0){
+        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
+        std::cout << "theta prior param  : " << theta_prior_param.transpose() << std::endl;
+    }
+
+//#ifdef DATA_TEMPERATURE
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     if(MPI_rank == 0){
         std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
     }
-#endif
+//#endif
 
     if(MPI_rank == 0 && dim_th == 4){
         Vect theta_interpret_initial(dim_th);
@@ -780,9 +781,8 @@ int main(int argc, char* argv[])
     //fx = fun(theta, grad_test);
     //std::cout <<  "f(x) = " << fx << std::endl;
 
-    if(MPI_rank == 0){
-        std::cout << "\nCall BFGS solver now. " << std::endl;
-    }
+    if(MPI_rank == 0)
+        printf("\n====================== CALL BFGS SOLVER =====================\n");
 
     //LIKWID_MARKER_INIT;
     //LIKWID_MARKER_THREADINIT;
@@ -916,7 +916,10 @@ int main(int argc, char* argv[])
         t_get_fixed_eff += omp_get_wtime();
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
         //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
-        std::cout << "Dxy*mu : " << Dxy*mu << ", it should be : " << e << std::endl;
+#if PRINT_MSG
+        if(constr == true)
+            std::cout << "Dxy*mu : " << Dxy*mu << ", should be : " << e << std::endl;
+#endif
     }
 
     #endif
