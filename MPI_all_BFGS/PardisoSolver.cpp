@@ -239,7 +239,7 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
 
         for(i = 0; i < nnz; i++){
             if(isnan(a[i])){
-                std::cout << "Found NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
+                std::cout << "In factorize!Found NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
             }
         }
 
@@ -1014,8 +1014,7 @@ void PardisoSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vec
     // map solution back
     // V has column-major format
     memcpy(V.data(), x, nrhs*n*sizeof(double));
-    //std::cout << "norm(Q*V   - t(D) = " << (Q*V - D.transpose()).norm() << std::endl;
-
+    //std::cout << "norm(Q*V   - t(D)) = " << (Q*V - D.transpose()).norm() << std::endl;
 
     /* -------------------------------------------------------------------- */    
     /* ... Inverse factorization.                                           */                                       

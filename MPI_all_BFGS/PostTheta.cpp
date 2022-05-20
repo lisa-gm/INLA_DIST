@@ -572,15 +572,15 @@ void PostTheta::convert_interpret2theta(double ranT, double ranS, double sigU, d
 
 void PostTheta::get_mu(Vect& theta, Vect& mu){
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "get_mu()" << std::endl;
-	#endif
+#endif
 
 	double f_theta = eval_post_theta(theta, mu);
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "mu(-10:end) :" << mu.tail(10) << std::endl;
-	#endif
+#endif
 }
 
 Vect PostTheta::get_grad(){
@@ -642,12 +642,15 @@ MatrixXd PostTheta::get_Cov_interpret_param(Vect& interpret_theta, double eps){
 
 	timespent_hess_eval += omp_get_wtime();
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
-	#endif 
+#endif 
 
-	//std::cout << "estimated hessian         : \n" << hess << std::endl; 
-	//std::cout << "eps : " << eps << endl;
+	if(MPI_rank == 0){
+		std::cout << "estimated hessian         : \n" << hess << std::endl; 
+		std::cout << "eigenvalues hessian : \n" << hess.eigenvalues().real() << std::endl;
+		//std::cout << "eps : " << eps << endl;
+	}
 
 	MatrixXd cov(dim_th,dim_th);
 	// pardiso call with identity as rhs & solve.
@@ -669,9 +672,25 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 	SpMat Q(n, n);
 	construct_Q(theta, Q);
 
-	#ifdef PRINT_MSG
+	//std::cout << "theta     : " << theta.transpose() << std::endl;
+	/*MatrixXd Q_temp = MatrixXd(Q.rightCols(nb));
+	std::cout << "dim(Q_temp) : " << Q_temp.rows() << " " << Q_temp.cols() << std::endl;
+	MatrixXd Q_fe = Q_temp.bottomRows(nb);
+	std::cout << "dim(Q(FE, FE))    : " << Q_fe.rows() << " " << Q_fe.cols() << std::endl;*/
+	/*MatrixXd Q_d = MatrixXd(Q);
+	std::cout << "Q(1:10,1:10) : \n" << Q_d.topLeftCorner(10,10) << std::endl;
+	MatrixXd Q_fe = Q_d.bottomRightCorner(10,10);
+	std::cout << "dim(Q(FE, FE))    : " << Q_fe.rows() << " " << Q_fe.cols() << std::endl;
+	std::cout << "Q_fe : \n" << Q_fe << std::endl;
+	std::cout << "eigenvalues Q(FE, FE) : " << Q_fe.eigenvalues().real().transpose() << std::endl;
+	std::cout << "inv(Q_fe).diagonal() = " << Q_fe.inverse().diagonal().transpose() << std::endl;
+
+	std::cout << "exp(theta[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
+	*/
+
+#ifdef PRINT_MSG
 		std::cout << "after construct Q in get get_marginals_f" << std::endl;
-	#endif
+#endif
 
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 
@@ -689,10 +708,10 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 				update_vars[i] = V.row(i)*S.col(i);
 			}
 
-			//std::cout << "vars        = " << vars.transpose() << std::endl;			
-			//std::cout << "update_vars = " << update_vars.transpose() << std::endl;
+			//std::cout << "\nvars        = " << vars.tail(10).transpose() << std::endl;			
+			//std::cout << "update_vars = " << update_vars.tail(10).transpose() << std::endl;
 			vars = vars - update_vars;
-			//std::cout << "vars        = " << vars.transpose() << std::endl;			
+			//std::cout << "vars        = " << vars.tail(10).transpose() << std::endl;			
 
 		}
 
@@ -705,10 +724,10 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 		}
 	}
 	
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 		timespent_sel_inv_pardiso += omp_get_wtime();
 		std::cout << "time spent selected inversion pardiso : " << timespent_sel_inv_pardiso << std::endl; 
-	#endif	
+#endif	
 
 }
 
@@ -1223,14 +1242,13 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	// sum log prior, log det spat-temp prior
 	double log_prior_sum;
-	double log_det_Qu;
+	double val_prior_lat;
 
 	// eval_likelihood: log_det, -theta*yTy
 	double log_det_l;
 	double val_l; 
 
-	// log det denominator, value
-	double log_det_d;
+	// value : pi(x | theta, y) or constraint problem pi(x | theta, y, Ax = e)
 	double val_d;
 
 	#pragma omp parallel
@@ -1273,9 +1291,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		exit(1);
 	}
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "log prior sum : " << log_prior_sum << std::endl;
-	#endif
+#endif
 
 	// =============== evaluate prior of random effects : need log determinant ================= //
 
@@ -1285,21 +1303,21 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// denominator to be reused?
 
 	if(ns > 0 ){
-		eval_log_prior_lat(theta, log_det_Qu);
+		eval_log_prior_lat(theta, val_prior_lat);
 	}
 
-	#ifdef PRINT_MSG
-		std::cout << "log det Qu : "  << log_det_Qu << std::endl;
-	#endif
+#ifdef PRINT_MSG
+		std::cout << "val prior lat : "  << val_prior_lat << std::endl;
+#endif
 
 	// =============== evaluate likelihood ================= //
 
 	eval_likelihood(theta, log_det_l, val_l);
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "log det likelihood : "  << log_det_l << std::endl;
 		std::cout << "val likelihood     : " << val_l << std::endl;
-	#endif
+#endif
 
 	} // end pragma omp task of computing nominator
 
@@ -1312,12 +1330,11 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	SpMat Q(n, n);
 	Vect rhs(n);
 
- 	eval_denominator(theta, log_det_d, val_d, Q, rhs, mu);
+ 	eval_denominator(theta, val_d, Q, rhs, mu);
 
-	#ifdef PRINT_MSG
-		std::cout << "log det d : " << log_det_d << std::endl;
+#ifdef PRINT_MSG
 		std::cout << "val d     : " <<  val_d << std::endl;
-	#endif
+#endif
 	}
 
     #pragma omp taskwait
@@ -1325,14 +1342,14 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	} // closing omp parallel region
 
 	// =============== add everything together ================= //
-	//std::cout << "log_det_d = "  << log_det_d << ", val d = " << val_d << std::endl;
-  	double val = -1 * (log_prior_sum + log_det_Qu + log_det_l + val_l - (log_det_d + val_d));
+	//std::cout << " val d = " << val_d << std::endl;
+  	double val = -1 * (log_prior_sum + val_prior_lat + log_det_l + val_l - val_d);
 
 #ifdef PRINT_MSG
   	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
   	std::cout << " " << std::fixed << std::setprecision(12);
   	std::cout << log_prior_sum << " ";
-  	std::cout << log_det_Qu << " " << log_det_l << " " << val_l << " " << log_det_d << " " << val_d << " " << val << std::endl;
+  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << log_det_d << " " << val_d << " " << val << std::endl;
 
   	//std::cout << "f theta : " << val << std::endl;
 #endif
@@ -1474,6 +1491,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 
 }
 
+// ONLY WORKS FOR SUM-TO-ZERO CONSTRAINTS
 // 0.5*theta[0]*t(y - B*b - A*u)*(y - B*b - A*u) => normally assume x = u,b = 0
 // constraint case -> maybe cannot evaluate in zero i.e. when e != 0, 
 // might make more sense to evaluate x = mu_constraint, from Dxy*mu_constraint = e
@@ -1537,25 +1555,44 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	// g^2 * fem$c0 + fem$g1
 	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
 
-	 // g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
-		SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
+	// g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
+	SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
 
-		// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
-		SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
+	// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
+	SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
-		#ifdef PRINT_MSG
-			/*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
 
 		std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
 		std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
 
 		std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
-        std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
-        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
-		#endif
+	    std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
+	    std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;
 
-		// assemble overall precision matrix Q.st
-		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+	    std::cout << "M0  : \n" << M0.block(0,0,10,10) << std::endl;
+	    std::cout << "M1  : \n" << M1.block(0,0,10,10) << std::endl;
+	    std::cout << "M2  : \n" << M2.block(0,0,10,10) << std::endl;
+	   }
+#endif
+
+	// assemble overall precision matrix Q.st
+	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+	/*if(MPI_rank == 0)
+		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;*/
+
+	// check for NaN values in matrix
+	SpMat Qst_lower = Qst.triangularView<Lower>(); 
+	int nnz = Qst_lower.nonZeros();
+
+	for(int i= 0; i<nnz; i++){
+		if(isnan(Qst_lower.valuePtr()[i])){
+			std::cout << "In construct_Qst! Found NaN value in Qst. Qst[" << i << "] = " << Qst_lower.valuePtr()[i] << std::endl;
+			std::cout << "exp(theta_u) = " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+		}
+	}
 
 		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
 }
@@ -1582,10 +1619,6 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 	double exp_theta0 = exp(theta[0]);
 
-	SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
-	/*std::cout << "Q_b " << std::endl;
-	std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
-
 	if(ns > 0){
 		SpMat Qu(nu, nu);
 		// TODO: find good way to assemble Qx
@@ -1596,6 +1629,19 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			construct_Q_spatial(theta, Qu);
 		}	
 
+
+		////////////////////////////////////////////////////////////// 
+		// here to stabilize the model ... theoretically shouldn't be here ...
+		// but it is in INLA so ... 
+		if(constr){
+			SpMat epsId(nu,nu);
+			epsId.setIdentity();
+			epsId = 1e-4*epsId;
+
+			Qu = Qu + epsId;
+		}
+		////////////////////////////////////////////////////////////// 
+
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
 		// construct Qx from Qs values, extend by zeros 
 		SpMat Qx(n,n);         // default is column major			
@@ -1603,19 +1649,21 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 		int nnz = Qu.nonZeros();
 		Qx.reserve(nnz);
 
-		for (int k=0; k<Qu.outerSize(); ++k)
+		for (int k=0; k<Qu.outerSize(); ++k){
 		  for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
 		  {
 		    Qx.insert(it.row(),it.col()) = it.value();                 
 		  }
-
+		}
 		//Qs.makeCompressed();
 		//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
         //                   Qs.innerIndexPtr(),Qs.valuePtr());
 
-		for(int i=nu; i<(n); i++){
-			Qx.coeffRef(i,i) = 1e-5;
+		for(int i=nu; i < n; i++){
+			// CAREFUL 1e-3 is arbitrary choice!!
+			Qx.coeffRef(i,i) = 1e-3;
 		}
+
 
 		Qx.makeCompressed();
 
@@ -1638,6 +1686,11 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 	}
 
 	if(ns == 0){
+
+		SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+		/*std::cout << "Q_b " << std::endl;
+		std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
+		
 		// Q.e <- Diagonal(no, exp(theta))
 		// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
 		Q = Q_b + exp_theta0*B.transpose()*B;	
@@ -1668,7 +1721,9 @@ void PostTheta::construct_b(Vect& theta, Vect &rhs){
 }
 
 
-void PostTheta::eval_denominator(Vect& theta, double& log_det, double& val, SpMat& Q, Vect& rhs, Vect& mu){
+void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, Vect& mu){
+
+	double log_det;
 
 	double time_construct_Q = -omp_get_wtime();
 	// construct Q_x|y,
@@ -1704,29 +1759,24 @@ void PostTheta::eval_denominator(Vect& theta, double& log_det, double& val, SpMa
 		mu = constr_mu;
 
 		Vect x = Vect::Zero(mu.size());
+		// log det is already in val
 		eval_log_dens_constr(x, unconstr_mu, Q, log_det, Dxy, W, val);
-
-		// set log det to zero because its already in val
-		log_det = 0;
 
 	} else {
 		// solve linear system
 		// returns vector mu, which is of the same size as rhs
 		//solve_cholmod(Q, rhs, mu, log_det);
 		solverQ->factorize_solve(Q, rhs, mu, log_det);
-
-		log_det = 0.5 * (log_det);
 	
-#ifdef PRINT_MSG
-	std::cout << "log det d : " << log_det << std::endl;
-#endif
-
 		// compute value
-		val = -0.5 * mu.transpose()*(Q)*(mu);
+		val = 0.5*log_det - 0.5 * mu.transpose()*(Q)*(mu);
 	}
 
 	time_solve_Q += omp_get_wtime();
 
+#ifdef PRINT_MSG
+	std::cout << "log det d : " << log_det << std::endl;
+#endif
 
 #ifdef PRINT_TIMES
 	if(MPI_rank == 0){

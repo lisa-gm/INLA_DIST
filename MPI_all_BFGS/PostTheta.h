@@ -25,7 +25,7 @@
 #include "RGFSolver.h"
 //#include "RGFSolver_dummy.h"
 
-//#define SMART_GRAD
+#define SMART_GRAD
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
@@ -367,7 +367,7 @@ class PostTheta{
  	 * @param[inout] rhs construct right-handside
  	 * @param[inout] mu insert mean of latent parameters
      */
-	void eval_denominator(Vect& theta, double& log_det, double& val, SpMat& Q, Vect& rhs, Vect& mu);
+	void eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, Vect& mu);
 
 	// ============================================================================================ //
 	// FINITE DIFFERENCE GRADIENT EVALUATION

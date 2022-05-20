@@ -544,10 +544,10 @@ int main(int argc, char* argv[])
             if(constr)
                 std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
         }
-        //theta << 4, 4, 4, 4;    //
-        //theta_param << 4, 0, 0, 0;
+        //theta << 4, 4, 4, 4;    // -> converges to wrong solution
+        theta_param << 4, 0, 0, 0;
         //theta_param << -1.308664,  0.498426,  4.776162,  1.451209;
-        theta_param << -1.270, 12.132, 9.773, 4.710;
+        //theta_param << -1.269992, 12.132359, 9.772552, 4.710185;
         //theta_param << -1.25, 13.6, 10.4, 5.4;
         theta_original << -1.269613,  5.424197, -8.734293, -6.026165;  // estimated from INLA / same for my code varies a bit according to problem size
 
@@ -565,13 +565,13 @@ int main(int argc, char* argv[])
 
             // set up constraints Dx = e
             Dx.resize(num_constr, ns*nt);
-            SpMat D = KroneckerProductSparse<SpMat, SpMat>(M0, c0);
+            /*SpMat D = KroneckerProductSparse<SpMat, SpMat>(M0, c0);
             Dx = D.diagonal().transpose();
             if(MPI_rank == 0){
                 std::cout << "sum(Dx)  = " << Dx.row(0).sum() << std::endl;
                 //std::cout << "Dx(1:50) = " << Dx.block(0,0,1,50) << std::endl;
-            }
-            //Dx << MatrixXd::Ones(num_constr, ns*nt);
+            }*/
+            Dx << MatrixXd::Ones(num_constr, ns*nt);
 
             // rescale Dx such that each row sums to one
             for(int i=0; i<num_constr; i++){
@@ -622,7 +622,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-2;
     param.delta = 1e-3;
     // maximum line search iterations
-    param.max_iterations = 200;
+    param.max_iterations = 100;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -676,6 +676,141 @@ int main(int argc, char* argv[])
             std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
         }
     }
+
+
+#if 0 // for testing constraints
+
+    //int m = 5;
+    //int num_constr = 1;
+
+    //MatrixXd D(num_constr, nb);
+    //Vect e(num_constr);
+    MatrixXd Cov = Prec.inverse();
+    //Vect mu_normal(nb);
+    //mu_normal << 0,0,0,0; //1,2,3,4;
+    Vect mu_normal = b;
+    Vect rhs_normal = Vect::Zero(nb);
+
+    //fun->generate_test_constraints(m, num_constr, D, e, Cov, mu_normal, rhs_normal);
+    //std::cout << "Cov = \n" << Cov << std::endl;
+    //std::cout << "Dx = " << Dx << ", e = " << e.transpose() << std::endl;
+    std::cout << "mu = " << mu_normal.transpose() << "\nrhs = " << rhs_normal.transpose() << std::endl;
+
+    MatrixXd V = Cov*Dx.transpose();
+    MatrixXd W(num_constr, num_constr);
+    MatrixXd U(num_constr, nb);
+    Vect constr_mu_normal(nb);
+
+    fun->update_mean_constr(Dx, e, mu_normal, V, W, U, constr_mu_normal);
+    std::cout << "constrained mu = " << constr_mu_normal.transpose() << std::endl;
+
+    // constr_mu_st will by definition satisfy Ax = e, hence choose x = constr_mu_xy
+    //Vect x_normal = constr_mu_normal;
+    Vect x_normal = Vect::Zero(nb);
+    SpMat Q = Cov.inverse().sparseView();
+    double log_det_Q = - log(Cov.determinant());
+
+    double val;
+
+    fun->eval_log_dens_constr(x_normal, mu_normal, Q, log_det_Q, Dx, W, val);
+
+    // ================================================================================================== //
+    // compute control, can get very inaccurate very quickly as dimension increases !!! pseudo-inverse not numerically stable ...    
+    // compute constrained mean and covariance
+    MatrixXd invW = (Dx*Cov*Dx.transpose()).inverse();
+    //std::cout << "W = " << W << ", W = " << Dx*Cov*Dx.transpose() << std::endl;
+    //std::cout << "inv(W) = " << W.inverse() << ", invW = " << invW << std::endl;
+    Vect constr_mu_normal2 = mu_normal - Cov*Dx.transpose()*invW*(Dx*mu_normal - e);
+    //std::cout << "norm(constr_mu_xy - constr_mu_xy2) = " << (constr_mu_normal - constr_mu_normal2).norm() << std::endl;
+    //std::cout << "constr_mu = " << constr_mu.transpose() << std::endl;
+    MatrixXd constr_Cov = Cov - Cov*Dx.transpose()*invW*Dx*Cov;
+    //std::cout << "constr_Cov = \n" << constr_Cov << std::endl;
+
+    EigenSolver<MatrixXd> es(constr_Cov);
+    MatrixXd EV = es.eigenvectors().real();
+    //cout << "Eigenvectors = " << endl << V << endl;
+
+    Vect eivals = es.eigenvalues().real();
+    //std::cout << "eigenvalues(constr_Cov) = " <<  eivals.transpose() << std::endl;
+    //std::cout << "V*D*V^T = " << endl << V*eivals.asDiagonal()*V.transpose() << std::endl;
+          
+    // identify non-zero eigenvalues
+    double log_sum = 0;
+    double prod = 1;
+    Vect invD = Vect::Zero(nb);
+    for(int i=0; i<nb; i++){
+        if(eivals[i] > 1e-7){
+            log_sum += log(eivals[i]);
+            prod *= eivals[i];
+            invD[i] = 1/eivals[i];
+        }
+    }
+
+    MatrixXd invD_mat = invD.asDiagonal();
+    //std::cout << "invD = " << invD_mat << std::endl;
+
+    //printf("sum(eivals)     = %f\n", log(prod));
+    //printf("log_sum(eivals) = %f\n", log_sum);
+
+    // compute log pi(x | Ax = e), evaluated at x, make sure x satisfies condition ...
+    //Vect x = Vect::Zero(m);
+    //Vect x = constr_mu;
+    MatrixXd pInv = EV*invD.asDiagonal()*EV.transpose();
+    //std::cout << "pInv = \n" << pInv << std::endl;
+    //std::cout << "Cov = \n" << V*eivals.asDiagonal()*V.transpose() << std::endl;
+    std::cout << "(V*eivals.asDiagonal()*V.transpose() - constr_Cov).norm() = " << (EV*eivals.asDiagonal()*EV.transpose() - constr_Cov).norm() << std::endl;
+    double temp = (x_normal - constr_mu_normal2).transpose()*pInv*(x_normal - constr_mu_normal2);
+    std::cout << "temp = " << temp << std::endl;
+    double log_val = - 0.5*(Cov.rows()-Dx.rows())*log(2*M_PI) - 0.5*log_sum - 0.5*temp;
+    std::cout << - 0.5*Cov.rows()*log(2*M_PI) - (- 0.5*Dx.rows()*log(2*M_PI)) << " " << - 0.5*(Cov.rows()-Dx.rows())*log(2*M_PI) << std::endl;
+    std::cout << "log val direct = " << log_val << std::endl;
+    
+#endif    
+
+
+
+#if 0   // for measuring noise
+
+    PostTheta* fun2;
+    fun2 = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type);
+
+    Vect theta2 = theta;
+
+    Vect mu(n);
+    Vect grad(dim_th);
+
+    /*if(MPI_rank == 0){
+        std::cout << "\ntheta : " << std::right << std::fixed << std::setprecision(4) << theta.transpose() << std::endl;
+    }*/
+
+    for(int i = 0; i<1; i++){
+        if(MPI_rank == 0){
+                double f_theta = fun->eval_post_theta(theta, mu); // gets called by each rank individually
+        }
+        //double f_theta = fun->operator()(theta, grad);  // same for all ranks
+        /*if(MPI_rank == 0){  
+            std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
+            std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+        }*/
+    }
+
+    if(MPI_rank == 0){
+        std::cout << "\n============================================================================\n" << std::endl;
+        std::cout << "theta2 : " << theta2.transpose() << std::endl;
+    }
+
+    for(int i = 0; i<1; i++){
+        if(MPI_rank == 0){
+            double f_theta = fun2->eval_post_theta(theta, mu); // gets called by each rank individually
+        }
+        //double f_theta = fun2->operator()(theta, grad);  // same for all ranks
+        /*if(MPI_rank == 0){  
+            std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
+            std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+        }*/
+    }
+
+#endif
 
 
 #if 1
@@ -747,7 +882,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -890,10 +1025,8 @@ int main(int argc, char* argv[])
     // construct Q = Qx(theta_mode) + theta_mode*AxTAx => assume Q_b = 1e-5*Id
     // compute inverse -> using pardiso & using .inverse() => extract diagonal => compare
 
-    SpMat Qst(ns*nt,ns*nt);  // not n?!
+    SpMat Qst(n,n);
     construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, Qst);
-
-    //SpMat epsId()
 
     SpMat Qx(n,n);        
     int nnz = Qst.nonZeros();
