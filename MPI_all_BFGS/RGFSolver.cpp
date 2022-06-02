@@ -117,6 +117,12 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 }
 
+
+// TODO ...
+void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V){
+    printf("Please implement me: factorize_w_constr"); 
+}
+
 void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
 
 #ifdef PRINT_MSG
@@ -234,6 +240,11 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
   	delete[] b;
 }
 
+// TODO ...
+void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
+    printf("Please implement me: factorize_w_constr"); 
+}
+
 // IMPLEMENT IN A WAY SUCH THAT FACTORISATION WILL BE PERFORMED AGAIN
 // FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
@@ -335,7 +346,13 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 	delete[] a;
 	delete[] invDiag;
 
+} // end selected inversion function
+
+
+void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V){
+    std::cout << "dummy placholder selected_inversion_w_constr" << std::endl;
 }
+
 
 
 

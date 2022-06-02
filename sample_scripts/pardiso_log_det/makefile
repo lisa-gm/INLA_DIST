@@ -2,8 +2,8 @@
 
 
 INCEIGEN=-I/usr/include/eigen3
-#LIBPARDISO=/home/x_gaedkelb/applications/pardiso/libpardiso720-GNU840-X86-64-RINLA_new.so
-LIBPARDISO=/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so
+LIBPARDISO=/home/x_gaedkelb/applications/pardiso/libpardiso720-GNU840-X86-64-RINLA_new.so
+#LIBPARDISO=/home/x_gaedkelb/applications/pardiso/libpardiso700-GNU840-X86-64-RINLA.so
 
 
 main: main.cpp PardisoSolver.cpp

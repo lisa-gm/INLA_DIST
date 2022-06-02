@@ -78,7 +78,6 @@ private:
     int      idum;              /**< Integer dummy. */
 
     int     mtype;              /**< matrix type */
-    int     nrhs;               /**< number of rhs. */
     int     init;               /**< flag that indicates if symbolic factorisation already performed. */
 
 
@@ -108,6 +107,7 @@ public:
      */
     void factorize(SpMat& Q, double& log_det);
 
+    void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V);
 
     /**
      * @brief factorises and solves matrix in one call (to reuse pardiso objects)
@@ -118,13 +118,17 @@ public:
      */    
     void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
 
-
+    void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
+    
     /**
      * @brief selected inversion of the diagonal elements of Q.
      * @param[in]       Q precision matrix.
      * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
      */
     void selected_inversion(SpMat& Q, Vect& inv_diag);
+
+    void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
+
 
     /**
      * @brief inversion of the entire matrix (only meant for small matrices) by means of using identity 

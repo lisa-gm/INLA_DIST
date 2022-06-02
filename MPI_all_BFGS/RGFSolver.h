@@ -69,6 +69,8 @@ class RGFSolver: public Solver {
          */
 		void factorize(SpMat& Q, double& log_det);
 
+        // TODO ...
+        void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V);
 
         /**
          * @brief factorises and solves matrix in one call 
@@ -79,6 +81,9 @@ class RGFSolver: public Solver {
          */ 
 		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
 
+        // TODO ...
+        void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
+
         /**
          * @brief selected inversion of the diagonal elements of Q.
          * @param[in]       Q precision matrix.
@@ -86,6 +91,8 @@ class RGFSolver: public Solver {
          * @note is there some way to potentially reuse Cholesky factor that is already on CPU?
          */
       	void selected_inversion(SpMat& Q, Vect& inv_diag);
+
+        void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
 
       	// will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)
         // OR not? Eigen function is probably fine, most likely also using lapack.
