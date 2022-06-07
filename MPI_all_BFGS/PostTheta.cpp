@@ -3,7 +3,7 @@
 //#include <likwid-marker.h>
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dxy_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dxy(Dxy_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -71,7 +71,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
 	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -80,8 +80,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	nu          = ns;
 	n           = nb + ns;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
+	
+
 	yTy         = y.dot(y);
-	AxTy		= Ax.transpose()*y;
+	AxTy		= Ax.transpose()*y;	
 	AxTAx       = Ax.transpose()*Ax;
 
 
@@ -152,7 +154,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 }
 
 // constructor for spatial-temporal case
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -161,8 +163,16 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	nu          = ns*nt;
 	n           = nb + ns*nt;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
-	yTy         = y.dot(y);
-	AxTy		= Ax.transpose()*y;
+
+	if(validate){
+		yTy         = (w.cwiseProduct(y)).dot(w.cwiseProduct(y));
+		//std::cout << yTy << std::endl;
+		AxTy		= Ax.transpose()*w.cwiseProduct(y);
+	} else {
+		yTy         = y.dot(y);
+		AxTy		= Ax.transpose()*y;
+	}
+
 	AxTAx       = Ax.transpose()*Ax;
 
 
@@ -490,14 +500,6 @@ void PostTheta::computeG(Vect& theta){
     }
 
 #ifdef PRINT_MSG
-    if(MPI_rank == 0){  
-            std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
-            std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
-    }
-#endif
-
-
-#ifdef PRINT_MSG
     if(MPI_rank == 0){
     	// check if ThetaDiff = G*R
     	//std::cout << "norm(ThetaDiff - G*R) = " << (ThetaDiff - G*R).norm() << std::endl;
@@ -672,21 +674,32 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 	SpMat Q(n, n);
 	construct_Q(theta, Q);
 
-	//std::cout << "theta     : " << theta.transpose() << std::endl;
-	/*MatrixXd Q_temp = MatrixXd(Q.rightCols(nb));
-	std::cout << "dim(Q_temp) : " << Q_temp.rows() << " " << Q_temp.cols() << std::endl;
-	MatrixXd Q_fe = Q_temp.bottomRows(nb);
-	std::cout << "dim(Q(FE, FE))    : " << Q_fe.rows() << " " << Q_fe.cols() << std::endl;*/
-	/*MatrixXd Q_d = MatrixXd(Q);
-	std::cout << "Q(1:10,1:10) : \n" << Q_d.topLeftCorner(10,10) << std::endl;
-	MatrixXd Q_fe = Q_d.bottomRightCorner(10,10);
+	MatrixXd Q_d = MatrixXd(Q);
+	//std::cout << "Q.bottomRightCorner(10,10) : \n" << Q_d.bottomRightCorner(10,10) << std::endl;
+	MatrixXd Q_fe = Q_d.bottomRightCorner(nb,nb);
 	std::cout << "dim(Q(FE, FE))    : " << Q_fe.rows() << " " << Q_fe.cols() << std::endl;
 	std::cout << "Q_fe : \n" << Q_fe << std::endl;
-	std::cout << "eigenvalues Q(FE, FE) : " << Q_fe.eigenvalues().real().transpose() << std::endl;
-	std::cout << "inv(Q_fe).diagonal() = " << Q_fe.inverse().diagonal().transpose() << std::endl;
+	Vect eig =  Q_fe.eigenvalues().real();
+	std::cout << "\neigenvalues Q(FE, FE) : \n" << eig.transpose() << std::endl;
+	Vect norm_eig = eig / eig.minCoeff();
+	std::cout << "\nnormalized eigenvalues Q(FE, FE) : \n" << norm_eig.transpose() << std::endl;
 
-	std::cout << "exp(theta[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
-	*/
+	MatrixXd Cov_fe = Q_fe.inverse();
+	std::cout << "\nCovariance mat FE = \n" << Cov_fe << std::endl;
+
+	// compute correlation matrix : cor(x_i, x_j) = cov(x_i, x_j) / sqrt(cov(x_i, x_i)*cov(x_j, x_j))
+	MatrixXd Cor_fe(Cov_fe.rows(), Cov_fe.cols());
+	for(int i = 0; i<Cov_fe.rows(); i++){
+		for(int j=0; j<Cov_fe.cols(); j++){
+			Cor_fe(i,j) = Cov_fe(i,j) / sqrt(Cov_fe(i,i)*Cov_fe(j,j));
+		}
+	}
+
+	std::cout << "Correlation mat FE = \n" << Cor_fe << "\n" << std::endl;
+
+
+	//std::cout << "exp(theta[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
+	
 
 #ifdef PRINT_MSG
 		std::cout << "after construct Q in get get_marginals_f" << std::endl;
@@ -708,7 +721,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 				update_vars[i] = V.row(i)*S.col(i);
 			}
 
-			//std::cout << "\nvars        = " << vars.tail(10).transpose() << std::endl;			
+			//std::cout << "\nvars        = " << vars.transpose() << std::endl;			
 			//std::cout << "update_vars = " << update_vars.tail(10).transpose() << std::endl;
 			vars = vars - update_vars;
 			//std::cout << "vars        = " << vars.tail(10).transpose() << std::endl;			
@@ -1194,7 +1207,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
 	return hess;
 }
-#endif
+
+#endif // end #if at line 978
 
 void PostTheta::check_pos_def(MatrixXd &hess){
 
@@ -1349,7 +1363,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
   	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
   	std::cout << " " << std::fixed << std::setprecision(12);
   	std::cout << log_prior_sum << " ";
-  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << log_det_d << " " << val_d << " " << val << std::endl;
+  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
 
   	//std::cout << "f theta : " << val << std::endl;
 #endif
@@ -1451,17 +1465,16 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		//std::cout << "in eval log det Qu in constr true" << std::endl;
 		MatrixXd V(nu, Dx.rows());
 		solverQst->factorize_w_constr(Qu, Dx, log_det, V);
-		//std::cout << "after factorize_w_constr" << std::endl;
 
 		Vect constr_mu(nu);
-		Vect e = Vect::Zero(1);
+		Vect e = Vect::Zero(Dx.rows());
 		MatrixXd U(Dx.rows(), nu);
 		MatrixXd W(Dx.rows(), Dx.rows());
 		Vect mu_tmp = Vect::Zero(nu);
 		update_mean_constr(Dx, e, mu_tmp, V, W, U, constr_mu);
 		Vect unconstr_mu = mu_tmp;
 		mu_tmp = constr_mu;
-		//std::cout << "mu = " << mu_tmp.transpose() << std::endl;
+		//std::cout << "mu = " << mu_tmp.head(10).transpose() << std::endl;
 
 		Vect x = Vect::Zero(nu);
 		// multiplication with 0.5 is already included
@@ -1475,7 +1488,6 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	}
 
 	time_factorize_Qst += omp_get_wtime();
-
 
 #ifdef PRINT_MSG
 	std::cout << "val log prior lat " << val << std::endl;
@@ -1499,7 +1511,12 @@ void PostTheta::eval_likelihood(Vect& theta, double &log_det, double &val){
 	
 	// multiply log det by 0.5
 	double theta0 = theta[0];
-	log_det = 0.5 * no*theta0;
+
+	if(validate){
+		log_det = 0.5 * w.sum()*theta0;  // some are zero ...
+	} else {
+		log_det = 0.5 * no*theta0;
+	}
 	//log_det = 0.5 * no*3;
 
 	// - 1/2 ...
@@ -1632,14 +1649,14 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 		////////////////////////////////////////////////////////////// 
 		// here to stabilize the model ... theoretically shouldn't be here ...
-		// but it is in INLA so ... 
-		if(constr){
+		// is in INLA
+		/*if(constr){
 			SpMat epsId(nu,nu);
 			epsId.setIdentity();
 			epsId = 1e-4*epsId;
 
 			Qu = Qu + epsId;
-		}
+		}*/
 		////////////////////////////////////////////////////////////// 
 
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
@@ -1751,7 +1768,7 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 		//std::cout << "after factorize_solve_w_constr" << std::endl;
 
 		Vect constr_mu(mu.size());
-		Vect e = Vect::Zero(1);
+		Vect e = Vect::Zero(Dxy.rows());
 		MatrixXd U(Dxy.rows(), mu.size());
 		MatrixXd W(Dxy.rows(), Dxy.rows());
 		update_mean_constr(Dxy, e, mu, V, W, U, constr_mu);

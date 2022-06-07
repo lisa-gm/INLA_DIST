@@ -124,6 +124,9 @@ class PostTheta{
     //MatrixXd W;			/**< W = A*V  										*/
     //Vect U;				/**< U = W^-1 * t(V)                                */
 
+    const bool validate;
+    const Vect w;
+
 
 	public:
 	 /**
@@ -139,7 +142,8 @@ class PostTheta{
 	PostTheta(int ns, int nt, int nb, int no, 
 		MatrixXd B, Vect y, 
 		Vect theta_prior, string solver_type,
-		bool constr, MatrixXd Dxy);
+		const bool constr, const MatrixXd Dxy,
+		const bool validate, const Vect w);
 	/**
      * @brief constructor for spatial model (order 2).
      * @param[in] ns_ number of spatial grid points per time step.
@@ -155,7 +159,8 @@ class PostTheta{
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2,
 		Vect theta_prior, string solver_type, 
-		bool constr, MatrixXd Dx, MatrixXd Dxy);
+		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
+		const bool validate, const Vect w);
 
 	/**
      * @brief constructor for spatial temporal model.
@@ -178,7 +183,8 @@ class PostTheta{
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
 		SpMat M0, SpMat M1, SpMat M2, 
 		Vect theta_prior, string solver_type, 
-		bool constr, MatrixXd Dx, MatrixXd Dxy); 
+		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
+		const bool validate, const Vect w); 
 
 	/**
      * @brief structure required by BFGS solver, requires : theta, gradient theta

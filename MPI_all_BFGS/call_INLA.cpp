@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-//#define DATA_SYNTHETIC
-#define DATA_TEMPERATURE
+#define DATA_SYNTHETIC
+//#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF
@@ -43,6 +43,39 @@ using Eigen::MatrixXd;
 typedef Eigen::VectorXd Vect;
 
 using namespace LBFGSpp;
+
+
+/*void create_validation_set(int& no, int& size_valSet, std::vector<int> &indexSet, std::vector<int> &valSet){
+
+    //int no = 30;
+    //int size_valSet = 8;
+
+    // requires C++-17 !!
+    // create sorted index vector
+    std::mt19937 rbg { 42u }; 
+
+    //std::vector<int> indexSet(no);
+    std::iota(indexSet.begin(), indexSet.end(), 0);
+    //std::vector<int> valSet(size_valSet);
+    // sample random indices
+    std::sample(indexSet.begin(), indexSet.end(), valSet.begin(), valSet.size(), rbg);
+    
+    for (int valIndex: indexSet) std::cout << valIndex << ' '; 
+    std::cout << '\n';
+
+    for (int valIndex: valSet) std::cout << valIndex << ' '; 
+    std::cout << '\n';
+
+    // assuming sorted vectors : removes all elements of valSet that are in indexSet
+    indexSet.erase( remove_if( begin(indexSet),end(indexSet),
+    [&valSet](auto x){return binary_search(begin(valSet),end(valSet),x);}), end(indexSet) );
+
+    for( int elem: valSet) std::cout << elem << ' '; 
+    std::cout << '\n';
+
+    for( int elem: indexSet) std::cout << elem << ' '; 
+    std::cout << '\n';
+}*/
 
 
 void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3, SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Qst){
@@ -478,16 +511,58 @@ int main(int argc, char* argv[])
             // sum to zero constraint for latent parameters
             // construct vector (in GMRF book called A, I will call it D) as D=diag(kron(M0, c0)) 
             // in equidistant mesh this would be a vector of all ones, we want sum D_i x_i = 0
+
+            // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
+            // number of time-steps per constraint 
+            int tsPerConstr = 16;
+            num_constr = ceil(1.0 * nt / tsPerConstr);
+            if(MPI_rank == 0)
+                std::cout << "num constr = " << num_constr << std::endl;
+
+            if(num_constr*tsPerConstr < nt || tsPerConstr > nt){
+                if(MPI_rank == 0)
+                    std::cout << "Error! number of constraints * tsPerConstraint not matching nt!! " << num_constr << " " << tsPerConstr << std::endl;
+                exit(1);
+            }
+
+            // initialize with zero
             Dx.resize(num_constr, ns*nt);
-            SpMat D = KroneckerProductSparse<SpMat, SpMat>(M0, c0);
-            //Vect D_diag = D.diagonal();
-            Dx = D.diagonal().transpose();
-            //Dx << MatrixXd::Ones(num_constr, ns*nt);
+            Dx.setZero();
+
+            Vect M0_diag = M0.diagonal();
+
+            for(int i = 0; i<num_constr; i++){
+                int i_start = tsPerConstr*i;
+                //std::cout << "i_start = " << i_start << std::endl;
+                int nt_int = nt;
+                int i_end   = std::min(tsPerConstr*(i+1), nt_int);
+                //std::cout << "i_end = " << i_end << std::endl;
+                int num_elem = i_end - i_start;
+
+                SpMat M(num_elem, num_elem);
+                Vect M_diag = M0_diag.segment(i_start,num_elem);
+                M = M0_diag.asDiagonal();
+                SpMat D = KroneckerProductSparse<SpMat, SpMat>(M, c0);
+                Vect D_diag = D.diagonal();
+
+                //std::cout << "ns*i_end = " << ns*i_end << std::endl;
+
+                for(int j=ns*i_start; j<ns*i_end; j++){
+                    //Dx(i,j) = 1.0;
+                    Dx(i,j) = D_diag(j);
+                }
+
+                //Dx = D.diagonal().transpose();
+                //Dx.row(i).segment(ns*i_start, ns*num_elem) << MatrixXd::Ones(1, num_elem);
+            }
+
+            /*if(MPI_rank == 0)
+                std::cout << Dx << std::endl;*/
 
             // rescale Dx such that each row sums to one
             for(int i=0; i<num_constr; i++){
                 double sum_row = Dx.row(i).sum();
-                Dx = 1/sum_row*Dx;
+                Dx.row(i) = 1/sum_row*Dx.row(i);
             }
 
             Dxy.resize(num_constr, n);
@@ -495,9 +570,12 @@ int main(int argc, char* argv[])
 
             // FOR NOW only SUM-TO-ZERO constraints feasible
             e.resize(num_constr);
-            e = Vect::Zero(num_constr);            
+            e = Vect::Zero(num_constr);     
 
-            /*if(MPI_rank == 0)
+            //exit(1);       
+
+#if 1
+            if(MPI_rank == 0)
                 std::cout << "constrain spatial-temporal data." << std::endl;
             
             // assemble Qst ... 
@@ -523,14 +601,16 @@ int main(int argc, char* argv[])
             MatrixXd Cov_xy_true = Q_xy_true.inverse(); // need to call pardiso here to be efficient ...       
             //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
             if(MPI_rank == 0)
-                std::cout << "unconstr. var. fixed eff : " << Cov_xy_true.diagonal().tail(nb).transpose() << std::endl;
+                std::cout << "unconstr. sd. fixed eff : " << Cov_xy_true.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
 
             // update for constraints
             MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
             if(MPI_rank == 0)
-                std::cout << "constr. var. fixed eff   : " << constraint_Cov_xy_true.diagonal().tail(nb).transpose() << std::endl;
+                std::cout << "constr. sd. fixed eff   : " << constraint_Cov_xy_true.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
 
-            //exit(1);*/
+            //exit(1);
+#endif            
+
 
         }
 
@@ -563,8 +643,71 @@ int main(int argc, char* argv[])
 
         if(constr){
 
-            // set up constraints Dx = e
+#if 1
+            // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
+            // number of time-steps per constraint 
+            int tsPerConstr = 60;
+            num_constr = ceil(1.0 * nt / tsPerConstr);
+            if(MPI_rank == 0)
+                std::cout << "num constr = " << num_constr << std::endl;
+
+            if(num_constr*tsPerConstr < nt || tsPerConstr > nt){
+                if(MPI_rank == 0)
+                    std::cout << "Error! number of constraints * tsPerConstraint not matching nt!! " << num_constr << " " << tsPerConstr << std::endl;
+                exit(1);
+            }
+
+            // initialize with zero
             Dx.resize(num_constr, ns*nt);
+            Dx.setZero();
+
+            Vect M0_diag = M0.diagonal();
+
+            for(int i = 0; i<num_constr; i++){
+                int i_start = tsPerConstr*i;
+                //std::cout << "i_start = " << i_start << std::endl;
+                int nt_int = nt;
+                int i_end   = std::min(tsPerConstr*(i+1), nt_int);
+                //std::cout << "i_end = " << i_end << std::endl;
+                int num_elem = i_end - i_start;
+
+                SpMat M(num_elem, num_elem);
+                Vect M_diag = M0_diag.segment(i_start,num_elem);
+                M = M0_diag.asDiagonal();
+                SpMat D = KroneckerProductSparse<SpMat, SpMat>(M, c0);
+                Vect D_diag = D.diagonal();
+
+                //std::cout << "ns*i_end = " << ns*i_end << std::endl;
+
+                for(int j=ns*i_start; j<ns*i_end; j++){
+                    //Dx(i,j) = 1.0;
+                    Dx(i,j) = D_diag(j);
+                }
+
+                //Dx = D.diagonal().transpose();
+                //Dx.row(i).segment(ns*i_start, ns*num_elem) << MatrixXd::Ones(1, num_elem);
+            }
+
+            /*if(MPI_rank == 0)
+                std::cout << Dx << std::endl;*/
+
+            // rescale Dx such that each row sums to one
+            for(int i=0; i<num_constr; i++){
+                double sum_row = Dx.row(i).sum();
+                Dx.row(i) = 1/sum_row*Dx.row(i);
+            }
+
+            Dxy.resize(num_constr, n);
+            Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+            // FOR NOW only SUM-TO-ZERO constraints feasible
+            e.resize(num_constr);
+            e = Vect::Zero(num_constr);  
+            
+#endif
+
+            // set up constraints Dx = e
+            /*Dx.resize(num_constr, ns*nt);
             SpMat D = KroneckerProductSparse<SpMat, SpMat>(M0, c0);
             Dx = D.diagonal().transpose();
             if(MPI_rank == 0){
@@ -592,7 +735,7 @@ int main(int argc, char* argv[])
             e.resize(num_constr);
             e = Vect::Zero(num_constr); 
 
-            //exit(1);
+            //exit(1);*/
         }
 
 #else 
@@ -601,6 +744,32 @@ int main(int argc, char* argv[])
 #endif
 
     }
+
+    // ========================== set up validation set ======================= //
+
+    bool validate = false;
+    Vect w;
+
+    if(validate){
+        // Vect::Random() creates uniformly distributed random vector between [-1,1]
+        // size validation set, ie. 0.1 -> 10% of total observations
+        double r = 0.05;
+        w = Vect::Random(no);
+
+        for(int i=0;i<no; i++){
+            if(w[i] < 1 - 2*r){
+                w[i] = 1;
+            } else {
+                w[i] = 0;
+            }
+        }
+
+        if(MPI_rank == 0)
+            std::cout << "size validation set = " << no - w.sum() << std::endl;
+        //std::cout << "w = " << w.transpose() << std::endl;
+    }
+
+    //exit(1);
 
     // ============================ set up BFGS solver ======================== //
 
@@ -641,18 +810,18 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "Call constructor for regression model." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type, constr, Dxy);
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type, constr, Dxy, validate, w);
     } else if(ns > 0 && nt == 1) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, constr, Dx, Dxy);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, constr, Dx, Dxy, validate, w);
     } else {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, constr, Dx, Dxy);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, constr, Dx, Dxy, validate, w);
     }
 
     if(MPI_rank == 0)
@@ -773,7 +942,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 1
+    #if 0
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -803,16 +972,17 @@ int main(int argc, char* argv[])
     if(MPI_rank == 0){
         t_get_fixed_eff = - omp_get_wtime();
         
-        fun->get_mu(theta, mu);
+        fun->get_mu(theta_original, mu);
 
         t_get_fixed_eff += omp_get_wtime();
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
-        std::cout << "estimated mean random effects: " << mu.head(50).transpose() << std::endl;
+        std::cout << "estimated mean random effects: " << mu.head(10).transpose() << std::endl;
         //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
-//#if PRINT_MSG
+
+#ifdef PRINT_MSG
         if(constr == true)
-            std::cout << "Dxy*mu : " << Dxy*mu << ", should be : " << e << std::endl;
-//#endif
+            std::cout << "Dxy*mu : " << (Dxy*mu).transpose() << ", \nshould be : " << e.transpose() << std::endl;
+#endif
     }
 
     #endif
@@ -827,12 +997,12 @@ int main(int argc, char* argv[])
     // when the range of u is large the variance of b0 is large.
     if(MPI_rank == 0){
 
-        std::cout << "==================== compute marginal variances ================" << std::endl;
+        std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
+        std::cout << "\nUSING ESTIMATED THETA : " << theta_original.transpose() << std::endl;
 
         t_get_marginals = -omp_get_wtime();
-        fun->get_marginals_f(theta, marg);
+        fun->get_marginals_f(theta_original, marg);
         t_get_marginals += omp_get_wtime();
 
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
@@ -840,6 +1010,7 @@ int main(int argc, char* argv[])
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
 
+/*
 #ifdef DATA_SYNTHETIC
         // ============================================ //
         Vect marg_original(n);
@@ -881,8 +1052,11 @@ int main(int argc, char* argv[])
         std::cout << "est. standard dev fixed eff  : " << marg_INLA.tail(nb).cwiseSqrt().transpose() << std::endl;
         std::cout << "est. std dev random eff      : " << marg_INLA.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
+   */
     }
+
 #endif  // #if 0/1 for marginals
+
 
 #if 0
     // =================== expected marginal variances ============================ //
