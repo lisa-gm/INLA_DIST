@@ -1093,6 +1093,19 @@ inline void indexed_log_sum(T *x, size_t *index, size_t N, T *sum)
    }
 }
 
+
+/************************************************************************************************/
+
+template <typename T>
+inline void log_sum(T *x, size_t N, T *sum)
+{
+   #pragma omp parallel for reduction(+:sum[:1])
+   for (int i = 0; i < N; i++)
+   {
+      *sum += log(x[i]);
+   }
+}
+
 /************************************************************************************************/
 
 template <typename T>

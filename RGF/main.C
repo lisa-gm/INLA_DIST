@@ -464,12 +464,17 @@ int main(int argc, char* argv[])
 
   t_factorise = get_time(0.0);
   //solver->solve_equation(GR);
-  double flops_factorize = solver->factorize();
-  t_factorise = get_time(t_factorise);
-
-
+  double logDet_new;
+  double flops_factorize = solver->factorize_noCopyHost(logDet_new);
   double log_det = solver->logDet();
-  printf("logdet: %f\n", log_det);
+
+  t_factorise = get_time(t_factorise);
+  //double log_det = solver->logDet();
+  printf("log det new : %f\n", logDet_new);
+  printf("logdet      : %f\n", log_det);
+
+  printf("\n\n");
+
 
   printf("flops factorize: %f\n", flops_factorize);
 
