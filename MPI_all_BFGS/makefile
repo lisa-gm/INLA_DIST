@@ -20,10 +20,10 @@ include $(RGF_PATH)/make.inc
 CXX=mpicxx     # FAU
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
 
-DEBUG= # -g -Wall
+DEBUG= -g #-Wall
 
 # LIBRARIES
-LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_new		#version with deterministic determinant! 
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv		#version with deterministic determinant! 
 							#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L$(MKLROOT)/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 #LIBRGF=-lrgf
@@ -35,8 +35,8 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
-INCEIGEN=-I/usr/include/eigen3
-#INCEIGEN=-I$(BASE_PATH)/applications/eigen
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.3.9
 INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 

@@ -34,7 +34,6 @@ class RGFSolver: public Solver {
         int threads_level1;
 
         /* matrix size */
-        unsigned int n;                  /**< size of the matrix */
         unsigned int nnz;       /**< number of nonzeros */
 
         // to avoid redeclaration every time
