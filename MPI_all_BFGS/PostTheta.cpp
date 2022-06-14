@@ -164,16 +164,29 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	n           = nb + ns*nt;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 
+	// slow for large datasets!!
 	if(validate){
-		yTy         = (w.cwiseProduct(y)).dot(w.cwiseProduct(y));
+		// CAREFUL: overwriting y here!
+		y          = w.cwiseProduct(y);
+		yTy         = y.dot(y);
 		//std::cout << yTy << std::endl;
-		AxTy		= Ax.transpose()*w.cwiseProduct(y);
+
+		// CAREFUL: overwriting Ax here!
+		for(int i=0; i<Ax.rows(); i++){
+			Ax.row(i) *= w(i);
+		}
+
+		AxTy        = Ax.transpose()*y;
+		AxTAx       = Ax.transpose()*Ax;
+		
+		w_sum       = w.sum();
+
 	} else {
 		yTy         = y.dot(y);
 		AxTy		= Ax.transpose()*y;
+		AxTAx       = Ax.transpose()*Ax;
 	}
 
-	AxTAx       = Ax.transpose()*Ax;
 
 
 #ifdef PRINT_MSG
@@ -674,6 +687,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 	SpMat Q(n, n);
 	construct_Q(theta, Q);
 
+	/*
 	MatrixXd Q_d = MatrixXd(Q);
 	//std::cout << "Q.bottomRightCorner(10,10) : \n" << Q_d.bottomRightCorner(10,10) << std::endl;
 	MatrixXd Q_fe = Q_d.bottomRightCorner(nb,nb);
@@ -696,7 +710,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 	}
 
 	std::cout << "Correlation mat FE = \n" << Cor_fe << "\n" << std::endl;
-
+	*/
 
 	//std::cout << "exp(theta[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
 	
@@ -1513,7 +1527,7 @@ void PostTheta::eval_likelihood(Vect& theta, double &log_det, double &val){
 	double theta0 = theta[0];
 
 	if(validate){
-		log_det = 0.5 * w.sum()*theta0;  // some are zero ...
+		log_det = 0.5 * w_sum*theta0;  // some are zero ...
 	} else {
 		log_det = 0.5 * no*theta0;
 	}

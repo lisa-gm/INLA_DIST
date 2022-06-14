@@ -102,6 +102,8 @@ class PostTheta{
     Vect t_grad;		/**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
 
+    double w_sum;       /**< only used if validate is true                  */
+
     int no_f_eval;      /**< number of function evaluations per iteration   */
 
     int MPI_size;       /**< number of mpi ranks                            */

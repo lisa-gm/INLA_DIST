@@ -337,9 +337,8 @@ int main(int argc, char* argv[])
     theta = {-1.5,-5,-2};
     //theta.print();
   } else {
-    //theta = {1.386, -5.883, 1.04, 3.689};
+    theta = {1.386, -5.883, 1.04, 3.689};
     //theta = {5, -10, 2.5, 1};
-    theta = {1.386294, -5.882541,  1.039721,  3.688879};
     //theta.print();
   }
 
@@ -467,7 +466,7 @@ int main(int argc, char* argv[])
   t_factorise1 = get_time(0.0);
   //solver->solve_equation(GR);
   double logDet_new;
-  //double flops_factorize = solver->factorize_noCopyHost(logDet_new);
+  double flops_factorize = solver->factorize_noCopyHost(logDet_new);
   t_factorise1 = get_time(t_factorise1);
 
   t_factorise2 = get_time(0.0);
@@ -483,7 +482,7 @@ int main(int argc, char* argv[])
   printf("\n\n");
 
 
-  ///printf("flops factorize: %f and %f\n", flops_factorize, flops_factorize2);
+  printf("flops factorize: %f and %f\n", flops_factorize, flops_factorize2);
 
   // write this to file
   /*std::string L_factor_file_name = base_path + "/L_factor_RGF"  + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s + ".dat";
@@ -533,7 +532,6 @@ int main(int argc, char* argv[])
   }*/
 
   // create file with solution vector
-  /*
   std::string sol_x_file_name = base_path + "/x_sol_RGF"  + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
   std::ofstream sol_x_file(sol_x_file_name,    std::ios::out | std::ios::trunc);
 
@@ -543,9 +541,7 @@ int main(int argc, char* argv[])
   }
 
   sol_x_file.close();
-  */
 
-  /*
   std::string log_file_name = base_path + "/log_RGF_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
   std::ofstream log_file(log_file_name);
   log_file << ns << std::endl;
@@ -565,10 +561,9 @@ int main(int argc, char* argv[])
   log_file << flops_inv << std::endl;
 
   log_file.close(); 
-  */
 
     // print/write diag 
-  string sel_inv_file_name = base_path +"/sel_inv_RGF_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+  string sel_inv_file_name = base_path +"/RGF_sel_inv_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
   cout << sel_inv_file_name << endl;
   ofstream sel_inv_file(sel_inv_file_name,    ios::out | ::ios::trunc);
   

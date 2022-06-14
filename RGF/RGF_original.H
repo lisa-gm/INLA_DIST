@@ -2,7 +2,6 @@
 #define __RGF
 
 #include <string.h>
-#include <omp.h>
 
 #include "cublas_v2.h"
 #include "Types.H"
@@ -20,7 +19,6 @@ public:
 
     ~RGF();
     double factorize();
-    double factorize_noCopyHost(double &logDet);
     double solve(T*,size_t);
     double solve(T*,T*,size_t);
     double RGFdiag(T*);
@@ -45,7 +43,6 @@ private:
     size_t *diag_pos;
 
     size_t b_size;
-    bool MF_allocated = false;
     bool MF_dev_allocated = false;
     bool factorization_completed = false;
 
@@ -72,7 +69,6 @@ private:
     inline size_t mf_dense_block_lda(size_t);
 
     double FirstStageFactor();
-    double FirstStageFactor_noCopyHost(double &logDet);
     double SecondStageSolve(size_t);
     double ThirdStageRGF(T*,T*);
     void create_blocks();
@@ -157,12 +153,6 @@ RGF<T>::RGF(size_t *ia, size_t *ja, T *a, size_t ns, size_t nt, size_t nd)
 template <class T>
 RGF<T>::~RGF()
 {
-   // in case that only factorize_noCopyHost is called MF not allocated ...
-   if (MF_allocated)
-   {
-      delete[] MF;
-   }
-
    if (MF_dev_allocated)
    {
       size_t max_supernode_nnz = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
@@ -171,6 +161,7 @@ RGF<T>::~RGF()
       deallocate_data_on_dev(blockM_dev,max_supernode_nnz*sizeof(T));
       deallocate_data_on_dev(blockP_dev,max_supernode_nnz*sizeof(T));
       deallocate_data_on_dev(blockDense_dev,dense_supernode_nnz*sizeof(T));
+      delete[] MF;
    }
 
    magma_queue_destroy(magma_queue);
@@ -401,194 +392,6 @@ double RGF<T>::FirstStageFactor()
     return flops;
 }
 
-
-/************************************************************************************************/
-
-template <class T>
-double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
-{
-    int info;
-    size_t IB;
-    size_t NR,NM;
-    T ONE      = f_one();
-
-    // count floating point operations
-    double flops = 0;
-
-//tpotrf_dev('L', NR, M1_dev ,NR ,&info)
-//rj dpotrf MF[0,0]
-//rj dtrsm RLTN MF[0,0] MF[1,0]
-
-    IB = 0;
-    NR = Bmax[0]-Bmin[0];
-
-    init_supernode(blockR_dev, IB);
-    if (matrix_nd > 0)
-    {
-       init_supernode(blockDense_dev, matrix_nt);
-    }
-
-#ifdef PRINT_MSG
-    std::cout << "calling first Cholesky factorization now" << std::endl;
-#endif
-
-    // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
-    tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-    //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
-    flops += 0.5 * NR * NR * NR;
-
-    //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
-    if (matrix_nt > 1)
-    {
-       // UPDATE COLUMNS ACCORDING TO CHOLESKY FACTORISATION
-       ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue);
-       flops += 2.0*(NR + matrix_nd) * NR * NR;
-    }
-
-    // replace all copy supernode to host by computing sum of current diagonal block
-    //copy_supernode_to_host(blockR_dev, IB);
-    copy_supernode_diag(blockR_dev, IB);
-
-#ifdef PRINT_MSG
-   std::cout << "entering loop block factorization loop now" << std::endl; 
-#endif  
-
-    //rj IB = 1; IB < NBlock; IB++
-    for (IB = 1; IB < matrix_nt-1; IB++)
-    {
-
-#ifdef PRINT_MSG
-         std::cout << "IB = " << IB << std::endl;
-#endif
-
-       NR  = Bmax[IB]-Bmin[IB];
-       NM  = Bmax[IB-1]-Bmin[IB-1];
-
-       swap_pointers(&blockR_dev, &blockM_dev);
-       init_supernode(blockR_dev, IB);
-
-       // UPDATE NEXT DIAGONAL BLOCK 
-       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
-       // todo rj: 3-last parameter ZERO in PARDISO
-       tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
-       flops += 2.0 * NR * NR * NR;
-
-       if (matrix_nd > 0)
-       {
-          // Update dense rows of super node IB
-          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          // NM = NR
-          flops += 2.0*matrix_nd * NR * NM;
-          
-          // update last diagonal block
-          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-          flops += 2.0 * matrix_nd * matrix_nd * NM;
-       }
-       //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
-       //rj dpotrf MF[IB,IB]
-       tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
-       //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
-       //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
-       ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
-       flops += 2.0 *(NR + matrix_nd) * NR * NR;
-       //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
-
-       //copy_supernode_to_host(blockR_dev, IB);
-       copy_supernode_diag(blockR_dev, IB);
-
-    }
-
-    if (matrix_nt > 1)
-    {
-       IB = matrix_nt-1;
-       NR  = Bmax[IB]-Bmin[IB];
-       NM  = Bmax[IB-1]-Bmin[IB-1];
-
-       swap_pointers(&blockR_dev, &blockM_dev);
-       init_supernode(blockR_dev, IB);
-
-       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
-       // todo rj: 3-last parameter ZERO in PARDISO
-       tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
-       flops += 2.0* NR * NR * NR;
-
-       if (matrix_nd > 0)
-       {
-          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          flops += 2.0*matrix_nd * NR * NM;
-
-          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-          flops += 2.0* matrix_nd * matrix_nd * NM; 
-       }
-       //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
-       //rj dpotrf MF[IB,IB]
-       tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
-    
-       //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
-       //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
-       if (matrix_nd > 0)
-       {
-          ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          flops += 2.0*matrix_nd * NR * NR;
-       
-       }
-       //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
-
-       //copy_supernode_to_host(blockR_dev, IB);
-       copy_supernode_diag(blockR_dev, IB);
-
-    }
-
-    if (matrix_nd > 0)
-    {
-       IB = NBlock-1;
-       NR  = Bmax[IB]-Bmin[IB];
-       NM  = Bmax[IB-1]-Bmin[IB-1];
-
-       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
-       //rj NM is the same for all blocks 0..nt-1
-       tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-       flops += 2.0* matrix_nd * matrix_nd * NM; 
-   
-       //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
-       //rj dpotrf MF[IB,IB]
-       tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
-
-       //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
-
-#ifdef PRINT_MSG
-       std::cout << "after complete Cholesky factorization" << std::endl;
-#endif
-
-       //copy_supernode_to_host(blockDense_dev, IB);
-       copy_supernode_diag(blockDense_dev, IB);
-
-    }
-
-   double t_copy = -omp_get_wtime();
-   // copy result from the device to the host:
-   T* diag;
-   diag = new T[matrix_size];
-   cudaMemcpy(diag, diag_dev, matrix_size*sizeof(T), cudaMemcpyDeviceToHost );
-
-   // compute log sum
-   log_sum(diag, matrix_size, &logDet);
-   logDet = 2*logDet;
-
-   t_copy += omp_get_wtime();
-
-#ifdef PRINT_TIMES
-   std::cout << "Log Det Copy & Compute time : " << t_copy << std::endl;
-
-#endif
-   //printf("\nnew logDet = %f\n", logDet);
-
-    return flops;
-}
-
 /************************************************************************************************/
 
 // After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
@@ -813,12 +616,6 @@ double RGF<T>::factorize()
 {
     create_blocks();
 
-   if(!MF_allocated)
-   {
-      MF = new T[matrix_n_nonzeros];
-      MF_allocated = true;
-   }
-
     //Data allocation
     if (!MF_dev_allocated)
     {
@@ -850,65 +647,6 @@ double RGF<T>::factorize()
     deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));
 
     factorization_completed = true;
-
-    return flops;
-}
-
-
-/************************************************************************************************/
-
-template <class T>
-double RGF<T>::factorize_noCopyHost(double &logDet)
-{
-    //printf("In new factorize function.\n");
-    create_blocks();
-
-    // Data allocation device
-    if (!MF_dev_allocated)
-    {
-       // don't need to initialize MF 
-       //MF = new T[matrix_n_nonzeros];
-       size_t max_supernode_nnz = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
-       size_t dense_supernode_nnz = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
-       allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz*sizeof(T));
-       allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz*sizeof(T));
-       allocate_data_on_device((void**)&blockP_dev,max_supernode_nnz*sizeof(T));
-       allocate_data_on_device((void**)&blockDense_dev,dense_supernode_nnz*sizeof(T));
-       MF_dev_allocated = true; // otherwise stuff never gets deleted ...
-    }
-
-    size_t nnz = matrix_ia[matrix_size];
-    size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
-    size_t max_cols = max(matrix_ns, matrix_nd);
-
-    //Temp data allocation
-    allocate_data_on_device((void**)&ia_dev,(max_cols+1)*sizeof(size_t));
-    allocate_data_on_device((void**)&ja_dev,max_rows*max_cols*sizeof(size_t));
-    allocate_data_on_device((void**)&a_dev,max_rows*max_cols*sizeof(T));
-
-    //////// NEW /////////////
-   // allocate arrays to store diagonal elements 
-   allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
-   allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
-   
-   //Copy diag_pos to device
-   memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
-
-    //Computation
-    double flops = FirstStageFactor_noCopyHost(logDet);
-
-    //////// NEW /////////////
-    //Data deallocation
-    deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
-    deallocate_data_on_dev(diag_pos_dev,matrix_size*sizeof(size_t));
-
-    //Temp data deallocation
-    deallocate_data_on_dev(ia_dev,(max_cols+1)*sizeof(size_t));
-    deallocate_data_on_dev(ja_dev,max_rows*max_cols*sizeof(size_t));
-    deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));
-
-    // factor doesn't exist, hence mark as false
-    factorization_completed = false;
 
     return flops;
 }

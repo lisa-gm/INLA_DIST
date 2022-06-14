@@ -233,8 +233,8 @@ int main(int argc, char* argv[])
     Vect y;
 
     int num_constr = 1;
-    //bool constr = false;
-    bool constr = true;
+    bool constr = false;
+    //bool constr = true;
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -424,7 +424,10 @@ int main(int argc, char* argv[])
     file_exists(y_file);
     // at this point no is set ... 
     // not a pretty solution. 
-    y = read_matrix(y_file, no, 1);   
+    y = read_matrix(y_file, no, 1);  
+    if(MPI_rank == 0) 
+        std::cout << "sum(y) = " << y.sum() << std::endl;
+
 //#endif
 
 
@@ -574,7 +577,7 @@ int main(int argc, char* argv[])
 
             //exit(1);       
 
-#if 1
+#if 0
             if(MPI_rank == 0)
                 std::cout << "constrain spatial-temporal data." << std::endl;
             
@@ -646,7 +649,7 @@ int main(int argc, char* argv[])
 #if 1
             // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
             // number of time-steps per constraint 
-            int tsPerConstr = 60;
+            int tsPerConstr = 1;
             num_constr = ceil(1.0 * nt / tsPerConstr);
             if(MPI_rank == 0)
                 std::cout << "num constr = " << num_constr << std::endl;
@@ -748,12 +751,13 @@ int main(int argc, char* argv[])
     // ========================== set up validation set ======================= //
 
     bool validate = false;
+    //bool validate = true;
     Vect w;
 
     if(validate){
         // Vect::Random() creates uniformly distributed random vector between [-1,1]
         // size validation set, ie. 0.1 -> 10% of total observations
-        double r = 0.05;
+        double r = 0.1;
         w = Vect::Random(no);
 
         for(int i=0;i<no; i++){
@@ -847,14 +851,17 @@ int main(int argc, char* argv[])
     }
 
 
-#if 1
 
     double fx;
 
-    //Vect grad_test(dim_th);
-    //fx = fun(theta, grad_test);
-    //std::cout <<  "f(x) = " << fx << std::endl;
+    // single function evaluation
+    /*
+    Vect mu_dummy(n);
+    fx = fun->eval_post_theta(theta_original, mu_dummy);
+    std::cout <<  "f(x) = " << fx << std::endl;
+    */
 
+#if 1
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -942,7 +949,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 0
+    #if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -985,7 +992,33 @@ int main(int argc, char* argv[])
 #endif
     }
 
-    #endif
+    // ============================================ validate ============================================= //
+    if(validate && MPI_rank == 0){
+        // compute 1/n*||(y - Ax*mu))|| for all w_i = 0 and w_i = 1 respectively
+        std::cout << "sum(y) = " << y.sum() << std::endl;
+
+        Vect diff_pred = y - Ax*mu;
+        std::cout << "diff_pred(1:10) = " << diff_pred.head(10).transpose() << std::endl;
+
+        double diff_temp_w1 = 0;
+        double diff_temp_w0 = 0;
+
+        for(int i=0; i<no; i++){
+            if(w(i) == 1){
+                diff_temp_w1 += diff_pred[i]*diff_pred[i];
+            } else {
+                diff_temp_w0 += diff_pred[i]*diff_pred[i];
+            }
+        }
+
+        double diff_w1 = 1/w.sum()*sqrt(diff_temp_w1);
+        double diff_w0 = 1/(no - w.sum())*sqrt(diff_temp_w0);
+
+        std::cout << "difference w_i = 1 : " << diff_w1 << std::endl;
+        std::cout << "difference w_i = 0 : " << diff_w0 << std::endl;
+    }
+    
+#endif
 
   
     // =================================== compute marginal variances =================================== //
@@ -1135,7 +1168,7 @@ int main(int argc, char* argv[])
 #endif
 
     // =================================== print times =================================== //
-    #if 0
+    #if 1
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 

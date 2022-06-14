@@ -137,7 +137,7 @@ void generate_ex_regression( size_t nb,  size_t no, double& tau, Eigen::MatrixXd
 
     y = B*b + noise_vec;
 
-    std::cout << "b = " << b.transpose() << std::endl;
+    std::cout << "b                  : " << b.transpose() << std::endl;
 
     /*std::cout << "noise vec " << std::endl;
     std::cout << noise_vec << std::endl; 
@@ -230,13 +230,14 @@ void generate_ex_spatial_temporal_constr(size_t ns, size_t nt, size_t nb, size_t
     LLT<MatrixXd> lltOfA(Prec); // compute the Cholesky decomposition of A
     MatrixXd L_b = lltOfA.matrixL();
 
-    int seed = 4;
+    int seed = 199;
     Vect z_b(nb);
     rnorm_gen(nb, 0.0, 1.0, z_b, seed);
-    std::cout << "z_b = " << z_b.transpose() << std::endl;
+    //std::cout << "z_b = " << z_b.transpose() << std::endl;
 
     b = L_b.triangularView<Lower>().solve(z_b);
-    std::cout << "norm(L*b - z) = " << (L_b*b - z_b).norm() << std::endl;
+    //std::cout << "b : " << b.transpose() << std::endl;
+    //std::cout << "norm(L*b - z) = " << (L_b*b - z_b).norm() << std::endl;
 
     // handle CONSTRAINED spatial part
 
@@ -245,7 +246,7 @@ void generate_ex_spatial_temporal_constr(size_t ns, size_t nt, size_t nb, size_t
 
     Vect z_st(ns*nt);
     rnorm_gen(nb, 0.0, 1.0, z_st, seed+1);
-    std::cout << "z = " << z_st.transpose() << std::endl;
+    //std::cout << "z = " << z_st.transpose() << std::endl;
 
     u = L_st.triangularView<Lower>().solve(z_st);
 
@@ -254,7 +255,11 @@ void generate_ex_spatial_temporal_constr(size_t ns, size_t nt, size_t nb, size_t
     MatrixXd U = W.inverse()*V.transpose();
     Vect c = Dst*u - e;
     u = u - U.transpose()*c;
-    std::cout << "Dst*u = " << Dst*u << std::endl;
+    if((Dst*u).norm() > 1e-10){
+      std::cout << "Dst*u = " << Dst*u << std::endl;
+      std::cout << "This should be zero?!" << std::endl;
+      exit(1);
+    }
     // ", b = " << b.transpose()
 
     Vect noise_vec(no);

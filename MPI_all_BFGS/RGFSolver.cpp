@@ -98,10 +98,13 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
-	double flops_factorize = solver->factorize();
+    //double flops_factorize = solver->factorize_noCopyHost(log_det);
+    //std::cout << "log_det new      = " << log_det << std::endl;
+	
+    double flops_factorize = solver->factorize();
+    log_det = solver->logDet();
+    //std::cout << "log_det original = " << log_det << std::endl;
 	t_factorise = get_time(t_factorise);
-
-	log_det = solver->logDet();
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -320,7 +323,6 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 	//solver->solve_equation(GR);
 	double flops_factorize = solver->factorize();
 	t_factorise = get_time(t_factorise);
-
 	log_det = solver->logDet();
 
 #ifdef PRINT_MSG
@@ -498,7 +500,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
 // FOR NOW: cannot rely on factorisation to be there.
 void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 
-    unsigned int n = ns_t*ns_t + nb_t;
+    unsigned int n = ns_t*nt_t + nb_t;
 
 #ifdef PRINT_MSG
 	std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
