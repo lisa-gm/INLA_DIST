@@ -25,7 +25,7 @@
 #include "RGFSolver.h"
 //#include "RGFSolver_dummy.h"
 
-#define SMART_GRAD
+//#define SMART_GRAD
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
@@ -128,6 +128,8 @@ class PostTheta{
 
     const bool validate;
     const Vect w;
+
+    bool printed_eps_flag = false;
 
 
 	public:

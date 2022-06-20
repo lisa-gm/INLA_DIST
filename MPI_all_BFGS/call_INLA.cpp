@@ -861,7 +861,7 @@ int main(int argc, char* argv[])
     std::cout <<  "f(x) = " << fx << std::endl;
     */
 
-#if 1
+#if 0
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -923,7 +923,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 1
+    #if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -1168,7 +1168,7 @@ int main(int argc, char* argv[])
 #endif
 
     // =================================== print times =================================== //
-    #if 1
+    #if 0
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 

@@ -270,23 +270,29 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 double PostTheta::operator()(Vect& theta, Vect& grad){
 
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 		std::cout << "\niteration : " << iter_count << std::endl;
-	#endif
+#endif
 
-	#ifdef PRINT_TIMES
+#ifdef PRINT_TIMES
 		if(MPI_rank == 0)
 			std::cout << "\niteration : " << iter_count << std::endl;
-	#endif
+#endif
 
 	iter_count += 1; 
-
 	int dim_th = theta.size();
 
 	// configure finite difference approximation (along coordinate axes or smart gradient)
-	double eps = 0.005;
+	double eps = 1e-5;
+	//double eps = 1e-3;
 	// projection matrix G, either Identity or other orthonormal basis (from computeG function)
 	//G = MatrixXd::Identity(dim_th, dim_th);
+
+	if(MPI_rank == 0 && printed_eps_flag == false){
+		std::cout << "Finite Difference : h = " << std::scientific << eps << std::endl;
+		printed_eps_flag = true;
+	}
+
 
 #ifdef SMART_GRAD
 	// changing G here, however G needs to be available Hessian later
@@ -334,6 +340,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 		//LIKWID_MARKER_START("fThetaComputation");
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
+		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
 		//LIKWID_MARKER_STOP("fThetaComputation");
 		
 		timespent_f_theta_eval += omp_get_wtime();
@@ -407,20 +414,6 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	// now write them into appropriate forward / backward buffer
 	double f_theta = f_temp_list(0);
-
-	// print all theta's who result in a new minimum value for f(theta)
-	if(f_theta < min_f_theta){
-		min_f_theta = f_theta;
-		if(MPI_rank == 0){
-			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			std::cout << "theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
-			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			*/
-		}
-	}
-
 	Vect f_forw  = f_temp_list.segment(1,dim_th);
 	Vect f_backw = f_temp_list.tail(dim_th);
 
@@ -445,12 +438,29 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	t_grad = grad;
 	//std::cout << "grad : " << grad.transpose() << std::endl;
 
+	// print all theta's who result in a new minimum value for f(theta)
+	if(f_theta < min_f_theta){
+		min_f_theta = f_theta;
+		if(MPI_rank == 0){
+			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
+			//std::cout << "\ntheta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			//std::cout << "grad : " << grad.transpose() << std::endl;
+			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
+			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			*/
+		}
+	}
+
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){  
         //std::cout << "f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
-        std::cout << "grad    : " << std::right << std::fixed << std::setprecision(12) << grad.transpose()  << std::endl;
+        //std::cout << "grad    : " << std::right << std::fixed << std::setprecision(4) << grad.transpose()  << std::endl;
     }
 #endif
+
+
 
 	return f_theta;
 
