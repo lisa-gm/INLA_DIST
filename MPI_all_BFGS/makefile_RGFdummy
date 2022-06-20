@@ -4,13 +4,15 @@ MKLROOT?=$(shell echo $$MKLROOT)
 # PARDISO only
 #############################################################################################################
 #BASE_PATH=/home/x_gaedkelb
-BASE_PATH=/users/lgaedkem
+#BASE_PATH=/users/lgaedkem
+BASE_PATH=/home/hpc/ihpc/ihpc060h
 
-CXX=CC     #mpic++
+#CXX=CC     #mpic++
+CXX=mpicxx
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
 
 # LIBRARIES
-LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_new 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 
 ARMADILLO=-larmadillo

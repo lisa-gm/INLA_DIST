@@ -888,23 +888,22 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
         //printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
         inv_diag(k) = a[j];
     }
+    
 
     for(k = 0; k < 10; k++){
         int j = ia[k]-1;
         printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
-  
     }
 
     for(k = n-10; k < n; k++){
         int j = ia[k]-1;
-        printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
-  
+        printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);  
     }
 
     /* print & save diagonal elements */
-      std::string sel_inv_file_name =  "sel_inv_PARDISO_test.dat"; 
+      std::string sel_inv_file_name =  "sel_inv_PARDISO_test.dat";
       std::ofstream sel_inv_file(sel_inv_file_name,    std::ios::out | std::ios::trunc);
-      
+
     for (k = 0; k < n; k++){
       int j = ia[k]-1;
       sel_inv_file << a[j] << std::endl;
