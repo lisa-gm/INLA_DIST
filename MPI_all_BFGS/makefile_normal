@@ -2,8 +2,8 @@
 MKLROOT?=$(shell echo $$MKLROOT)
 
 #BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/home/hpc/ihpc/ihpc060h
-BASE_PATH=/users/lgaedkem
+BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/users/lgaedkem
 
 ############# RGF ################
 
@@ -17,14 +17,14 @@ RGF_PATH      = ../RGF
 include $(RGF_PATH)/make.inc
 #############################################################################################################
 
-CXX=CC    # cscs
-#CXX=mpicxx     # FAU
+#CXX=CC    # cscs
+CXX=mpicxx     # FAU
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
 
 DEBUG= # -g -Wall
 
 # LIBRARIES
-LIBPARDISO=-lpardiso700-GNU840-X86-64-RINLA 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L$(MKLROOT)/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 #LIBRGF=-lrgf
 
@@ -37,7 +37,7 @@ LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 # INCLUDES
 #INCEIGEN=-I/usr/include/eigen3
 INCEIGEN=-I$(BASE_PATH)/applications/eigen
-INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
+INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
@@ -52,6 +52,7 @@ $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))
 $(info CUDA     : $(CUDAHOME))
 $(info MAGMA    : $(MAGMA))
+$(info BFGS     : $(INCBFGS))
 $(info EIGEN    : $(INCEIGEN))
 $(info RGF      : $(RGF_PATH))
 
