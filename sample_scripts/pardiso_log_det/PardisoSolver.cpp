@@ -48,8 +48,8 @@ PardisoSolver::PardisoSolver(int MPI_rank){
 
     // make sure that this is called inside upper level parallel region 
     // to get number of threads on the second level 
-    //iparm[2] = threads_level2;
-    iparm[2] = 8;
+    iparm[2] = threads_level2;
+    //iparm[2] = 8;
 
 
     iparm[33] = 1;      /* always returns the same result, even when executed in parallel,
@@ -58,7 +58,7 @@ PardisoSolver::PardisoSolver(int MPI_rank){
     maxfct = 1;         /* Maximum number of numerical factorizations.  */
     mnum   = 1;         /* Which factorization to use. */
 
-    msglvl = 0;         /* Print statistical information  */
+    msglvl = 1;         /* Print statistical information  */
     error  = 0;         /* Initialize error flag */
 
     init = 0;           /* switch that determines if symbolic factorisation already happened */

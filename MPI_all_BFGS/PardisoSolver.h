@@ -15,7 +15,7 @@
 
 #include "Solver.h"
 
-//#define PRINT_PAR
+#define PRINT_PAR
 //#define PRINT_OMP
 
 typedef Eigen::VectorXd Vect;

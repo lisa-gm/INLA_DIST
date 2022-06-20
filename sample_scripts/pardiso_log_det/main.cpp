@@ -411,6 +411,33 @@ int main(int argc, char* argv[])
 
 #if 1
     // =========================================================================== //
+    // initialize solvers
+
+    //#pragma omp parallel
+    //#pragma omp single
+    //{
+
+    int MPI_rank = 0;
+
+    Solver* solverQst;
+    Solver* solverQ;
+
+    solverQst = new PardisoSolver(MPI_rank);
+    solverQ   = new PardisoSolver(MPI_rank);
+
+
+    std::cout << "Selective inversion num threads = " << omp_get_max_threads() << std::endl; 
+    Vect inv_diag(n);
+    solverQ->selected_inversion(Q, inv_diag);
+
+   std::cout << "invDiag(1:10) = " << inv_diag.head(10).transpose() << std::endl;
+ 
+    //} // close omp single
+
+#endif
+
+#if 0
+    // =========================================================================== //
     // set constraints
     std::cout << "setting up constraints." << std::endl;
     bool constr = true;
@@ -569,7 +596,7 @@ int main(int argc, char* argv[])
 #endif
 
 
-#if 1
+#if 0
     // ========================================================================== //
     // compute constrained pi(x | \theta, y, Dx = e )
 

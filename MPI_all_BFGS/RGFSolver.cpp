@@ -98,11 +98,11 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
-    //double flops_factorize = solver->factorize_noCopyHost(log_det);
+    double flops_factorize = solver->factorize_noCopyHost(log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
 	
-    double flops_factorize = solver->factorize();
-    log_det = solver->logDet();
+    //double flops_factorize = solver->factorize();
+    //log_det = solver->logDet();
     //std::cout << "log_det original = " << log_det << std::endl;
 	t_factorise = get_time(t_factorise);
 
