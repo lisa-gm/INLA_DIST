@@ -70,6 +70,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 
 #ifdef RECORD_TIMES
 	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + ".txt";
+    std::ofstream log_file(log_file_name);
+    log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
+    log_file.close(); 
 #endif
 
 }
@@ -156,6 +159,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 #ifdef RECORD_TIMES
 	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + ".txt";
+    std::ofstream log_file(log_file_name);
+    log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
+    log_file.close(); 
 #endif
 
 
@@ -266,6 +272,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 #ifdef RECORD_TIMES
 	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + ".txt";
+    std::ofstream log_file(log_file_name);
+    log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
+    log_file.close(); 
 #endif
 
 }
@@ -361,8 +370,8 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 		// for now write to file. Not sure where the best spot would be.
 		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-		record_times(log_file_name, iter_count, t_Ftheta_ext, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-						t_likel, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+						t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 		
 		timespent_f_theta_eval += omp_get_wtime();
@@ -1315,6 +1324,11 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	#pragma omp single
 	{
 	// =============== evaluate NOMINATOR ================= //
+	
+#ifdef RECORD_TIMES
+	t_thread_nom = -omp_get_wtime();
+#endif
+
 	#pragma omp task
 	{ 
 	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
@@ -1407,6 +1421,14 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	} // end pragma omp task of computing nominator
 
+#ifdef RECORD_TIMES
+	t_thread_nom += omp_get_wtime();
+#endif
+
+#ifdef RECORD_TIMES
+	t_thread_denom = -omp_get_wtime();
+#endif
+
 	#pragma omp task
 	{
 
@@ -1430,6 +1452,10 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		std::cout << "val d     : " <<  val_d << std::endl;
 #endif
 	}
+
+#ifdef RECORD_TIMES
+	t_thread_denom += omp_get_wtime();
+#endif
 
     #pragma omp taskwait
 
@@ -1911,16 +1937,16 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 }
 
 // record times within one iteration (over multiple iterations)
-void PostTheta::record_times(std::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
-								double& t_priorLat, double& t_priorLatAMat, double& t_priorLatChol, double& t_likel, 
-								double& t_condLat, double& t_condLatAMat, double& t_condLatChol, double& t_condLatSolve){
+void PostTheta::record_times(std::string file_name, int iter_count, double t_Ftheta_ext, double t_thread_nom, double t_priorHyp, 
+								double t_priorLat, double t_priorLatAMat, double t_priorLatChol, double t_likel, 
+								double t_thread_denom, double t_condLat, double t_condLatAMat, double t_condLatChol, double t_condLatSolve){
 
-	    std::ofstream log_file(file_name, std::ios_base::app | std::ios_base::out);
-	    log_file << MPI_rank     << " " << threads_level1 << " " << iter_count     << " ";
-	    log_file << t_Ftheta_ext << " " << t_priorHyp     << " " << t_priorLat     << " " << t_priorLatAMat << " " << t_priorLatChol << " " << t_likel << " ";
-	    log_file << t_condLat    << " " << t_condLatAMat  << " " << t_condLatChol  << " " << t_condLatSolve << " " << std::endl;
+    std::ofstream log_file(file_name, std::ios_base::app | std::ios_base::out);
+    log_file << MPI_rank       << " " << threads_level1 << " " << iter_count     << " ";
+    log_file << t_Ftheta_ext   << " " << t_thread_nom   << " " << t_priorHyp     << " " << t_priorLat     << " " << t_priorLatAMat << " " << t_priorLatChol << " " << t_likel << " ";
+    log_file << t_thread_denom << " " << t_condLat    << " " << t_condLatAMat  << " " << t_condLatChol  << " " << t_condLatSolve << " " << std::endl;
 
-  log_file.close(); 
+	log_file.close(); 
 }
 
 
