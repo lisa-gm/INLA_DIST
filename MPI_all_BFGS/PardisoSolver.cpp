@@ -163,7 +163,7 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
 }
 
 
-void PardisoSolver::factorize(SpMat& Q, double& log_det){
+void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol){
 
     int nrhs   = 1;              /* here only dummy variable */
 
@@ -241,9 +241,13 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det){
             if(isnan(a[i])){
                 std::cout << "In factorize!Found NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
             }
+
+            if(isinf(a[i])){
+                std::cout << "In factorize!Found Inf value in *a. a[" << i << "] = " << a[i] << std::endl;
+            }
         }
 
-    exit(1);
+        exit(1);
     }
 
     phase = 22;
@@ -418,7 +422,7 @@ void PardisoSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_
 } // end factorize_w_constr
 
  
-void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det){
+void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve){
 
     int nrhs   = 1;              /* only one solve necessary */
 
@@ -860,6 +864,8 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
     }
     //printf("\nFactorization completed ...\n");
 
+    std::cout << "Calling PARDISO with " << iparm[2] << "threads."<< std::endl;
+
     /* -------------------------------------------------------------------- */    
     /* ... Inverse factorization.                                           */                                       
     /* -------------------------------------------------------------------- */  
@@ -870,11 +876,17 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
 
     //printf("\nCompute Diagonal Elements of the inverse of A ... \n");
     phase = -22;
-    iparm[35]  = 0; /*  no not overwrite internal factor L */ 
+
+    iparm[35]  = 0; /*  no not overwrite internal factor L, CRASHES FOR LARGE MATRICES */ 
     //printf("iparm[35] = %d\n", iparm[35]);
 
     pardiso (pt, &maxfct, &mnum, &mtype, &phase, &n, a, ia, ja, &idum, &nrhs,
          iparm, &msglvl, b, x, &error,  dparm);
+
+    if (error != 0) {
+        printf("\nERROR %d", error);
+        exit(1);
+    }
 
     /* print diagonal elements */
     for (k = 0; k < n; k++)
@@ -884,7 +896,8 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
         inv_diag(k) = a[j];
     }
 
-
+    //std::cout << "indDiag(1:10) = " << inv_diag.head(10).transpose() << std::endl;
+    
     delete[] ia;
     delete[] ja;
     delete[] a;

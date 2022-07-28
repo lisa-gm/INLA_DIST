@@ -105,7 +105,7 @@ public:
      * @param[in]       Q precision matrix to be factorised.
      * @param[inout]    log_det computes log determinant of Q.
      */
-    void factorize(SpMat& Q, double& log_det);
+    void factorize(SpMat& Q, double& log_det, double& t_priorLatChol);
 
     void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V);
 
@@ -116,7 +116,7 @@ public:
      * @param[inout]    sol solution of the system.
      * @param[inout]    log_det log determinant of Q.
      */    
-    void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
+    void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve);
 
     void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
     

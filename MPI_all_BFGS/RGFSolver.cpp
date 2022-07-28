@@ -26,7 +26,7 @@ void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 }
 
 // NOTE: this function is written to factorize prior! Assumes tridiagonal structure.
-void RGFSolver::factorize(SpMat& Q, double& log_det) {
+void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 
     unsigned int n = ns_t*nt_t;
 
@@ -98,12 +98,16 @@ void RGFSolver::factorize(SpMat& Q, double& log_det) {
 
 	t_factorise = get_time(0.0);
 	//solver->solve_equation(GR);
+
+    t_priorLatChol = get_time(0.0);
     double flops_factorize = solver->factorize_noCopyHost(log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
 	
     //double flops_factorize = solver->factorize();
     //log_det = solver->logDet();
     //std::cout << "log_det original = " << log_det << std::endl;
+    t_priorLatChol = get_time(t_priorLatChol);
+
 	t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_MSG
@@ -251,7 +255,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 
 }  // end factorize w constraints
 
-void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det) {
+void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve) {
 
     int nrhs = 1;
     unsigned int n = ns_t*nt_t + nb_t;
@@ -320,9 +324,12 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
 #endif
 
 	t_factorise = get_time(0.0);
+    t_condLatChol = get_time(0.0);
 	//solver->solve_equation(GR);
 	double flops_factorize = solver->factorize();
+    t_condLatChol = get_time(t_condLatChol);
 	t_factorise = get_time(t_factorise);
+    
 	log_det = solver->logDet();
 
 #ifdef PRINT_MSG
@@ -342,7 +349,11 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det)
   	}
 
   	t_solve = get_time(0.0); 
+    t_condLatSolve = get_time(0.0);
+
   	double flops_solve = solver->solve(x, b, nrhs);
+    
+    t_condLatSolve = get_time(t_condLatSolve);
   	t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
