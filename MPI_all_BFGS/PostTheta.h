@@ -29,6 +29,7 @@
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
+#define RECORD_TIMES
 
 using namespace Eigen;
 using namespace std;
@@ -45,6 +46,13 @@ typedef Eigen::VectorXd Vect;
 class PostTheta{
 
 	private:
+
+    int MPI_size;       /**< number of mpi ranks                            */
+    int MPI_rank;       /**< personal mpi rank                              */
+	int threads_level1; /**<  number of threads on first level 				*/
+	int threads_level2;
+
+
 	int ns;				/**<  number of spatial grid points per timestep 	*/
 	int nt;				/**<  number of temporal time steps 				*/
     int nb;				/**<  number of fixed effects 						*/
@@ -53,7 +61,6 @@ class PostTheta{
     int n;				/**<  total number of unknowns, i.e. ns*nt + nb 	*/
 
 	int dim_th;			/**<  dimension of hyperparameter vector theta 		*/
-	int threads_level1; /**<  number of threads on first level 				*/
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
@@ -106,9 +113,6 @@ class PostTheta{
 
     int no_f_eval;      /**< number of function evaluations per iteration   */
 
-    int MPI_size;       /**< number of mpi ranks                            */
-    int MPI_rank;       /**< personal mpi rank                              */
-
     MatrixXd G; 		/**< orthonormal basis for finite difference stencil 
     						  is Identity if smart gradient disabled 		*/
 
@@ -130,6 +134,20 @@ class PostTheta{
     const Vect w;
 
     bool printed_eps_flag = false;
+
+#ifdef RECORD_TIMES
+    std::string log_file_name;
+    // to record times 
+    double t_Ftheta_ext;
+	double t_priorHyp;
+	double t_priorLat;
+	double t_likel;
+	double t_condLat;
+
+	double t_priorLatChol;
+	double t_condLatChol;
+	double t_condLatSolve;
+#endif
 
 
 	public:
@@ -390,6 +408,12 @@ class PostTheta{
  	 * \todo don't actually need gradient?
      */
 	void eval_gradient(Vect& theta, double f_theta, Vect& mu, Vect& grad);
+
+	// measure times within each iterationstd::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
+	void record_times(std::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
+								double& t_priorLat, double& t_priorLatChol, double& t_likel, 
+								double& t_condLat, double& t_condLatChol, double& t_condLatSolve);
+
 
 	 /**
      * @brief class destructor. Frees memory allocated by PostTheta class.

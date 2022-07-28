@@ -163,7 +163,7 @@ void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
 }
 
 
-void PardisoSolver::factorize(SpMat& Q, double& log_det){
+void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol){
 
     int nrhs   = 1;              /* here only dummy variable */
 
@@ -422,7 +422,7 @@ void PardisoSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_
 } // end factorize_w_constr
 
  
-void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det){
+void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve){
 
     int nrhs   = 1;              /* only one solve necessary */
 
@@ -876,10 +876,18 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
 
     //printf("\nCompute Diagonal Elements of the inverse of A ... \n");
     phase = -22;
-    iparm[35]  = 1; /*  no not overwrite internal factor L */ 
+    iparm[35]  = 1; /*  no not overwrite internal factor L, CRASHES FOR LARGE MATRICES */ 
+
+
+    error = 0;
 
     pardiso (pt, &maxfct, &mnum, &mtype, &phase, &n, a, ia, ja, &idum, &nrhs,
          iparm, &msglvl, b, x, &error,  dparm);
+
+    if (error != 0) {
+        printf("\nERROR %d", error);
+        exit(1);
+    }
 
     /* print diagonal elements */
     for (k = 0; k < n; k++)
@@ -888,35 +896,9 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
         //printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
         inv_diag(k) = a[j];
     }
+
+    std::cout << "indDiag(1:10) = " << inv_diag.head(10).transpose() << std::endl;
     
-
-    for(k = 0; k < 10; k++){
-        int j = ia[k]-1;
-        printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
-    }
-
-    for(k = n-10; k < n; k++){
-        int j = ia[k]-1;
-        printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);  
-    }
-
-    /* print & save diagonal elements */
-      std::string sel_inv_file_name =  "sel_inv_PARDISO_test.dat";
-      std::ofstream sel_inv_file(sel_inv_file_name,    std::ios::out | std::ios::trunc);
-
-    for (k = 0; k < n; k++){
-      int j = ia[k]-1;
-      sel_inv_file << a[j] << std::endl;
-
-      //printf ("Diagonal element of A^{-1} = %d %d %32.24e\n", k, ja[j]-1, a[j]);
-      //printf ("Diagonal element of A      = %d %d %32.24e\n", k, ja[j]-1, 1.0*Q_u(k,k));
-
-      //printf ("Diagonal element of A^{-1}*A = %d %d %32.24e\n", k, ja[j]-1, a[j]*Q_u(k,k));
-
-    }
-  
-    sel_inv_file.close();
-
     delete[] ia;
     delete[] ja;
     delete[] a;
