@@ -141,8 +141,10 @@ class PostTheta{
     double t_Ftheta_ext;
 	double t_priorHyp;
 	double t_priorLat;
+	double t_priorLatAMat;
 	double t_likel;
 	double t_condLat;
+	double t_condLatAMat;
 
 	double t_priorLatChol;
 	double t_condLatChol;
@@ -411,8 +413,8 @@ class PostTheta{
 
 	// measure times within each iterationstd::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
 	void record_times(std::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
-								double& t_priorLat, double& t_priorLatChol, double& t_likel, 
-								double& t_condLat, double& t_condLatChol, double& t_condLatSolve);
+								double& t_priorLat, double& t_priorLatAMat, double& t_priorLatChol, double& t_likel, 
+								double& t_condLat, double& t_condLatAMat, double& t_condLatChol, double& t_condLatSolve);
 
 
 	 /**
