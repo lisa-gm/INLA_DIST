@@ -781,7 +781,7 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
         std::cout << "init = " << init << std::endl;
     #endif
 
-    msglvl = 1;
+    //msglvl = 1;
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -876,10 +876,9 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
 
     //printf("\nCompute Diagonal Elements of the inverse of A ... \n");
     phase = -22;
-    iparm[35]  = 1; /*  no not overwrite internal factor L, CRASHES FOR LARGE MATRICES */ 
 
-
-    error = 0;
+    iparm[35]  = 0; /*  no not overwrite internal factor L, CRASHES FOR LARGE MATRICES */ 
+    //printf("iparm[35] = %d\n", iparm[35]);
 
     pardiso (pt, &maxfct, &mnum, &mtype, &phase, &n, a, ia, ja, &idum, &nrhs,
          iparm, &msglvl, b, x, &error,  dparm);
@@ -897,7 +896,7 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
         inv_diag(k) = a[j];
     }
 
-    std::cout << "indDiag(1:10) = " << inv_diag.head(10).transpose() << std::endl;
+    //std::cout << "indDiag(1:10) = " << inv_diag.head(10).transpose() << std::endl;
     
     delete[] ia;
     delete[] ja;
@@ -1038,7 +1037,7 @@ void PardisoSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vec
 
     //printf("\nCompute Diagonal Elements of the inverse of A ... \n");
     phase = -22;
-    iparm[35]  = 1; /*  no not overwrite internal factor L */ 
+    iparm[35]  = 0; /*  no not overwrite internal factor L */ 
 
     pardiso (pt, &maxfct, &mnum, &mtype, &phase, &n, a, ia, ja, &idum, &nrhs,
          iparm, &msglvl, b, x, &error,  dparm);
