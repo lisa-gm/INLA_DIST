@@ -795,7 +795,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-2;
     param.delta = 1e-3;
     // maximum line search iterations
-    param.max_iterations = 200;
+    param.max_iterations = 5;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -854,12 +854,17 @@ int main(int argc, char* argv[])
 
     double fx;
 
-    // single function evaluation
-    /*
-    Vect mu_dummy(n);
-    fx = fun->eval_post_theta(theta_original, mu_dummy);
-    std::cout <<  "f(x) = " << fx << std::endl;
-    */
+#if 1
+    if(MPI_rank == 0){
+    	// single function evaluation
+    	for(int i=0; i<10; i++){
+    		Vect mu_dummy(n);
+    		fx = fun->eval_post_theta(theta_original, mu_dummy);
+    		std::cout <<  "f(x) = " << fx << std::endl;
+    	}
+    }
+#endif
+
 
 #if 0
     if(MPI_rank == 0)
@@ -923,7 +928,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-    #if 0
+#if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -949,7 +954,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 1
+    #if 0
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -972,6 +977,7 @@ int main(int argc, char* argv[])
         //std::cout << "time get covariance         : " << t_get_covariance << " sec" << std::endl;
     }
     #endif
+
 
     double t_get_fixed_eff;
     Vect mu(n);
@@ -1020,9 +1026,10 @@ int main(int argc, char* argv[])
     
 #endif
 
+
   
     // =================================== compute marginal variances =================================== //
-#if 1
+#if 0
 
     double t_get_marginals;
     Vect marg(n);
@@ -1032,10 +1039,10 @@ int main(int argc, char* argv[])
 
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta_original.transpose() << std::endl;
+        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
 
         t_get_marginals = -omp_get_wtime();
-        fun->get_marginals_f(theta_original, marg);
+        fun->get_marginals_f(theta, marg);
         t_get_marginals += omp_get_wtime();
 
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;

@@ -1,7 +1,7 @@
 # make.inc for RGF solver
 
-BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 ###### CPU ######
 RGF_MPICXX        = mpicxx #-Wl,-rpath -Wl,$(INTEL64)/compiler/lib/intel64
@@ -14,8 +14,8 @@ OPENMP            = -fopenmp
 
 ###### GPU ######
 NVCC              = nvcc
-RGF_NVCCFLAGS     = -arch=compute_70 -code=sm_70
-#RGF_NVCCFLAGS     = -arch=compute_80 -code=sm_80
+#RGF_NVCCFLAGS     = -arch=compute_70 -code=sm_70
+RGF_NVCCFLAGS     = -arch=compute_80 -code=sm_80
 
 RGF_CUDA_SDK      = 3
 RGF_COMMONFLAGS   = -DCUDA_SDK=$(CUDA_SDK)
@@ -26,7 +26,7 @@ INCMAG            = -I$(BASE_PATH)/applications/magma-2.6.1/include
 MAGMA             = -L$(BASE_PATH)/applications/magma-2.6.1/lib -lmagma
 
 CUDAHOME          = /usr/local/cuda
-#CUDAHOME          = $(CUDA_HOME)
+CUDAHOME          = $(CUDA_HOME)
 INCCUD	          = -I$(CUDAHOME)/include
 CUDA              = -L/usr/lib64/ -L$(CUDAHOME)/lib64 -lcudart -lcublas -lcufft -lcusparse -Wl,-rpath,$(CUDAHOME)/lib64
 

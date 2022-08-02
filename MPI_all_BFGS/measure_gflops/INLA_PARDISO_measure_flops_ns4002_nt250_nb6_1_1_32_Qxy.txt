@@ -1,0 +1,853 @@
+
+============== PARALLELISM & NUMERICAL SOLVERS ==============
+total no MPI ranks  : 1
+OMP threads level 1 : 1
+OMP threads level 2 : 32
+RGF dummy version
+Solver : PARDISO
+
+==================== MODEL SPECIFICATIONS ===================
+spatial-temporal model.
+sum(y) = -2.00616e+06
+using SYNTHETIC DATASET
+
+call spatial-temporal constructor.
+Prior : pc
+Regular FD gradient enabled.
+
+======================= HYPERPARAMETERS =====================
+theta original     :  1.386294 -5.882541  1.039721  3.688879
+theta prior param  : 0.233333 0.098000 0.700000 0.233333
+initial theta      :  4.000000 -3.344954  1.039721  1.386294
+initial theta interpret. param. : 4.000000 0.000000 0.000000 0.000000
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( reorder to reorder )
+=======================
+
+Times:
+======
+
+      Time fulladj: 0.207634 s
+      Time reorder: 8.561718 s
+      Time symbfct: 9.676166 s
+      Time parlist: 1.433345 s
+      Time malloc : -0.920671 s
+      Time total  : 23.888150 s total - sum: 4.929957 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         3013782989
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       3.01378e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 52.518856 s
+      Time malloc : 0.010326 s
+      Time total  : 52.529237 s total - sum: 0.000055 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        395.114361
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.702080 s
+      Time total  : 1.726847 s total - sum: 0.024767 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        395.114361
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 52.757859 s
+      Time malloc : 0.001583 s
+      Time total  : 52.759497 s total - sum: 0.000055 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        393.324418
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.451896 s
+      Time total  : 1.469881 s total - sum: 0.017985 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        393.324418
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 53.328937 s
+      Time malloc : 0.028356 s
+      Time total  : 53.357354 s total - sum: 0.000060 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        389.112469
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.621055 s
+      Time total  : 1.656728 s total - sum: 0.035673 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        389.112469
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 53.948107 s
+      Time malloc : 0.026163 s
+      Time total  : 53.974321 s total - sum: 0.000052 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        384.646572
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.567706 s
+      Time total  : 1.588190 s total - sum: 0.020484 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        384.646572
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 54.796823 s
+      Time malloc : 0.026830 s
+      Time total  : 54.823712 s total - sum: 0.000057 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        378.688999
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.470201 s
+      Time total  : 1.495758 s total - sum: 0.025557 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        378.688999
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 52.970653 s
+      Time malloc : 0.001181 s
+      Time total  : 52.971895 s total - sum: 0.000061 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        391.744354
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.528883 s
+      Time total  : 1.554993 s total - sum: 0.026110 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        391.744354
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 55.730517 s
+      Time malloc : 0.001462 s
+      Time total  : 55.732038 s total - sum: 0.000059 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        372.344548
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.500032 s
+      Time total  : 1.512011 s total - sum: 0.011979 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        372.344548
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 54.423117 s
+      Time malloc : 0.026215 s
+      Time total  : 54.449390 s total - sum: 0.000058 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        381.289339
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.545071 s
+      Time total  : 1.571607 s total - sum: 0.026536 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        381.289339
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 53.603245 s
+      Time malloc : 0.014325 s
+      Time total  : 53.617630 s total - sum: 0.000060 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        387.121233
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.536677 s
+      Time total  : 1.557636 s total - sum: 0.020959 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        387.121233
+f(x) = -94870.753259
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 55.427088 s
+      Time malloc : 0.027951 s
+      Time total  : 55.455106 s total - sum: 0.000067 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        374.382905
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( solve to solve )
+=======================
+
+Times:
+======
+
+      Time solve  : 1.554576 s
+      Time total  : 1.583852 s total - sum: 0.029277 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              32
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     1000506
+             #non-zeros in A:                                31922019
+             non-zeros in A (%):                             0.003189
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    272788
+             size of largest supernode:                      8010
+             number of nonzeros in L                         -1281184307
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       -1.28118e+09
+             number of perturbed pivots                      0
+             number of nodes in solve                        1000506
+             Gflop   for the numerical factorization:        20750.954251
+             Gflop/s for the numerical factorization:        374.382905
+f(x) = -94870.753259

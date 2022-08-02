@@ -56,8 +56,13 @@ PardisoSolver::PardisoSolver(int MPI_rank){
     mnum   = 1;         /* Which factorization to use. */
 
     msglvl = 0;         /* Print statistical information  */
-    error  = 0;         /* Initialize error flag */
 
+#ifdef MEAS_GFLOPS
+    if(MPI_rank == 0)
+        msglvl = 1;
+#endif
+
+    error  = 0;         /* Initialize error flag */
     init = 0;           /* switch that determines if symbolic factorisation already happened */
 
 } // end constructor
@@ -65,9 +70,9 @@ PardisoSolver::PardisoSolver(int MPI_rank){
 
 void PardisoSolver::symbolic_factorization(SpMat& Q, int& init){
 
-    #ifdef PRINT_PAR
-        std::cout << "in symbolic factorization." << std::endl;
-    #endif
+#ifdef PRINT_PAR
+    std::cout << "in symbolic factorization. thread ID: " << omp_get_thread_num() << std::endl;
+#endif
 
     n = Q.rows();
     int nrhs   = 1;              /* in symbolic factorization only dummy variable */
@@ -167,9 +172,15 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol)
 
     int nrhs   = 1;              /* here only dummy variable */
 
-    #ifdef PRINT_PAR
+#ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;
-    #endif
+#endif
+
+    // first measure flops of factorize_solve then factorize ... 
+    // so that they don't get mixed up in output
+#ifdef MEAS_GFLOPS
+    msglvl = 0;
+#endif
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -253,9 +264,13 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol)
     phase = 22;
     iparm[32] = 1; /* compute determinant */
 
+    t_priorLatChol = -omp_get_wtime();
+
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
+
+    t_priorLatChol += omp_get_wtime();
    
     if (error != 0) {
         printf("\nERROR during numerical factorization: %d", error);
@@ -430,6 +445,12 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
         std::cout << "init = " << init << std::endl;
     #endif
 
+    // first measure flops of factorize_solve then factorize ... 
+    // so that they don't get mixed up in output
+/*#ifdef MEAS_GFLOPS
+    msglvl = 0;
+#endif*/
+
     if(init == 0){
         symbolic_factorization(Q, init);
     }
@@ -531,9 +552,13 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     phase = 22;
     iparm[32] = 1; /* compute determinant */
 
+    t_condLatChol = -omp_get_wtime();
+
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
+
+    t_condLatChol += omp_get_wtime();
    
     if (error != 0) {
         printf("\nERROR during numerical factorization: %d", error);
@@ -553,10 +578,14 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     phase = 33;
 
     iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
-   
+
+    t_condLatSolve = -omp_get_wtime();
+     
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, b, x, &error,  dparm);
+
+    t_condLatSolve += omp_get_wtime();  
    
     if (error != 0) {
         printf("\nERROR during solution: %d", error);
@@ -876,7 +905,6 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
 
     //printf("\nCompute Diagonal Elements of the inverse of A ... \n");
     phase = -22;
-
     iparm[35]  = 0; /*  no not overwrite internal factor L, CRASHES FOR LARGE MATRICES */ 
     //printf("iparm[35] = %d\n", iparm[35]);
 
@@ -1233,3 +1261,4 @@ PardisoSolver::~PardisoSolver(){
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
 
 }
+
