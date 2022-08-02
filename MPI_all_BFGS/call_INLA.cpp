@@ -12,7 +12,7 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-//#define RGF
+#define RGF
 
 #ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -498,8 +498,8 @@ int main(int argc, char* argv[])
 
         //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
-        theta_param << 4, 0, 0, 0;
-        //theta_param << 4,4,4,4;
+        //theta_param << 4, 0, 0, 0;
+        theta_param << 4,4,4,4;
         //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
         /*theta << 2, -3, 1.5, 5;
         if(MPI_rank == 0){
@@ -786,14 +786,14 @@ int main(int argc, char* argv[])
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
     // stops if grad.norm() < eps_rel*x.norm() 
-    param.epsilon_rel = 1e-3;
+    param.epsilon_rel = 1e-5;
     // in the past ... steps
-    param.past = 2;
+    param.past = 1;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
     //param.delta = 1e-2;
-    param.delta = 1e-3;
+    param.delta = 1e-10;
     // maximum line search iterations
     param.max_iterations = 5;
 
@@ -866,7 +866,7 @@ int main(int argc, char* argv[])
 #endif
 
 
-#if 0
+#if 1
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -1029,7 +1029,7 @@ int main(int argc, char* argv[])
 
   
     // =================================== compute marginal variances =================================== //
-#if 0
+#if 1
 
     double t_get_marginals;
     Vect marg(n);
