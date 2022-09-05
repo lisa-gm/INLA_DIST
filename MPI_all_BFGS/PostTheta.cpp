@@ -25,6 +25,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
 	threads_level1 = omp_get_max_threads();
+	threads_level2 = 1; // dummy, can use more ...
 
 	if(MPI_rank == 0){
 		printf("threads level 1 : %d\n", threads_level1);
@@ -44,8 +45,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank);
-		solverQst = new PardisoSolver(MPI_rank);
+		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
@@ -133,8 +134,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank);
-		solverQst = new PardisoSolver(MPI_rank);
+		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
@@ -158,9 +159,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 #endif
 
 #ifdef RECORD_TIMES
-	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt"; 
+	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     std::ofstream log_file(log_file_name);
-    log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
+    log_file << "MPI_rank threads_level1 threads_level2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     log_file.close(); 
 #endif
 
@@ -210,17 +211,16 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	//threads_level1 = omp_get_max_threads();
-	threads_level1 = 2;
+	threads_level1 = omp_get_max_threads();
+	//threads_level1 = 2;
 
 	threads_level2;
 
-	/*#pragma omp parallel
+	#pragma omp parallel
     {  
-   	threads_level2 = omp_get_max_threads();
-    }*/
+   		threads_level2 = omp_get_max_threads();
+    }
 
-    threads_level2 = 8;
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
@@ -230,7 +230,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 #endif
 
 	dim_grad_loop      = 2*dim_th;
-	no_f_eval 		   = 2*dim_th + 1;
+	no_f_eval          = 2*dim_th + 1;
 
 	// one solver per thread, but not more than required
 	//num_solvers        = std::min(threads_level1, dim_grad_loop);
@@ -243,8 +243,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank);
-		solverQst = new PardisoSolver(MPI_rank);
+		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, nb, no);
@@ -275,10 +275,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 
 #ifdef RECORD_TIMES
-	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt"; 
-    std::ofstream log_file(log_file_name);
-    log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
-    log_file.close(); 
+    if((MPI_rank) == 0){
+    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_rank) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
+    	std::ofstream log_file(log_file_name);
+    	log_file << "MPI_rank threads_level1 threads_level_2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
+    	log_file.close();
+    }	
 #endif
 
 }
@@ -295,7 +297,7 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 */
 double PostTheta::operator()(Vect& theta, Vect& grad){
 
-double t_f_grad_f = -omp_get_wtime();
+	double t_f_grad_f = -omp_get_wtime();
 
 #ifdef PRINT_MSG
 		std::cout << "\niteration : " << iter_count << std::endl;
@@ -316,7 +318,7 @@ double t_f_grad_f = -omp_get_wtime();
 	//G = MatrixXd::Identity(dim_th, dim_th);
 
 	if(MPI_rank == 0 && printed_eps_flag == false){
-		std::cout << "Finite Difference : h = " << std::scientific << eps << std::endl;
+		std::cout << "Finite Difference    : h = " << std::scientific << eps << std::endl;
 		printed_eps_flag = true;
 	}
 
@@ -370,13 +372,12 @@ double t_f_grad_f = -omp_get_wtime();
 #endif
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
-		std::cout << "before record times section." << std::endl;
+		//std::cout << "before record times section." << std::endl;
 #ifdef RECORD_TIMES		
 		t_Ftheta_ext += omp_get_wtime();
 
 		// for now write to file. Not sure where the best spot would be.
-		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-		std::cout << "call record times function" << std::endl;
+		// file contains : MPI_rank iter_count l1t l2t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
 		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
 						t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
@@ -406,7 +407,19 @@ double t_f_grad_f = -omp_get_wtime();
 				Vect mu_dummy(n);
 
 				theta_forw = theta + eps*G.col(k);
+#ifdef RECORD_TIMES
+		                t_Ftheta_ext = -omp_get_wtime();
+#endif			
+	
 				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy);
+
+#ifdef RECORD_TIMES
+                               t_Ftheta_ext += omp_get_wtime();
+                		// for now write to file. Not sure where the best spot would be.
+                		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+                		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                                                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+#endif
 			} // end MPI if
 		
 		// compute all BACKWARD DIFFERENCES
@@ -424,7 +437,18 @@ double t_f_grad_f = -omp_get_wtime();
 				Vect mu_dummy(n);
 
 				theta_backw = theta - eps*G.col(k);
+#ifdef RECORD_TIMES
+                                t_Ftheta_ext = -omp_get_wtime();
+#endif
 				f_temp_list_loc(i) = eval_post_theta(theta_backw, mu_dummy);
+#ifdef RECORD_TIMES
+                		t_Ftheta_ext += omp_get_wtime();
+      			        // for now write to file. Not sure where the best spot would be.
+                		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+                		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                                                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+#endif
+
 			} // end MPI if
 		}
 	} // end for loop
@@ -481,7 +505,7 @@ double t_f_grad_f = -omp_get_wtime();
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			//std::cout << "\ntheta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
 			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
@@ -498,13 +522,11 @@ double t_f_grad_f = -omp_get_wtime();
     }
 #endif
 
+	t_f_grad_f += omp_get_wtime();
 
-t_f_grad_f += omp_get_wtime();
-
-if(MPI_rank == 0){
-	std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
-}
-
+	/*if(MPI_rank == 0){
+		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
+	}*/
 
 	return f_theta;
 
@@ -1333,18 +1355,19 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// value : pi(x | theta, y) or constraint problem pi(x | theta, y, Ax = e)
 	double val_d;
 
-	#pragma omp parallel num_threads(threads_level1)
+	#pragma omp parallel 
+	#pragma omp single
 	{
-	if(omp_get_thread_num() == 0)
-	{
+
 	// =============== evaluate NOMINATOR ================= //
-	
-	omp_set_num_threads(threads_level2);
-	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
-	
+		
 #ifdef RECORD_TIMES
 	t_thread_nom = -omp_get_wtime();
 #endif
+
+	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
+	#pragma omp task
+	{
 
 #ifdef PRINT_MSG
 		std::cout << "prior : " << prior << std::endl;
@@ -1436,10 +1459,11 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	t_thread_nom += omp_get_wtime();
 #endif
 
-	} // end pragma omp for thread 0
-	else
+	} // end pragma omp task, evaluating nominator
+
+
+	#pragma omp task
 	{
-	omp_set_num_threads(threads_level2);
 
 #ifdef RECORD_TIMES
 	t_thread_denom = -omp_get_wtime();
@@ -1468,9 +1492,10 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #ifdef RECORD_TIMES
 	t_thread_denom += omp_get_wtime();
 #endif
-	} // omp else for thread 1
 
-    //#pragma omp taskwait
+	}
+
+    #pragma omp taskwait
 
 	} // closing omp parallel region
 
@@ -1954,9 +1979,9 @@ void PostTheta::record_times(std::string file_name, int iter_count, double t_Fth
 								double t_priorLat, double t_priorLatAMat, double t_priorLatChol, double t_likel, 
 								double t_thread_denom, double t_condLat, double t_condLatAMat, double t_condLatChol, double t_condLatSolve){
 
-	std::cout << "in record times function" << std::endl;
+	//std::cout << "in record times function" << std::endl;
     std::ofstream log_file(file_name, std::ios_base::app | std::ios_base::out);
-    log_file << MPI_rank       << " " << threads_level1 << " " << iter_count     << " ";
+    log_file << MPI_rank       << " " << threads_level1 << " " << threads_level2 << " " << iter_count     << " ";
     log_file << t_Ftheta_ext   << " " << t_thread_nom   << " " << t_priorHyp     << " " << t_priorLat     << " " << t_priorLatAMat << " " << t_priorLatChol << " " << t_likel << " ";
     log_file << t_thread_denom << " " << t_condLat    << " " << t_condLatAMat  << " " << t_condLatChol  << " " << t_condLatSolve << " " << std::endl;
 
@@ -1981,4 +2006,5 @@ PostTheta::~PostTheta(){
 // -> swap sign, invert, get covariance
 
 // once converged call again : extract -> Q.xy -> selected inverse (diagonal), gives me variance wrt mode theta & data y
+
 

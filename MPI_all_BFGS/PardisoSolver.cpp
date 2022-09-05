@@ -27,24 +27,14 @@ PardisoSolver::PardisoSolver(int MPI_rank, int threads_level1, int threads_level
         #endif
     }
 
-    int threads_level2;
-
-    // also add check that max number of threads not smaller than threads_level1 * threads_level2
-
-    #pragma omp parallel num_threads(threads_level1)
-    {
-        omp_set_num_threads(threads_level2);
-        threads_level2 = omp_get_max_threads();
-    }
-
-    #ifdef PRINT_OMP
+#ifdef PRINT_OMP
         if(omp_get_thread_num() == 0 && MPI_rank == 0){
             //char* var = getenv("OMP_NUM_THREADS");
             //std::cout << "OMP_NUM_THREADS = " << var << std::endl;
             std::cout << "Pardiso will be called with " << threads_level2 << " threads per solver. " << std::endl;
         }
         // printf("Thread rank: %d out of %d threads.\n", omp_get_thread_num(), omp_get_num_threads());
-    #endif
+#endif
 
     //iparm[2]  = num_procs;
 
