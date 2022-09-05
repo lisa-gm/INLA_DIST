@@ -12,7 +12,7 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-//#define RGF
+#define RGF
 
 #ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -854,12 +854,17 @@ int main(int argc, char* argv[])
 
     double fx;
 
-    // single function evaluation
-    /*
-    Vect mu_dummy(n);
-    fx = fun->eval_post_theta(theta_original, mu_dummy);
-    std::cout <<  "f(x) = " << fx << std::endl;
-    */
+#if 0
+    if(MPI_rank == 0){
+        // single function evaluation
+        for(int i=0; i<5; i++){
+            Vect mu_dummy(n);
+            fx = fun->eval_post_theta(theta_original, mu_dummy);
+            std::cout <<  "f(x) = " << fx << std::endl;
+        }
+    }
+#endif
+    
 
 #if 1
     if(MPI_rank == 0)
