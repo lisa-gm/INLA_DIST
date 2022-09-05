@@ -160,7 +160,9 @@ RGF<T>::~RGF()
    // in case that only factorize_noCopyHost is called MF not allocated ...
    if (MF_allocated)
    {
-      delete[] MF;
+      //delete[] MF;
+      // delete pinned memory
+      cudaFreeHost(MF);
    }
 
    if (MF_dev_allocated)
@@ -251,7 +253,7 @@ double RGF<T>::FirstStageFactor()
     T ONE      = f_one();
 
     // count floating point operations
-    double flops = 0;
+    double flop_count = 0;
 
 //tpotrf_dev('L', NR, M1_dev ,NR ,&info)
 //rj dpotrf MF[0,0]
@@ -270,17 +272,20 @@ double RGF<T>::FirstStageFactor()
     std::cout << "calling first Cholesky factorization now" << std::endl;
 #endif
 
+    // start timer for counting flops
+    double t_fact = get_time(0.0);
+
     // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
-    flops += 0.5 * NR * NR * NR;
+    flop_count += 1.0/3.0 * NR * NR * NR;
 
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
     {
        // UPDATE COLUMNS ACCORDING TO CHOLESKY FACTORISATION
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue);
-       flops += 2.0*(NR + matrix_nd) * NR * NR;
+       flop_count += (NR + matrix_nd) * NR * NR;
     }
 
     copy_supernode_to_host(blockR_dev, IB);
@@ -307,27 +312,27 @@ double RGF<T>::FirstStageFactor()
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
-       flops += 2.0 * NR * NR * NR;
+       flop_count += 2.0 * NR * NR * NR + 2.0 * NR * NR;
 
        if (matrix_nd > 0)
        {
           // Update dense rows of super node IB
           tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
           // NM = NR
-          flops += 2.0*matrix_nd * NR * NM;
+          flop_count += 2.0*matrix_nd * NR * NM + 2.0 * matrix_nd * NR;
           
           // update last diagonal block
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-          flops += 2.0 * matrix_nd * matrix_nd * NM;
+          flop_count += 2.0 * matrix_nd * matrix_nd * NM + 2.0 * matrix_nd * matrix_nd;
        }
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
+       flop_count += 1.0/3.0 * NR * NR * NR;
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
-       flops += 2.0 *(NR + matrix_nd) * NR * NR;
+       flop_count += (NR + matrix_nd) * NR * NR;
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
        copy_supernode_to_host(blockR_dev, IB);
@@ -345,27 +350,27 @@ double RGF<T>::FirstStageFactor()
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
-       flops += 2.0* NR * NR * NR;
+       flop_count += 2.0* NR * NR * NR + 2*NR*NR;
 
        if (matrix_nd > 0)
        {
           tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          flops += 2.0*matrix_nd * NR * NM;
+          flop_count += 2.0*matrix_nd * NR * NM + 2.0*matrix_nd*NR;
 
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-          flops += 2.0* matrix_nd * matrix_nd * NM; 
+          flop_count += 2.0* matrix_nd * matrix_nd * NM + 2.0 * matrix_nd * matrix_nd;
        }
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
+       flop_count += 1.0/3.0 * NR * NR * NR;
     
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        if (matrix_nd > 0)
        {
           ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          flops += 2.0*matrix_nd * NR * NR;
+          flop_count += matrix_nd * NR * NR;
        
        }
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
@@ -382,13 +387,12 @@ double RGF<T>::FirstStageFactor()
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        //rj NM is the same for all blocks 0..nt-1
        tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-       flops += 2.0* matrix_nd * matrix_nd * NM; 
+       flop_count += matrix_nd * matrix_nd * NM; 
    
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
-
+       flop_count += 1.0/3.0 * NR * NR * NR;
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
 
 #ifdef PRINT_MSG
@@ -398,7 +402,13 @@ double RGF<T>::FirstStageFactor()
        copy_supernode_to_host(blockDense_dev, IB);
     }
 
-    return flops;
+   t_fact = get_time(t_fact);
+   std::cout << "gflop count    : " << flop_count / 1e9 << std::endl;
+   std::cout << "time factorize : " << t_fact << std::endl;
+   //std::cout << "floating point operations = " << flop_count << std::endl;
+   double gflops = flop_count / (1e9*t_fact);
+
+   return gflops;
 }
 
 
@@ -413,7 +423,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
     T ONE      = f_one();
 
     // count floating point operations
-    double flops = 0;
+    double flop_count = 0;
 
 //tpotrf_dev('L', NR, M1_dev ,NR ,&info)
 //rj dpotrf MF[0,0]
@@ -432,17 +442,19 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
     std::cout << "calling first Cholesky factorization now" << std::endl;
 #endif
 
+    double t_fact = get_time(0.0);
+
     // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
-    flops += 0.5 * NR * NR * NR;
+    flop_count += 1.0/3.0 * NR * NR * NR;
 
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
     {
        // UPDATE COLUMNS ACCORDING TO CHOLESKY FACTORISATION
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue);
-       flops += 2.0*(NR + matrix_nd) * NR * NR;
+       flop_count += 2.0*(NR + matrix_nd) * NR * NR;
     }
 
     // replace all copy supernode to host by computing sum of current diagonal block
@@ -471,27 +483,27 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
-       flops += 2.0 * NR * NR * NR;
+       flop_count += 2.0 * NR * NR * NR;
 
        if (matrix_nd > 0)
        {
           // Update dense rows of super node IB
           tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
           // NM = NR
-          flops += 2.0*matrix_nd * NR * NM;
+          flop_count += 2.0*matrix_nd * NR * NM;
           
           // update last diagonal block
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-          flops += 2.0 * matrix_nd * matrix_nd * NM;
+          flop_count += 2.0 * matrix_nd * matrix_nd * NM;
        }
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
+       flop_count += 0.5 * NR * NR * NR;
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
-       flops += 2.0 *(NR + matrix_nd) * NR * NR;
+       flop_count += 2.0 *(NR + matrix_nd) * NR * NR;
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
        //copy_supernode_to_host(blockR_dev, IB);
@@ -511,27 +523,27 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
-       flops += 2.0* NR * NR * NR;
+       flop_count += 2.0* NR * NR * NR;
 
        if (matrix_nd > 0)
        {
           tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          flops += 2.0*matrix_nd * NR * NM;
+          flop_count += 2.0*matrix_nd * NR * NM;
 
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-          flops += 2.0* matrix_nd * matrix_nd * NM; 
+          flop_count += 2.0* matrix_nd * matrix_nd * NM; 
        }
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
+       flop_count += 0.5 * NR * NR * NR;
     
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        if (matrix_nd > 0)
        {
           ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
-          flops += 2.0*matrix_nd * NR * NR;
+          flop_count += 2.0*matrix_nd * NR * NR;
        
        }
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
@@ -550,15 +562,15 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        //rj NM is the same for all blocks 0..nt-1
        tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
-       flops += 2.0* matrix_nd * matrix_nd * NM; 
+       flop_count += 2.0* matrix_nd * matrix_nd * NM; 
    
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
-       flops += 0.5 * NR * NR * NR;
+       flop_count += 0.5 * NR * NR * NR;
 
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
-
+ 
 #ifdef PRINT_MSG
        std::cout << "after complete Cholesky factorization" << std::endl;
 #endif
@@ -567,6 +579,11 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        copy_supernode_diag(blockDense_dev, IB);
 
     }
+
+   t_fact = get_time(t_fact);
+   std::cout << "gflop count    : " << flop_count / 1e9 << std::endl;
+   std::cout << "time factorize : " << t_fact << std::endl;
+   double gflops = flop_count / (1e9*t_fact);
 
    double t_copy = -omp_get_wtime();
    // copy result from the device to the host:
@@ -586,7 +603,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 #endif
    //printf("\nnew logDet = %f\n", logDet);
 
-    return flops;
+    return gflops;
 }
 
 /************************************************************************************************/
@@ -604,16 +621,18 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
     NR = Bmax[0]-Bmin[0];
 
     // counting FLOPS
-    double flops = 0;
+    double flop_count = 0;
 
 #ifdef PRINT_MSG
     std::cout <<"calling first block solver in second stage factor now" << std::endl;
 #endif
 
+    double t_solve = get_time(0.0);
+
     //rj dtrsm LLNN MF[0,0] rhs[0]
     // solve for first diagonal block (using solve for tridiagonal matrix), ie. x_0 = D^-0*b_0
     c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(0, 0)], mf_block_lda(0, 0), &rhs[Bmin[0]], matrix_size);
-    flops += 2.0 * NR * NR * nrhs;
+    flop_count += 2.0 * NR * NR * nrhs;
 
     //rj IB = 1; IB < NBlock; IB++
     for (IB = 1; IB < matrix_nt; IB++)
@@ -624,11 +643,11 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
        // compute b_i = b_i - E_i-1 * x_i-1
        //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
        c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB-1]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
-       flops += 2.0 * NR * nrhs * NM;
+       flop_count += 2.0 * NR * nrhs * NM;
        // solve for x_i = D^-1_i*b_i (which was updated before)
        //rj dtrsm LLNN MF[IB,IB] rhs[IB]
        c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
-       flops += 2.0*NR * NR * nrhs; 
+       flop_count += 2.0*NR * NR * nrhs; 
     }
 
     // dense rows at the end
@@ -643,11 +662,11 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
        for (size_t i = 0; i < NBlock-1; i++)
        {    
           c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[i]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
-          flops += 2.0*NR * nrhs * NM;
+          flop_count += 2.0*NR * nrhs * NM;
        }
        //rj dtrsm LLNN MF[IB,IB] rhs[IB]
        c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
-       flops += 2.0*NR * NR * nrhs;
+       flop_count += 2.0*NR * NR * nrhs;
     }
 
     //Backward pass
@@ -660,13 +679,13 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
        // solve D^T_n*x_n = y_n for x_n
        //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
        c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
-       flops += 2.0*NR * NR * nrhs;
+       flop_count += 2.0*NR * NR * nrhs;
        // now update y everywhere : y_i = y_i - F^T_i * x_n
        //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
        for (size_t i = 0; i < NBlock-1; i++)
        {
           c_tgemm('T', 'N', NM, nrhs, NR, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[IB]], matrix_size, ONE, &rhs[Bmin[i]], matrix_size);
-          flops += 2.0*NM * nrhs * NR;
+          flop_count += 2.0*NM * nrhs * NR;
        }
     }
 
@@ -679,11 +698,11 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
        // compute D^T_i x_i = y_i
        //rj dtrsm LLTN MF[IB,IB] rhs[IB]
        c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
-       flops += 2.0* NR * NR * nrhs;
+       flop_count += 2.0* NR * NR * nrhs;
        // compute y_i = y_i - E_i^T * x_i+1
        //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
        c_tgemm('T', 'N', NM, nrhs, NR, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB]], matrix_size, ONE, &rhs[Bmin[IB-1]], matrix_size);
-       flops += 2.0 * NM * nrhs * NR; 
+       flop_count += 2.0 * NM * nrhs * NR; 
     }
 
     IB = 0;
@@ -693,13 +712,17 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
     //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
     c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
 
+    flop_count += 2.0 * NR * NR * nrhs;
+    t_solve = get_time(t_solve);
+
+    double gflops = flop_count / (1e9*t_solve);
+
 #ifdef PRINT_MSG
     std::cout << "after forward-backword solve in 2nd stage factor" << std::endl;
 #endif
 
-    flops += 2.0 * NR * NR * nrhs;
 
-    return flops;
+    return gflops;
 }
 
 /************************************************************************************************/
@@ -715,7 +738,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
 
    ND = matrix_nd;
 
-   double flops = 0;
+   double flop_count = 0;
+   double t_inv = get_time(0.0);
 
    if (matrix_nd > 0)
    {
@@ -726,9 +750,9 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       tlacpy_dev('L', NR, NR, blockDense_dev, mf_block_lda(IB, IB), tmp1_dev, NR, magma_queue);
       tril_dev(tmp1_dev, NR, NR);
       ttrtri_dev('L', 'N', NR, tmp1_dev, NR, &info);
-      flops += 0.5 * NR * NR * NR;
+      flop_count += 0.5 * NR * NR * NR;
       tgemm_dev('T', 'N', NR, NR, NR, ONE, tmp1_dev, NR, tmp1_dev, NR, ZERO, blockDense_dev, mf_block_lda(IB, IB), magma_queue);
-      flops += 2.0 * NR * NR * NR;
+      flop_count += 2.0 * NR * NR * NR;
 
       //last non-dense block
       IB = NBlock-2;
@@ -737,17 +761,17 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
 
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR);
       ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-      flops += 0.5 * NR * NR * NR;
+      flop_count += 0.5 * NR * NR * NR;
       init_eye_on_dev(tmp1_dev,NR,0);
 
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), blockDense_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue);
-      flops += 2.0 * NR * NP * NP;
+      flop_count += 2.0 * NR * NP * NP;
       tgemm_dev('N', 'N', NR, NR, NP, ONE, tmp2_dev, NR, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ONE, tmp1_dev, NR, magma_queue);
-      flops += 2.0 * NR * NR * NP;
+      flop_count += 2.0 * NR * NR * NP;
       tgemm_dev('T', 'N', NR, NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, ZERO, tmp2_dev, NR, magma_queue);
-      flops += 2.0 * NR * NR * NR;
+      flop_count += 2.0 * NR * NR * NR;
       tgemm_dev('N', 'N', NR, NR, NR, ONE, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), ZERO, tmp1_dev, NR, magma_queue);
-      flops += 2.0 * NR * NR * NR;
+      flop_count += 2.0 * NR * NR * NR;
       tlacpy_dev('F', NR, NR, tmp1_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue);
 
       copy_supernode_diag(blockDense_dev, NBlock-1);
@@ -761,7 +785,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       tlacpy_dev('L', NR, NR, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, magma_queue);
       tril_dev(tmp1_dev, NR, NR);
       ttrtri_dev('L', 'N', NR, tmp1_dev, NR, &info);
-      flops += 0.5 * NR * NR * NR;
+      flop_count += 0.5 * NR * NR * NR;
       tgemm_dev('T', 'N', NR, NR, NR, ONE, tmp1_dev, NR, tmp1_dev, NR, ZERO, blockR_dev, mf_block_lda(IB, IB), magma_queue);
    }
 
@@ -778,32 +802,35 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
 
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR);
       ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-      flops += 0.5 * NR * NR * NR;
+      flop_count += 0.5 * NR * NR * NR;
       init_eye_on_dev(tmp1_dev,NR,0);
 
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockP_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue);
-      flops += 2.0 * NR * NP * NP;
+      flop_count += 2.0 * NR * NP * NP;
       tgemm_dev('N', 'N', NR, NR, NP, ONE, tmp2_dev, NR, &blockR_dev[NR], mf_block_lda(IB+1, IB), ONE, tmp1_dev, NR, magma_queue);
-      flops += 2.0 * NR * NR * NP;
+      flop_count += 2.0 * NR * NR * NP;
       
       if (matrix_nd > 0)
       {
          tgemm_dev('T', 'N', NR, ND, ND, ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), blockDense_dev, mf_block_lda(NBlock-1, NBlock-1), ZERO, tmp2_dev, NR, magma_queue);
-         flops += 2.0 * NR * ND * ND;
+         flop_count += 2.0 * NR * ND * ND;
          tgemm_dev('N', 'N', NR, NR, ND, ONE, tmp2_dev, NR, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ONE, tmp1_dev, NR, magma_queue);
-         flops += 2.0 * NR * NR * ND;
+         flop_count += 2.0 * NR * NR * ND;
       }
 
       tgemm_dev('T', 'N', NR, NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, ZERO, tmp2_dev, NR, magma_queue);
-      flops += 2.0 * NR * NR * NR; 
+      flop_count += 2.0 * NR * NR * NR; 
       tgemm_dev('N', 'N', NR, NR, NR, ONE, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), ZERO, tmp1_dev, NR, magma_queue);
-      flops += 2.0 * NR * NR * NR; 
+      flop_count += 2.0 * NR * NR * NR; 
       tlacpy_dev('F', NR, NR, tmp1_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue);
    }
 
+   t_inv = get_time(t_inv);
+   double gflops = flop_count / (1e9*t_inv);
+
    copy_supernode_diag(blockR_dev, 0);
 
-   return flops;
+   return gflops;
 }
 
 /************************************************************************************************/
@@ -815,14 +842,20 @@ double RGF<T>::factorize()
 
    if(!MF_allocated)
    {
-      MF = new T[matrix_n_nonzeros];
+      // memory allocation on CPU 
+      // unpinned memory:
+      //MF = new T[matrix_n_nonzeros];
+      // pin memory:
+      cudaMallocHost(&MF, (matrix_n_nonzeros) * sizeof(T));
       MF_allocated = true;
+      printf("In MF_allocated not allocated.\n");
    }
 
     //Data allocation
     if (!MF_dev_allocated)
     {
-       MF = new T[matrix_n_nonzeros];
+       printf("In MF_dev_allocated not allocated.\n");
+       //MF = new T[matrix_n_nonzeros];
        size_t max_supernode_nnz = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
        size_t dense_supernode_nnz = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
        allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz*sizeof(T));
@@ -842,7 +875,7 @@ double RGF<T>::factorize()
     allocate_data_on_device((void**)&a_dev,max_rows*max_cols*sizeof(T));
 
     //Computation
-    double flops = FirstStageFactor();
+    double gflops = FirstStageFactor();
 
     //Temp data deallocation
     deallocate_data_on_dev(ia_dev,(max_cols+1)*sizeof(size_t));
@@ -851,7 +884,7 @@ double RGF<T>::factorize()
 
     factorization_completed = true;
 
-    return flops;
+    return gflops;
 }
 
 
@@ -895,7 +928,7 @@ double RGF<T>::factorize_noCopyHost(double &logDet)
    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
 
     //Computation
-    double flops = FirstStageFactor_noCopyHost(logDet);
+    double gflops = FirstStageFactor_noCopyHost(logDet);
 
     //////// NEW /////////////
     //Data deallocation
@@ -910,7 +943,7 @@ double RGF<T>::factorize_noCopyHost(double &logDet)
     // factor doesn't exist, hence mark as false
     factorization_completed = false;
 
-    return flops;
+    return gflops;
 }
 
 /************************************************************************************************/
@@ -918,9 +951,9 @@ double RGF<T>::factorize_noCopyHost(double &logDet)
 template <class T>
 double RGF<T>::solve(T *b, size_t nrhs)
 {
-    double flops = solve(b, b, nrhs);
+    double gflops = solve(b, b, nrhs);
 
-    return flops;
+    return gflops;
 }
 
 /************************************************************************************************/
@@ -938,7 +971,7 @@ double RGF<T>::solve(T *x, T *b, size_t nrhs)
     memcpy(rhs,b,matrix_size*nrhs*sizeof(T));
 
     //Computation
-    double flops = SecondStageSolve(nrhs);
+    double gflops = SecondStageSolve(nrhs);
 
     //Copy data
     memcpy(x,rhs,matrix_size*nrhs*sizeof(T));
@@ -946,7 +979,7 @@ double RGF<T>::solve(T *x, T *b, size_t nrhs)
     //Data deallocation
     delete[] rhs;
 
-    return flops;
+    return gflops;
 }
 
 /************************************************************************************************/
@@ -971,7 +1004,7 @@ double RGF<T>::RGFdiag(T *diag)
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
 
     //Computation
-    double flops = ThirdStageRGF(tmp1_dev,tmp2_dev);
+    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev);
 
     //Copy data to host
     memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
@@ -982,7 +1015,7 @@ double RGF<T>::RGFdiag(T *diag)
     deallocate_data_on_dev(tmp1_dev,b_size*b_size*sizeof(T));
     deallocate_data_on_dev(tmp2_dev,b_size*b_size*sizeof(T));
 
-    return flops;
+    return gflops;
 }
 
 /************************************************************************************************/

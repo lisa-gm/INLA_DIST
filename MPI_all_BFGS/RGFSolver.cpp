@@ -17,6 +17,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
 
     // CAREFUL USING N in both functions ..
    	//n  = ns_t*nt_t + nb_t;
+
 }
 
 // currently not needed !!
@@ -44,9 +45,9 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     int counter = threads_level1*MPI_rank + omp_get_thread_num();
     int GPU_rank = counter % noGPUs;
     cudaSetDevice(GPU_rank);
-#ifdef PRINT_MSG
+//#ifdef PRINT_MSG
     std::cout << "FACT -- counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
-#endif
+//#endif
 
     // check if n and Q.size() match
     if(n != Q.rows()){
@@ -100,7 +101,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 	//solver->solve_equation(GR);
 
     t_priorLatChol = get_time(0.0);
-    double flops_factorize = solver->factorize_noCopyHost(log_det);
+    double gflops_factorize = solver->factorize_noCopyHost(log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
 	
     //double flops_factorize = solver->factorize();
@@ -109,6 +110,10 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     t_priorLatChol = get_time(t_priorLatChol);
 
 	t_factorise = get_time(t_factorise);
+
+    if(MPI_rank == 0){
+        std::cout << "Gflop/s for the numerical factorization: " << gflops_factorize << std::endl;
+    }
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -200,7 +205,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 
     t_factorise = get_time(0.0);
     //solver->solve_equation(GR);
-    double flops_factorize = solver->factorize();
+    double gflops_factorize = solver->factorize();
     t_factorise = get_time(t_factorise);
 
     log_det = solver->logDet();
@@ -226,7 +231,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
     memcpy(b, Dt.data(), n*nrhs*sizeof(double));
 
     t_solve = get_time(0.0); 
-    double flops_solve = solver->solve(x, b, nrhs);
+    double gflops_solve = solver->solve(x, b, nrhs);
     t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
@@ -275,9 +280,9 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
     int counter = threads_level1*MPI_rank + tid;
 	int GPU_rank = counter % noGPUs;
     cudaSetDevice(GPU_rank);
-#ifdef PRINT_MSG
+//#ifdef PRINT_MSG
     std::cout << "FACT & SOLVE -- counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
-#endif
+//#endif
 
 	// check if n and Q.size() match
     if(n != Q.rows()){
@@ -326,11 +331,17 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	t_factorise = get_time(0.0);
     t_condLatChol = get_time(0.0);
 	//solver->solve_equation(GR);
-	double flops_factorize = solver->factorize();
+	double gflops_factorize = solver->factorize();
     t_condLatChol = get_time(t_condLatChol);
 	t_factorise = get_time(t_factorise);
     
 	log_det = solver->logDet();
+
+    /*
+    if(MPI_rank == 0){
+        std::cout << "Gflop/s for the numerical factorization: " << gflops_factorize << std::endl;
+    }
+    */
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -351,7 +362,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
   	t_solve = get_time(0.0); 
     t_condLatSolve = get_time(0.0);
 
-  	double flops_solve = solver->solve(x, b, nrhs);
+  	double gflops_solve = solver->solve(x, b, nrhs);
     
     t_condLatSolve = get_time(t_condLatSolve);
   	t_solve = get_time(t_solve);
@@ -453,7 +464,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
 
     t_factorise = get_time(0.0);
     //solver->solve_equation(GR);
-    double flops_factorize = solver->factorize();
+    double gflops_factorize = solver->factorize();
     t_factorise = get_time(t_factorise);
 
     log_det = solver->logDet();
@@ -476,7 +487,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
     memcpy(b + n, Dt.data(), n*Dxy.rows()*sizeof(double));
 
     t_solve = get_time(0.0); 
-    double flops_solve = solver->solve(x, b, nrhs);
+    double gflops_solve = solver->solve(x, b, nrhs);
     t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
@@ -575,7 +586,7 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, nb_t);
 
 	t_factorise = get_time(0.0);
-	double flops_factorize = solver->factorize();
+	double gflops_factorize = solver->factorize();
 	t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
@@ -583,7 +594,7 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 #endif
 
 	t_inv = get_time(0.0);
-  	double flops_inv = solver->RGFdiag(invDiag);
+  	double gflops_inv = solver->RGFdiag(invDiag);
   	t_inv = get_time(t_inv);
 
 #ifdef PRINT_MSG

@@ -83,18 +83,29 @@ SpMat read_sym_CSC(std::string filename)
   fin >> nnz;
 
    // allocate memory
-  int outerIndexPtr[n+1];
+  int* outerIndexPtr;
+  int* innerIndices;
+  double* values;
+
+  outerIndexPtr = new int[n+1];
+  innerIndices  = new int[nnz];
+  values        = new double[nnz];
+
+  /*int outerIndexPtr[n+1];
   int innerIndices[nnz];
-  double values[nnz];
+  double values[nnz];*/
 
   for (int i = 0; i < nnz; i++){
-    fin >> innerIndices[i];}
+    fin >> innerIndices[i];
+  }
 
   for (int i = 0; i < n+1; i++){
-    fin >> outerIndexPtr[i];}
+    fin >> outerIndexPtr[i];
+  }
 
   for (int i = 0; i < nnz; i++){
-    fin >> values[i];}
+    fin >> values[i];
+  }
 
   fin.close();
 
@@ -106,6 +117,10 @@ SpMat read_sym_CSC(std::string filename)
   SpMat A = A_lower.selfadjointView<Lower>();
   //std::cout << "input A : " << std::endl;
   //std::cout << A << std::endl;
+
+  delete [] innerIndices;
+  delete [] outerIndexPtr;
+  delete [] values;
 
   return A;
 } 

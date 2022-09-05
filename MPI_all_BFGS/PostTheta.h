@@ -147,12 +147,13 @@ class PostTheta{
 	double t_condLatAMat;
 	double t_thread_nom;
 	double t_thread_denom;
+#endif
 
+	// these have to always be defined otherwise compile error.
+	// always get measured but not written to file
 	double t_priorLatChol;
 	double t_condLatChol;
 	double t_condLatSolve;
-#endif
-
 
 	public:
 	 /**

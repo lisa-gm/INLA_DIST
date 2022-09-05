@@ -18,6 +18,9 @@
 //#define PRINT_PAR
 //#define PRINT_OMP
 
+// get gflops manually from pardiso output
+//#define MEAS_GFLOPS
+
 typedef Eigen::VectorXd Vect;
 typedef Eigen::SparseMatrix<double> SpMat;
 

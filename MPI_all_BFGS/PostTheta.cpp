@@ -69,7 +69,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 #ifdef RECORD_TIMES
-	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + ".txt";
+	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     std::ofstream log_file(log_file_name);
     log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     log_file.close(); 
@@ -158,7 +158,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 #endif
 
 #ifdef RECORD_TIMES
-	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + ".txt";
+	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt"; 
     std::ofstream log_file(log_file_name);
     log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     log_file.close(); 
@@ -210,13 +210,17 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	threads_level1 = omp_get_max_threads();
+	//threads_level1 = omp_get_max_threads();
+	threads_level1 = 2;
+
 	threads_level2;
 
-	#pragma omp parallel
+	/*#pragma omp parallel
     {  
    	threads_level2 = omp_get_max_threads();
-    }
+    }*/
+
+    threads_level2 = 8;
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
@@ -271,7 +275,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 
 #ifdef RECORD_TIMES
-	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + ".txt";
+	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt"; 
     std::ofstream log_file(log_file_name);
     log_file << "MPI_rank threads_level1 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     log_file.close(); 
@@ -291,6 +295,7 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 */
 double PostTheta::operator()(Vect& theta, Vect& grad){
 
+double t_f_grad_f = -omp_get_wtime();
 
 #ifdef PRINT_MSG
 		std::cout << "\niteration : " << iter_count << std::endl;
@@ -305,8 +310,8 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	int dim_th = theta.size();
 
 	// configure finite difference approximation (along coordinate axes or smart gradient)
-	double eps = 1e-5;
-	//double eps = 1e-3;
+	//double eps = 1e-5;
+	double eps = 1e-3;
 	// projection matrix G, either Identity or other orthonormal basis (from computeG function)
 	//G = MatrixXd::Identity(dim_th, dim_th);
 
@@ -365,11 +370,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
+		std::cout << "before record times section." << std::endl;
 #ifdef RECORD_TIMES		
 		t_Ftheta_ext += omp_get_wtime();
 
 		// for now write to file. Not sure where the best spot would be.
 		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+		std::cout << "call record times function" << std::endl;
 		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
 						t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
@@ -491,6 +498,12 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
     }
 #endif
 
+
+t_f_grad_f += omp_get_wtime();
+
+if(MPI_rank == 0){
+	std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
+}
 
 
 	return f_theta;
@@ -1320,19 +1333,19 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// value : pi(x | theta, y) or constraint problem pi(x | theta, y, Ax = e)
 	double val_d;
 
-	#pragma omp parallel
-	#pragma omp single
+	#pragma omp parallel num_threads(threads_level1)
+	{
+	if(omp_get_thread_num() == 0)
 	{
 	// =============== evaluate NOMINATOR ================= //
+	
+	omp_set_num_threads(threads_level2);
+	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
 	
 #ifdef RECORD_TIMES
 	t_thread_nom = -omp_get_wtime();
 #endif
 
-	#pragma omp task
-	{ 
-	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
-	
 #ifdef PRINT_MSG
 		std::cout << "prior : " << prior << std::endl;
 #endif
@@ -1419,18 +1432,18 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		std::cout << "val likelihood     : " << val_l << std::endl;
 #endif
 
-	} // end pragma omp task of computing nominator
-
 #ifdef RECORD_TIMES
 	t_thread_nom += omp_get_wtime();
 #endif
 
+	} // end pragma omp for thread 0
+	else
+	{
+	omp_set_num_threads(threads_level2);
+
 #ifdef RECORD_TIMES
 	t_thread_denom = -omp_get_wtime();
 #endif
-
-	#pragma omp task
-	{
 
 	// =============== evaluate denominator ================= //
 	// denominator :
@@ -1451,13 +1464,13 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #ifdef PRINT_MSG
 		std::cout << "val d     : " <<  val_d << std::endl;
 #endif
-	}
 
 #ifdef RECORD_TIMES
 	t_thread_denom += omp_get_wtime();
 #endif
+	} // omp else for thread 1
 
-    #pragma omp taskwait
+    //#pragma omp taskwait
 
 	} // closing omp parallel region
 
@@ -1941,6 +1954,7 @@ void PostTheta::record_times(std::string file_name, int iter_count, double t_Fth
 								double t_priorLat, double t_priorLatAMat, double t_priorLatChol, double t_likel, 
 								double t_thread_denom, double t_condLat, double t_condLatAMat, double t_condLatChol, double t_condLatSolve){
 
+	std::cout << "in record times function" << std::endl;
     std::ofstream log_file(file_name, std::ios_base::app | std::ios_base::out);
     log_file << MPI_rank       << " " << threads_level1 << " " << iter_count     << " ";
     log_file << t_Ftheta_ext   << " " << t_thread_nom   << " " << t_priorHyp     << " " << t_priorLat     << " " << t_priorLatAMat << " " << t_priorLatChol << " " << t_likel << " ";
