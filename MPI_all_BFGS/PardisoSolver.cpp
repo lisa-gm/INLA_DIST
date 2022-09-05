@@ -1,6 +1,6 @@
 #include "PardisoSolver.h"
 
-PardisoSolver::PardisoSolver(int MPI_rank){
+PardisoSolver::PardisoSolver(int MPI_rank, int threads_level1, int threads_level2){
 
     mtype  = -2;             /* set to positive semi-definite */
 
@@ -27,12 +27,19 @@ PardisoSolver::PardisoSolver(int MPI_rank){
         #endif
     }
 
-    int threads_level2;
+    //threads_level2 = 32; //std::floor(1.0*omp_get_max_threads()/2);
+    
+    #pragma omp parallel num_threads(threads_level1)
+    {
+	omp_set_num_threads(threads_level2);
+    	threads_level2 = omp_get_max_threads();
+    }
 
-    #pragma omp parallel
+    std::cout << "Pardiso will be called with " << threads_level2 << " threads per solver. " << std::endl;
+    /*#pragma omp parallel
     {
         threads_level2 = omp_get_max_threads();
-    }
+    }*/
 
     #ifdef PRINT_OMP
         if(omp_get_thread_num() == 0 && MPI_rank == 0){

@@ -104,16 +104,16 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     double gflops_factorize = solver->factorize_noCopyHost(log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
 	
-    //double flops_factorize = solver->factorize();
+    //double gflops_factorize = solver->factorize();
     //log_det = solver->logDet();
     //std::cout << "log_det original = " << log_det << std::endl;
     t_priorLatChol = get_time(t_priorLatChol);
 
 	t_factorise = get_time(t_factorise);
 
-    if(MPI_rank == 0){
+    /*if(MPI_rank == 0){
         std::cout << "Gflop/s for the numerical factorization Qu: " << gflops_factorize << std::endl;
-    }
+    }*/
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -295,6 +295,10 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
     SpMat Q_lower = Q.triangularView<Lower>(); 
     nnz = Q_lower.nonZeros();
 
+#ifdef PRINT_MSG
+    std::cout << "nnz Q = " << nnz << std::endl;
+#endif
+
     size_t* ia; 
     size_t* ja;
     T* a; 
@@ -322,6 +326,10 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	double t_solve;
 	RGF<T> *solver;
 
+#ifdef PRINT_MSG
+	std::cout << "calling solver = new RGF now" << std::endl;
+#endif
+
 	solver = new RGF<T>(ia, ja, a, ns_t, nt_t, nb_t);
 
 #ifdef PRINT_MSG
@@ -338,9 +346,9 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	log_det = solver->logDet();
 
    
-    if(MPI_rank == 0){
+    /*if(MPI_rank == 0){
         std::cout << "Gflop/s for the numerical factorization Qxy: " << gflops_factorize << std::endl;
-    }
+    }*/
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -428,6 +436,10 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
     SpMat Q_lower = Q.triangularView<Lower>(); 
     nnz = Q_lower.nonZeros();
 
+#ifdef PRINT_MSG
+    std::cout << "nnz Qxy = " << nnz << std::endl;
+#endif
+
     size_t* ia; 
     size_t* ja;
     T* a; 
@@ -454,6 +466,10 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
     double t_factorise;
     double t_solve;
     RGF<T> *solver;
+
+#ifdef PRINT_MSG
+    std::cout << "Calling solver = new RGF() now" << std::endl;
+#endif
 
     solver = new RGF<T>(ia, ja, a, ns_t, nt_t, nb_t);
 
@@ -597,8 +613,8 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
   	t_inv = get_time(t_inv);
 
 #ifdef PRINT_MSG
-  	printf("flops factorise:      %f\n", flops_factorize);
-  	printf("flops inv      :      %f\n", flops_inv);
+  	printf("gflops factorise:      %f\n", gflops_factorize);
+  	printf("gflops inv      :      %f\n", gflops_inv);
 #endif
 
 #ifdef PRINT_TIMES

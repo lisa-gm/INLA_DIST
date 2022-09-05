@@ -12,7 +12,7 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-#define RGF
+//#define RGF
 
 #ifdef RGF
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -498,8 +498,8 @@ int main(int argc, char* argv[])
 
         //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
         //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
-        //theta_param << 4, 0, 0, 0;
-        theta_param << 4,4,4,4;
+        theta_param << 4, 0, 0, 0;
+        //theta_param << 4,4,4,4;
         //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
         /*theta << 2, -3, 1.5, 5;
         if(MPI_rank == 0){
@@ -786,14 +786,15 @@ int main(int argc, char* argv[])
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
     // stops if grad.norm() < eps_rel*x.norm() 
-    param.epsilon_rel = 1e-5;
+    param.epsilon_rel=1e-3;
+    //param.epsilon_rel = 1e-5;
     // in the past ... steps
-    param.past = 1;
+    param.past = 2;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    //param.delta = 1e-2;
-    param.delta = 1e-10;
+    param.delta = 1e-3;
+    //param.delta = 1e-10;
     // maximum line search iterations
     param.max_iterations = 5;
 
@@ -854,14 +855,18 @@ int main(int argc, char* argv[])
 
     double fx;
 
-#if 1
+#if 0
     if(MPI_rank == 0){
+	double t_f_eval = -omp_get_wtime();
     	// single function evaluation
-    	for(int i=0; i<10; i++){
+    	for(int i=0; i<1; i++){
     		Vect mu_dummy(n);
     		fx = fun->eval_post_theta(theta_original, mu_dummy);
     		std::cout <<  "f(x) = " << fx << std::endl;
     	}
+
+	t_f_eval += omp_get_wtime();
+	std::cout << "time in f eval loop : " << t_f_eval << std::endl;
     }
 #endif
 
@@ -1029,7 +1034,7 @@ int main(int argc, char* argv[])
 
   
     // =================================== compute marginal variances =================================== //
-#if 1
+#if 0
 
     double t_get_marginals;
     Vect marg(n);
@@ -1175,7 +1180,7 @@ int main(int argc, char* argv[])
 #endif
 
     // =================================== print times =================================== //
-    #if 0
+#if 0
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 
@@ -1183,7 +1188,7 @@ int main(int argc, char* argv[])
         std::cout << "\ntime BFGS solver             : " << time_bfgs << " sec" << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
-        std::cout << "total time                   : " << t_total << std::endl;
+        std::cout << "total time                   : " << t_total << " sec" << std::endl;
     }
     #endif
 

@@ -19,7 +19,7 @@
 //#define PRINT_OMP
 
 // get gflops manually from pardiso output
-#define MEAS_GFLOPS
+//#define MEAS_GFLOPS
 
 typedef Eigen::VectorXd Vect;
 typedef Eigen::SparseMatrix<double> SpMat;
@@ -89,7 +89,7 @@ public:
      /**
      * @brief constructor. initialises parameters, check pardiso license.
      */
-    PardisoSolver(int MPI_rank);
+    PardisoSolver(int MPI_rank, int threads_level1, int threads_level2);
 
 
     /* ======================================================================== */

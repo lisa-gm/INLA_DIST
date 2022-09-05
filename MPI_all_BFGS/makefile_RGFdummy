@@ -48,7 +48,3 @@ call_INLA.o: call_INLA.cpp
 
 clean:	
 	rm -f *.o call_INLA
-
-
-
-
