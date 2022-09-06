@@ -1,0 +1,117 @@
+========= New PARDISO main call ===========
+ns = 492, nt = 100, nb = 6
+spatial-temporal model. Reading in matrices.
+Pardiso will be called with 16 threads per solver. 
+Pardiso will be called with 16 threads per solver. 
+Calling Selective inversion
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( reorder to reorder )
+=======================
+
+Times:
+======
+
+      Time fulladj: 0.007549 s
+      Time reorder: 0.381868 s
+      Time symbfct: 0.180074 s
+      Time parlist: 0.039863 s
+      Time malloc : -0.025537 s
+      Time total  : 0.720787 s total - sum: 0.136969 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              16
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     49206
+             #non-zeros in A:                                1549989
+             non-zeros in A (%):                             0.064017
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    15412
+             size of largest supernode:                      990
+             number of nonzeros in L                         35133055
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       3.51331e+07
+             number of perturbed pivots                      0
+             number of nodes in solve                        49206
+             Gflop   for the numerical factorization:        34.718687
+nnz 1549989
+n 49206
+setting up matrices
+nrhs = 1
+Calling Pardiso with 16 threads.
+[PARDISO]: Matrix type      : real symmetric
+[PARDISO]: Matrix dimension : 49206
+[PARDISO]: Matrix non-zeros : 1549989
+[PARDISO]: Abs. coeff. range: min 4.26e-07  max 3.97e+05
+[PARDISO]: RHS no. 1:  min 0.00e+00  max 4.92e+04
+
+================  PARDISO: solving a symmetric indef.  system  ================
+
+
+Summary PARDISO 7.2: ( factorize to factorize )
+=======================
+
+Times:
+======
+
+      Time A to LU: 0.000000 s
+      Time numfct : 0.738991 s
+      Time malloc : 0.000154 s
+      Time total  : 0.739242 s total - sum: 0.000097 s
+
+Statistics:
+===========
+ < Parallel Direct Factorization with #cores: >              16
+ <                                and #nodes: >              1
+ < Numerical Factorization with BLAS3 and O(n) synchronization >
+
+ < Linear system Ax = b>
+             #equations:                                     49206
+             #non-zeros in A:                                1549989
+             non-zeros in A (%):                             0.064017
+             #right-hand sides:                              1
+
+< Factors L and U >
+             #columns for each panel:                        64
+             # of independent subgraphs:                     0
+ < preprocessing with state of the art partitioning metis 4.0.1>
+             #supernodes:                                    15412
+             size of largest supernode:                      990
+             number of nonzeros in L                         35133055
+             number of nonzeros in U                         1
+             number of nonzeros in L+U                       3.51331e+07
+             number of perturbed pivots                      0
+             number of nodes in solve                        49206
+             Gflop   for the numerical factorization:        34.718687
+             Gflop/s for the numerical factorization:        46.981232
+
+Pardiso   log(det) = 68978.870305 iparm[34] = 0
+iparm[35] = 1
+iparm[36] = 0
+Diagonal element of A^{-1} = 0 0   8.257374850695630152941362e-01
+Diagonal element of A^{-1} = 1 1   3.046311432811326658232076e-01
+Diagonal element of A^{-1} = 2 2   3.756249352107702832448410e-01
+Diagonal element of A^{-1} = 3 3   4.404319867439291380506461e-01
+Diagonal element of A^{-1} = 4 4   3.677034501837866398155086e-01
+Diagonal element of A^{-1} = 5 5   3.810245260356874830165452e-01
+Diagonal element of A^{-1} = 6 6   3.314019221497898071149280e-01
+Diagonal element of A^{-1} = 7 7   4.347683585225664559814618e-01
+Diagonal element of A^{-1} = 8 8   5.239461329820890300723590e-01
+Diagonal element of A^{-1} = 9 9   1.297896054785557140576202e+00
+error msg : 0
+invDiag(1:10) = 0.825737 0.304631 0.375625 0.440432 0.367703 0.381025 0.331402 0.434768 0.523946   1.2979
+ [PARDISO]: Time for inverse  preprocessing   1.4995445962995291E-002
+ [PARDISO]: Time inverse factorization (nsup)   3.8843100192025304E-003
+ [PARDISO]: Time inverse factorization  (dom)  0.92712897993624210     
+ [PARDISO]: Time inverse inversion              1.1530605419538915     
