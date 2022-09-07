@@ -1,5 +1,5 @@
-#ifndef __RGF
-#define __RGF
+#ifndef RGF_H
+#define RGF_H
 
 #include <string.h>
 #include <omp.h>
@@ -11,7 +11,9 @@
 
 //#define PRINT_MSG
 
-template <class T>
+//namespace RGFClass{  apparently not necessarily needed
+
+template <typename T>
 class RGF{
 	
 public:
@@ -1197,6 +1199,8 @@ inline double RGF<double>::f_zero()
 }
 
 /************************************************************************************************/
+
+//} // end RGFClass namespace
 
 #endif
 

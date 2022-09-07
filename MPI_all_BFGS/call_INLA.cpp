@@ -12,9 +12,9 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-#define RGF
+#define RGF_SOLVER
 
-#ifdef RGF
+#ifdef RGF_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
-#ifdef RGF
+#ifdef RGF_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
 #else
@@ -207,7 +207,7 @@ int main(int argc, char* argv[])
     // we have two cholesky factors ...
     if(MPI_rank == 0 && solver_type.compare("RGF") == 0){
         // required memory on CPU to store Cholesky factor
-        double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(T) / pow(10.0,9.0);
+        double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(double) / pow(10.0,9.0);
         printf("Memory Usage of each Cholesky factor on CPU = %f GB\n\n", mem_gb);
     }
 
