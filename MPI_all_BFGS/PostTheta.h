@@ -29,7 +29,7 @@
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
-#define RECORD_TIMES
+//#define RECORD_TIMES
 
 using namespace Eigen;
 using namespace std;

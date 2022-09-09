@@ -4,10 +4,14 @@
 #include "mpi.h"
 
 #include "Solver.h"
+#include "../RGF/RGF.H"
+//#include "RGF.H"
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
 
+
+/*
 #if 0
 typedef CPX T;
 #define assign_T(val) CPX(val, 0.0)
@@ -15,6 +19,7 @@ typedef CPX T;
 typedef double T;
 #define assign_T(val) val
 #endif
+*/
 
 
  /**
@@ -45,6 +50,8 @@ class RGFSolver: public Solver {
         size_t nb_t;
         size_t no_t;
 
+        size_t n;
+
         SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
 
         int* ia;                /**< CSR format. row indices. */
@@ -53,6 +60,9 @@ class RGFSolver: public Solver {
 
         double* b;              /**< right-hand side. */
         double* x;              /**< placeholder for solution. */
+
+        RGF<double> *solver;    /**< RGF solver object */
+
    	public:
    		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
 
@@ -68,7 +78,7 @@ class RGFSolver: public Solver {
          */
 		void factorize(SpMat& Q, double& log_det, double& t_priorLatChol);
 
-        // TODO ...
+        // function description TODO ...
         void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V);
 
         /**
@@ -80,7 +90,7 @@ class RGFSolver: public Solver {
          */ 
 		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve);
 
-        // TODO ...
+        // function description TODO ...
         void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
 
         /**
@@ -91,6 +101,7 @@ class RGFSolver: public Solver {
          */
       	void selected_inversion(SpMat& Q, Vect& inv_diag);
 
+        // function description TODO ... 
         void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
 
       	// will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)

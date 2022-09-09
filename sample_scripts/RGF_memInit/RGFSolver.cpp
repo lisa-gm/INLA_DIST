@@ -4,20 +4,38 @@
 
 RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
    	
-#ifdef PRINT_MSG
-   	std::cout << "constructing RGF solver." << std::endl;
-#endif
 
-   	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
+    MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
+#ifdef PRINT_MSG
+        std::cout << "constructing RGF solver. MPI rank = " << MPI_rank << ", MPI size = " << MPI_size << std::endl;
+#endif
+
     threads_level1 = omp_get_max_threads();
-    //std::cout << "threads level 1 : " << threads_level1 << std::endl;
+    std::cout << "threads level 1 : " << threads_level1 << std::endl;
 
     // CAREFUL USING N in both functions ..
    	n  = ns_t*nt_t + nb_t;
 
+    // assign GPU
+    int noGPUs;
+    cudaGetDeviceCount(&noGPUs);
+#ifdef PRINT_MSG
+    std::cout << "available GPUs : " << noGPUs << std::endl;
+#endif
+    // allocate devices as numThreads mod noGPUs
+    int counter = threads_level1*MPI_rank + omp_get_thread_num();
+    int GPU_rank = counter % noGPUs;
+    cudaSetDevice(GPU_rank);
+//#ifdef PRINT_MSG
+    std::cout << "RGF constructor -- counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
+//#endif	
+
     solver = new RGF<double>(ns_t, nt_t, nb_t);
+    
+    if(MPI_rank == 0)
+    	std::cout << "new RGFSolver Class version." << std::endl; 
 }
 
 // currently not needed !!
@@ -33,6 +51,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 	std::cout << "in RGF FACTORIZE()." << std::endl;
 #endif
 
+#if 0
 	// assign GPU
     int noGPUs; // = 2;
     cudaGetDeviceCount(&noGPUs);
@@ -46,6 +65,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 //#ifdef PRINT_MSG
     std::cout << "FACT -- counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
 //#endif
+#endif
 
     // check if n and Q.size() match
     if(n != Q.rows()){
@@ -119,6 +139,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
     std::cout << "in RGF FACTORIZE W CONSTRAINTS()." << std::endl;
 #endif
 
+#if 0    
     // assign GPU
     int noGPUs; 
     cudaGetDeviceCount(&noGPUs);
@@ -132,7 +153,8 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 #ifdef PRINT_MSG
     std::cout << "FACT -- counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
 #endif
-
+#endif
+    
     // check if n and Q.size() match
     if(n != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
@@ -231,6 +253,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
 #endif
 
+#if 0
 	// assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
@@ -247,7 +270,9 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
     std::cout << "FACT & SOLVE -- counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
 //#endif
 
-	// check if n and Q.size() match
+#endif    
+
+    // check if n and Q.size() match
     if(n != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
         printf("n = %ld.\nnrows(Q) = %ld.\n", n, Q.rows());
@@ -363,6 +388,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
 
     int nrhs = Dxy.rows() + 1;
 
+#if 0    
     // assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
@@ -377,7 +403,8 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
 #ifdef PRINT_MSG
     std::cout << "FACT & SOLVE -- counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
 #endif
-
+#endif
+    
     // check if n and Q.size() match
     if(n != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
@@ -480,6 +507,7 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
     std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
 #endif
 
+#if 0
     // assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
@@ -493,6 +521,7 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
     cudaSetDevice(GPU_rank);
 #ifdef PRINT_MSG
     std::cout << "counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+#endif
 #endif
 
     // check if n and Q.size() match
@@ -573,6 +602,7 @@ void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& i
     std::cout << "in RGF SELECTED_INVERSION_W_CONSTR()." << std::endl;
 #endif
 
+#if 0    
     // assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
@@ -586,6 +616,7 @@ void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& i
     cudaSetDevice(GPU_rank);
 #ifdef PRINT_MSG
     std::cout << "counter : " << counter << ", MPI rank : " << MPI_rank  << ", tid : " << tid << ", GPU rank : " << GPU_rank << std::endl;
+#endif
 #endif
 
     // check if n and Q.size() match

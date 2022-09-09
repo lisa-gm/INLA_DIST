@@ -4,11 +4,10 @@
 #include "mpi.h"
 
 #include "Solver.h"
-#include "../../RGF/RGF.H"
-//#include "RGF.H"
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
+#include "../../RGF/RGF.H"
 
 /*
 #if 0
@@ -20,7 +19,6 @@ typedef double T;
 #endif
 */
 
-
  /**
  * @brief creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system.
  * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
@@ -31,8 +29,6 @@ typedef double T;
 class RGFSolver: public Solver {
 
     private:
-
-
 
         int MPI_size;
         int MPI_rank;
@@ -50,8 +46,7 @@ class RGFSolver: public Solver {
         size_t nt_t;
         size_t nb_t;
         size_t no_t;
-
-        size_t n;
+	size_t n;
 
         SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
 
@@ -62,7 +57,7 @@ class RGFSolver: public Solver {
         double* b;              /**< right-hand side. */
         double* x;              /**< placeholder for solution. */
 
-        RGF<double> *solver;    /**< RGF solver object */
+	RGF<double> *solver;
 
    	public:
    		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
@@ -79,7 +74,7 @@ class RGFSolver: public Solver {
          */
 		void factorize(SpMat& Q, double& log_det, double& t_priorLatChol);
 
-        // function description TODO ...
+        // TODO ...
         void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V);
 
         /**
@@ -91,7 +86,7 @@ class RGFSolver: public Solver {
          */ 
 		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve);
 
-        // function description TODO ...
+        // TODO ...
         void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
 
         /**
@@ -102,7 +97,6 @@ class RGFSolver: public Solver {
          */
       	void selected_inversion(SpMat& Q, Vect& inv_diag);
 
-        // function description TODO ... 
         void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
 
       	// will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)

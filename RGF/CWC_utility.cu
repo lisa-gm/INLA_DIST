@@ -92,7 +92,9 @@ void copy_data_to_host(void *host_data,void *device_data,int N,int M,size_t size
 
 extern "C"
 void memcpy_to_host(void *host_data,void *device_data,size_t size_element){
-     cudaMemcpyAsync(host_data,device_data,size_element,cudaMemcpyDeviceToHost,NULL);
+     cudaError_t cudaErr = cudaMemcpyAsync(host_data,device_data,size_element,cudaMemcpyDeviceToHost,NULL);
+     if (cudaErr != cudaSuccess) { printf("Copy Supernode to host. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); }
+
 }
 
 extern "C"

@@ -162,13 +162,18 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 template <class T>
 RGF<T>::~RGF()
 {
+#ifdef PRINT_MSG
    std::cout << "In RGF destructor. MF_allocated : " << MF_allocated << std::endl;
+#endif 
+
    // in case that only factorize_noCopyHost is called MF not allocated ...
    if (MF_allocated)
    {
       //delete[] MF;
       // if memory PINNED
+#ifdef PRINT_MSG
       std::cout << "cudaFreeHost(MF) gets called." << std::endl;
+#endif
       cudaFreeHost(MF);
    }
 
@@ -254,6 +259,11 @@ inline size_t RGF<T>::mf_dense_block_lda(size_t i)
 template <class T>
 double RGF<T>::FirstStageFactor()
 {
+
+#ifdef PRINT_MSG
+    std::cout << "In first stage Factor" << std::endl;
+#endif
+    
     int info;
     size_t IB;
     size_t NR,NM;
@@ -332,10 +342,14 @@ double RGF<T>::FirstStageFactor()
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM;
        }
+
+
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
        flop_count += 1.0/3.0 * NR * NR * NR;
+       
+
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
@@ -847,7 +861,10 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
 template <class T>
 void RGF<T>::initialize_MF_host(){
 
+#ifdef PRINT_MSG
    std::cout << "in initialize MF host" << std::endl;
+#endif   
+   
    // cudaMallocHost takes a long time -> only worth it if we reuse it!
    if(!MF_allocated)
    {
@@ -871,7 +888,9 @@ template <class T>
 double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
 {
 
+#ifdef PRINT_MSG
    std::cout << "entered factorize." << std::endl;
+#endif
 
     matrix_ia = ia;
     matrix_ja = ja;
@@ -882,7 +901,10 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
    double t_allocate_MF_host = get_time(0.0);
 
    initialize_MF_host();
+   
+#ifdef PRINT_MSG   
    std::cout << "in factorize. MF_allocated : " << MF_allocated << std::endl; 
+#endif
 
 #if 0
    // cudaMallocHost takes a long time -> only worth it if we reuse it!
@@ -901,7 +923,7 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
 #endif
 
    t_allocate_MF_host = get_time(t_allocate_MF_host);
-   std::cout << "time to allocate memory on CPU: " << t_allocate_MF_host << std::endl;
+   //std::cout << "time to allocate memory on CPU: " << t_allocate_MF_host << std::endl;
 
    double t_allocate_MF_dev = get_time(0.0);
 
@@ -920,9 +942,11 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
     }
 
    t_allocate_MF_dev = get_time(t_allocate_MF_dev);
-   std::cout << "time to allocate memory on GPU: " << t_allocate_MF_dev << std::endl;
+   //std::cout << "time to allocate memory on GPU: " << t_allocate_MF_dev << std::endl;
 
+    
     size_t nnz = matrix_ia[matrix_size];
+    //std::cout << "nnz = " << nnz << std::endl;
     size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
     size_t max_cols = max(matrix_ns, matrix_nd);
 
@@ -950,7 +974,11 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
 template <class T>
 double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet)
 {
+
+#ifdef PRINT_MSG	
    printf("In factorize no copy host function.\n");
+#endif   
+   
    matrix_ia = ia;
    matrix_ja = ja;
    matrix_a = a;

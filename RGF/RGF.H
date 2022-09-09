@@ -16,15 +16,15 @@ class RGF{
 	
 public:
 
-    RGF(size_t*,size_t*,T*,size_t,size_t,size_t);
+    RGF(size_t,size_t,size_t);
 
     ~RGF();
-    double factorize();
-    double factorize_noCopyHost(double &logDet);
-    double solve(T*,size_t);
-    double solve(T*,T*,size_t);
-    double RGFdiag(T*);
-    T logDet();
+    double factorize(size_t* ia, size_t* ja, T* a);
+    double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet);
+    double solve(size_t*, size_t*, T*, T*,size_t);
+    double solve(size_t*, size_t*, T*, T*,T*,size_t);
+    double RGFdiag(size_t*, size_t*, T*, T*);
+    T logDet(size_t*, size_t*, T*);
     double residualNorm(T*,T*);
     double residualNormNormalized(T*,T*);
     double flop_count_factorise();
@@ -76,24 +76,28 @@ private:
     double SecondStageSolve(size_t);
     double ThirdStageRGF(T*,T*);
     void create_blocks();
+    void initialize_MF_host();
+    
     inline void init_supernode(T *M_dev, size_t supernode);
     inline void copy_supernode_to_host(T *M_dev, size_t supernode);
     inline void copy_supernode_to_device(T *M_dev, size_t supernode);
     inline void copy_supernode_diag(T *src, size_t supernode);
     inline void swap_pointers(T **ptr1, T **ptr2);
 
-   T f_one();
-   T f_zero();
+    inline T f_one();
+    inline T f_zero();
 };
 
 /************************************************************************************************/
 
 template <class T>
-RGF<T>::RGF(size_t *ia, size_t *ja, T *a, size_t ns, size_t nt, size_t nd)
+RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 {
-    matrix_ia = ia;
-    matrix_ja = ja;
-    matrix_a = a;
+   // only set up indices etc. no values yet.
+   
+    //matrix_ia = ia;
+    //matrix_ja = ja;
+    //matrix_a = a;
     matrix_ns = ns;
     matrix_nt = nt;
     matrix_nd = nd;
@@ -150,6 +154,7 @@ RGF<T>::RGF(size_t *ia, size_t *ja, T *a, size_t ns, size_t nt, size_t nd)
     magma_queue_create_from_cuda(device, NULL, NULL, NULL, &magma_queue);
     stream_c = magma_queue_get_cuda_stream(magma_queue);
     cublas_handle = magma_queue_get_cublas_handle(magma_queue);
+
 }
 
 /************************************************************************************************/
@@ -157,12 +162,19 @@ RGF<T>::RGF(size_t *ia, size_t *ja, T *a, size_t ns, size_t nt, size_t nd)
 template <class T>
 RGF<T>::~RGF()
 {
+#ifdef PRINT_MSG
+   std::cout << "In RGF destructor. MF_allocated : " << MF_allocated << std::endl;
+#endif 
+
    // in case that only factorize_noCopyHost is called MF not allocated ...
    if (MF_allocated)
    {
-      delete[] MF;
+      //delete[] MF;
       // if memory PINNED
-      //cudaFreeHost(MF);
+#ifdef PRINT_MSG
+      std::cout << "cudaFreeHost(MF) gets called." << std::endl;
+#endif
+      cudaFreeHost(MF);
    }
 
    if (MF_dev_allocated)
@@ -247,6 +259,11 @@ inline size_t RGF<T>::mf_dense_block_lda(size_t i)
 template <class T>
 double RGF<T>::FirstStageFactor()
 {
+
+#ifdef PRINT_MSG
+    std::cout << "In first stage Factor" << std::endl;
+#endif
+    
     int info;
     size_t IB;
     size_t NR,NM;
@@ -325,10 +342,14 @@ double RGF<T>::FirstStageFactor()
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM;
        }
+
+
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
        flop_count += 1.0/3.0 * NR * NR * NR;
+       
+
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
@@ -837,27 +858,76 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
    return gflops;
 }
 
-/************************************************************************************************/
-
 template <class T>
-double RGF<T>::factorize()
-{
-    create_blocks();
+void RGF<T>::initialize_MF_host(){
 
+#ifdef PRINT_MSG
+   std::cout << "in initialize MF host" << std::endl;
+#endif   
+   
+   // cudaMallocHost takes a long time -> only worth it if we reuse it!
    if(!MF_allocated)
    {
       // memory allocation on CPU 
       // PREVIOUSLY unpinned memory:
-      MF = new T[matrix_n_nonzeros];
+      //MF = new T[matrix_n_nonzeros];
       //unsigned int dummy_flag = 0;
       //cudaHostRegister(MF, (matrix_n_nonzeros) * sizeof(T), dummy_flag);
       // pin memory:
-      //cudaMallocHost(&MF, (matrix_n_nonzeros) * sizeof(T));
+      cudaMallocHost(&MF, (matrix_n_nonzeros) * sizeof(T));
       MF_allocated = true;
       //printf("In MF_allocated not allocated.\n");
    }
 
-    //Data allocation
+}
+
+
+/************************************************************************************************/
+
+template <class T>
+double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
+{
+
+#ifdef PRINT_MSG
+   std::cout << "entered factorize." << std::endl;
+#endif
+
+    matrix_ia = ia;
+    matrix_ja = ja;
+    matrix_a = a;
+
+    create_blocks();
+
+   double t_allocate_MF_host = get_time(0.0);
+
+   initialize_MF_host();
+   
+#ifdef PRINT_MSG   
+   std::cout << "in factorize. MF_allocated : " << MF_allocated << std::endl; 
+#endif
+
+#if 0
+   // cudaMallocHost takes a long time -> only worth it if we reuse it!
+   if(!MF_allocated)
+   {
+      // memory allocation on CPU 
+      // PREVIOUSLY unpinned memory:
+      //MF = new T[matrix_n_nonzeros];
+      //unsigned int dummy_flag = 0;
+      //cudaHostRegister(MF, (matrix_n_nonzeros) * sizeof(T), dummy_flag);
+      // pin memory:
+      cudaMallocHost(&MF, (matrix_n_nonzeros) * sizeof(T));
+      MF_allocated = true;
+      //printf("In MF_allocated not allocated.\n");
+   }
+#endif
+
+   t_allocate_MF_host = get_time(t_allocate_MF_host);
+   //std::cout << "time to allocate memory on CPU: " << t_allocate_MF_host << std::endl;
+
+   double t_allocate_MF_dev = get_time(0.0);
+
+    //Data allocation on GPU -> negligible time
     if (!MF_dev_allocated)
     {
        //printf("In MF_dev_allocated not allocated.\n");
@@ -871,7 +941,12 @@ double RGF<T>::factorize()
        MF_dev_allocated = true;
     }
 
+   t_allocate_MF_dev = get_time(t_allocate_MF_dev);
+   //std::cout << "time to allocate memory on GPU: " << t_allocate_MF_dev << std::endl;
+
+    
     size_t nnz = matrix_ia[matrix_size];
+    //std::cout << "nnz = " << nnz << std::endl;
     size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
     size_t max_cols = max(matrix_ns, matrix_nd);
 
@@ -897,10 +972,18 @@ double RGF<T>::factorize()
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorize_noCopyHost(double &logDet)
+double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet)
 {
-    //printf("In new factorize function.\n");
-    create_blocks();
+
+#ifdef PRINT_MSG	
+   printf("In factorize no copy host function.\n");
+#endif   
+   
+   matrix_ia = ia;
+   matrix_ja = ja;
+   matrix_a = a;
+
+   create_blocks();
 
     // Data allocation device
     if (!MF_dev_allocated)
@@ -955,7 +1038,7 @@ double RGF<T>::factorize_noCopyHost(double &logDet)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::solve(T *b, size_t nrhs)
+double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs)
 {
     double gflops = solve(b, b, nrhs);
 
@@ -965,10 +1048,17 @@ double RGF<T>::solve(T *b, size_t nrhs)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::solve(T *x, T *b, size_t nrhs)
+double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
 {
-    if (!factorization_completed)
-       factorize();
+
+   if (!factorization_completed)
+       factorize(ia, ja, a);
+   
+   // check if solve is performed on the right matrix 
+   if(!(ia[matrix_size] == matrix_ia[matrix_size])){
+      std::cout << "Matrices don't match!!" << std::endl;
+      exit(1);
+   }
 
     //Data allocation
     rhs = new T[matrix_size*nrhs];
@@ -991,10 +1081,17 @@ double RGF<T>::solve(T *x, T *b, size_t nrhs)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::RGFdiag(T *diag)
+double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
 {
-    if (!factorization_completed)
-       factorize();
+
+   if (!factorization_completed)
+       factorize(ia, ja, a);
+
+   // check if number of nnz are the same to check if matrix is the same
+   if(!(ia[matrix_size] == matrix_ia[matrix_size])){
+      std::cout << "Matrices don't match!!" << std::endl;
+      exit(1);
+   }
 
     factorization_completed = false;
 
@@ -1027,10 +1124,10 @@ double RGF<T>::RGFdiag(T *diag)
 /************************************************************************************************/
 
 template <class T>
-T RGF<T>::logDet()
+T RGF<T>::logDet(size_t *ia, size_t *ja, T *a)
 {
     if (!factorization_completed)
-       factorize();
+       factorize(ia, ja, a);
 
     //Computation
     T det = T(0.0);
@@ -1170,14 +1267,15 @@ inline void RGF<T>::swap_pointers(T **ptr1, T **ptr2)
 
 /************************************************************************************************/
 
+// added inline here and in the next 3 functions to avoid compiler issues! 
 template <>
-CPX RGF<CPX>::f_one()
+inline CPX RGF<CPX>::f_one()
 {
     return CPX(1.0, 0.0);
 }
 
 template <>
-double RGF<double>::f_one()
+inline double RGF<double>::f_one()
 {
     return 1.0;
 }
@@ -1185,13 +1283,13 @@ double RGF<double>::f_one()
 /************************************************************************************************/
 
 template <>
-CPX RGF<CPX>::f_zero()
+inline CPX RGF<CPX>::f_zero()
 {
     return CPX(0.0, 0.0);
 }
 
 template <>
-double RGF<double>::f_zero()
+inline double RGF<double>::f_zero()
 {
     return 0.0;
 }

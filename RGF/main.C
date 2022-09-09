@@ -462,7 +462,8 @@ int main(int argc, char* argv[])
     //printf("%f\n", b[i]);
   }
   
-  solver = new RGF<T>(ia, ja, a, ns, nt, nb);
+  //solver = new RGF<T>(ia, ja, a, ns, nt, nb);
+  solver = new RGF<T>(ns, nt, nb);
 
   t_factorise1 = get_time(0.0);
   //solver->solve_equation(GR);
@@ -472,8 +473,8 @@ int main(int argc, char* argv[])
 
   t_factorise2 = get_time(0.0);
 
-  double flops_factorize2 = solver->factorize();
-  double log_det = solver->logDet();
+  double flops_factorize2 = solver->factorize(ia, ja, a);
+  double log_det = solver->logDet(ia, ja, a);
 
   t_factorise2 = get_time(t_factorise2);
   //double log_det = solver->logDet();
@@ -506,13 +507,13 @@ int main(int argc, char* argv[])
   L_factor_file.close(); */
 
   t_solve = get_time(0.0); 
-  double flops_solve = solver->solve(x, b, 1);
+  double flops_solve = solver->solve(ia, ja, a, x, b, 1);
   t_solve = get_time(t_solve);
   printf("flops solve:     %f\n", flops_solve);
 
 
   t_inv = get_time(0.0);
-  double flops_inv = solver->RGFdiag(invDiag);
+  double flops_inv = solver->RGFdiag(ia, ja, a, invDiag);
   t_inv = get_time(t_inv);
   printf("flops inv:      %f\n", flops_inv);
 

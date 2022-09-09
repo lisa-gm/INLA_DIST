@@ -18,6 +18,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     // CAREFUL USING N in both functions ..
    	//n  = ns_t*nt_t + nb_t;
 
+    std::cout << "Create & delete RGF Class version." << std::endl;
     // initialize appropriate memory here to do so only once!
     //RGF<T> *solver;
 
