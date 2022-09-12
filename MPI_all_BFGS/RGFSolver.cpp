@@ -13,7 +13,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
 #endif
 
     threads_level1 = omp_get_max_threads();
-    std::cout << "threads level 1 : " << threads_level1 << std::endl;
+    //std::cout << "threads level 1 : " << threads_level1 << std::endl;
 
     // CAREFUL USING N in both functions ..
    	n  = ns_t*nt_t + nb_t;
@@ -28,9 +28,9 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     int counter = threads_level1*MPI_rank + omp_get_thread_num();
     int GPU_rank = counter % noGPUs;
     cudaSetDevice(GPU_rank);
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     std::cout << "RGF constructor -- counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
-//#endif	
+#endif	
 
     solver = new RGF<double>(ns_t, nt_t, nb_t);
     
@@ -616,7 +616,7 @@ void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& i
 
 
 RGFSolver::~RGFSolver(){
-    std::cout << "Derived destructor called." << std::endl;
+    //std::cout << "Derived destructor called." << std::endl;
     delete solver;
 
 }
