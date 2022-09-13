@@ -517,7 +517,7 @@ int main(int argc, char* argv[])
 
             // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
             // number of time-steps per constraint 
-            int tsPerConstr = 16;
+            int tsPerConstr = 100;
             num_constr = ceil(1.0 * nt / tsPerConstr);
             if(MPI_rank == 0)
                 std::cout << "num constr = " << num_constr << std::endl;
@@ -932,7 +932,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-#if 0
+#if 1
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -958,7 +958,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-    #if 0
+    #if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -1033,7 +1033,7 @@ int main(int argc, char* argv[])
 
   
     // =================================== compute marginal variances =================================== //
-#if 0
+#if 1
 
     double t_get_marginals;
     Vect marg(n);
@@ -1179,7 +1179,7 @@ int main(int argc, char* argv[])
 #endif
 
     // =================================== print times =================================== //
-#if 0
+#if 1
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 
