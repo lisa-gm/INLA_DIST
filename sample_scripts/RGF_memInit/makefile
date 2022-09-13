@@ -1,5 +1,5 @@
-BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 ############# RGF ################
 
@@ -8,19 +8,19 @@ BLAHOME       = $(MKLHOME)
 LAPHOME       = $(MKLHOME)
 SCAHOME       = $(MKLHOME)
 
-#RGF_PATH      = ../../RGF
-RGF_PATH      = /home/x_gaedkelb/b_INLA/RGF
+RGF_PATH      = ../../RGF
+#RGF_PATH      = /home/x_gaedkelb/b_INLA/RGF
 include $(RGF_PATH)/make.inc
 #############################################################################################################
 
-CXX=mpic++
-CXXFLAGS= -g -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -O0 # -O3 #-Wall -llikwid -DLIKWID_PERFMON
+CXX=mpicxx
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm # -O3 #-Wall -llikwid -DLIKWID_PERFMON
 
-DEBUG= -g #-Wall
+DEBUG= #-g #-Wall
 
 
-INCEIGEN=-I/usr/include/eigen3
-#INCEIGEN=-I${BASE_PATH}/applications/eigen
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I${BASE_PATH}/applications/eigen
 
 #LIBCHOLMOD=-lcholmod
 ARMADILLO=-larmadillo
@@ -63,7 +63,7 @@ $(RGF_PATH)/CWC_utility.o: $(RGF_PATH)/CWC_utility.cu
 main: main.o PardisoSolver.o RGFSolver.o $(RGF_CC_FILES) $(RGF_CU_FILES) #solver_cholmod.o 
 	$(CXX) $^ $(LIBS) $(RGF_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
-main.o: main.cpp #call_INLA.cpp
+main.o: mainOpenMP.cpp #call_INLA.cpp
 	$(CXX) -c $< $(CXXFLAGS) $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCEIGEN) $(RGF_INCLUDEDIR) -o $@ 
 
 %.o : %.cpp %.h
