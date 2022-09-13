@@ -897,7 +897,8 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
     }
     //printf("\nFactorization completed ...\n");
 
-    std::cout << "Calling PARDISO with " << iparm[2] << "threads."<< std::endl;
+    if(MPI_rank == 0)
+        std::cout << "Calling PARDISO with " << iparm[2] << " threads."<< std::endl;
 
     /* -------------------------------------------------------------------- */    
     /* ... Inverse factorization.                                           */                                       
