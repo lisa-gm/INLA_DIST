@@ -10,7 +10,7 @@
 #SBATCH --error=%x.err          #The .error file name
 #SBATCH --output=%x.out         #The .output file name
 
-num_ranks=1
+num_ranks=5
 
 #ns=2252
 #nt=0
@@ -27,9 +27,9 @@ num_ranks=1
 #nb=2
 #no=188242
 
-ns=4002
+ns=492
 #ns=19362
-nt=250
+nt=16
 #nt=30
 #nb=2
 nb=6

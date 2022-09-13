@@ -790,7 +790,7 @@ int main(int argc, char* argv[])
     Solver* solverQst;
     Solver* solverQ;
 
-#if 1
+#if 0
     std::cout << "=================== PARDISO ======================" << std::endl;
 
     solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
@@ -818,8 +818,10 @@ int main(int argc, char* argv[])
 
     std::cout << "Calling Selective inversion" << std::endl; 
     Vect inv_diag_PARD(n);
+    double t_sel_inv_PARD = - omp_get_wtime();
     solverQ->selected_inversion(Q, inv_diag_PARD);
-
+    t_sel_inv_PARD += omp_get_wtime();
+   std::cout << "time selected PARD : " << t_sel_inv_PARD << std::endl;
    std::cout << "invDiag(1:10) = " << inv_diag_PARD.head(10).transpose() << std::endl;    
 
 #endif
@@ -852,12 +854,14 @@ int main(int argc, char* argv[])
 
     std::cout << "Calling Selective inversion" << std::endl; 
     Vect inv_diag_RGF(n);
+    double t_sel_inv_RGF = -omp_get_wtime();
     solverQ->selected_inversion(Q, inv_diag_RGF);
-
+    t_sel_inv_RGF += omp_get_wtime();
+   std::cout << "time selected RGF : " << t_sel_inv_RGF << std::endl;
    std::cout << "invDiag(1:10) = " << inv_diag_RGF.head(10).transpose() << std::endl;  
 #endif
 
-#if 0
+#if 1
 
 for(int i=0; i<5; i++){
 

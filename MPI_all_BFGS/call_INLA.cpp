@@ -517,7 +517,7 @@ int main(int argc, char* argv[])
 
             // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
             // number of time-steps per constraint 
-            int tsPerConstr = 16;
+            int tsPerConstr = 100;
             num_constr = ceil(1.0 * nt / tsPerConstr);
             if(MPI_rank == 0)
                 std::cout << "num constr = " << num_constr << std::endl;
@@ -998,7 +998,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-#if 0
+#if 1
     double t_get_fixed_eff;
     Vect mu(n);
 
@@ -1017,7 +1017,7 @@ int main(int argc, char* argv[])
     }
 
     // CAREFUL! at the moment mu is in rank 1 ... how to do this properly??
-    if(MPI_rank == 1){
+    if(MPI_rank == fact_to_rank_list[1]){
 
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
         std::cout << "estimated mean random effects: " << mu.head(10).transpose() << std::endl;
