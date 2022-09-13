@@ -3,15 +3,9 @@
 #ifndef RGFSOLVER_DUMMY_H
 #define RGFSOLVER_DUMMY_H
 
-#include "Solver.h"
+//#include "../RGF/RGF.H"
 
-#if 0
-typedef CPX T;
-#define assign_T(val) CPX(val, 0.0)
-#else
-typedef double T;
-#define assign_T(val) val
-#endif
+#include "Solver.h"
 
 //extern "C" double 
 
@@ -47,23 +41,24 @@ class RGFSolver: public Solver {
 
         double* b;              /**< right-hand side. */
         double* x;              /**< placeholder for solution. */
+
    	public:
-   		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
+        RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
 
         /**
          * @brief not used for RGFSolver, only in PARDISO
          */
-		void symbolic_factorization(SpMat& Q, int& init);
+        void symbolic_factorization(SpMat& Q, int& init);
 
         /**
          * @brief numerical factorisation using block-wise factorisation on GPU. 
          * @param[in]       Q precision matrix to be factorised.
          * @param[inout]    log_det computes log determinant of Q.
          */
-		void factorize(SpMat& Q, double& log_det);
+        void factorize(SpMat& Q, double& log_det, double& t_priorLatChol);
 
-        // TODO ...
-        void factorize_w_constr(SpMat& Q,  MatrixXd& D, double& log_det, MatrixXd& V);
+        // function description TODO ...
+        void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V);
 
         /**
          * @brief factorises and solves matrix in one call 
@@ -72,10 +67,10 @@ class RGFSolver: public Solver {
          * @param[inout]    sol solution of the system.
          * @param[inout]    log_det log determinant of Q.
          */ 
-		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det);
+        void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve);
 
-               // TODO ...
-        void factorize_solve_w_constr(SpMat& Q, Vect& rhs, MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
+        // function description TODO ...
+        void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
 
         /**
          * @brief selected inversion of the diagonal elements of Q.
@@ -83,15 +78,18 @@ class RGFSolver: public Solver {
          * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
          * @note is there some way to potentially reuse Cholesky factor that is already on CPU?
          */
-      	void selected_inversion(SpMat& Q, Vect& inv_diag);
+        void selected_inversion(SpMat& Q, Vect& inv_diag);
 
-      	// will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)
+        // function description TODO ... 
+        void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
+
+        // will also need a "simple inversion" method to independent of PARDISO. regular lapack should do (see pardiso)
         // OR not? Eigen function is probably fine, most likely also using lapack.
 
         /**
          * @brief class destructor. Frees memory allocated by RGF.
          */
-      	~RGFSolver();
+        ~RGFSolver();
 
 };
 
