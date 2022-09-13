@@ -856,18 +856,32 @@ int main(int argc, char* argv[])
     double fx;
 
 #if 0
-    if(MPI_rank == 0){
 	double t_f_eval = -omp_get_wtime();
+
+    ArrayXi fact_to_rank_list(2);
+    fact_to_rank_list << 0,0;
+    if(MPI_size >= 2){
+        fact_to_rank_list[1] = 1; 
+        }
+    std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+            
+    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
+
     	// single function evaluation
     	for(int i=0; i<1; i++){
+
     		Vect mu_dummy(n);
-    		fx = fun->eval_post_theta(theta_original, mu_dummy);
+    		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
+            //fx = fun->eval_post_theta(theta_original, mu_dummy);
+
     		std::cout <<  "f(x) = " << fx << std::endl;
-    	}
+
+        }
+    }
 
 	t_f_eval += omp_get_wtime();
 	std::cout << "time in f eval loop : " << t_f_eval << std::endl;
-    }
+
 #endif
 
 #if 1
@@ -936,13 +950,13 @@ int main(int argc, char* argv[])
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    theta_max = theta;
+    theta_max = theta_original;
 
     // in what parametrisation are INLA's results ... ?? 
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 0
+    #if 1
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -971,7 +985,8 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    double t_get_covariance = -omp_get_wtime();
+    //double t_get_covariance = -omp_get_wtime();
+    t_get_covariance = -omp_get_wtime();
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
     t_get_covariance += omp_get_wtime();
 
@@ -983,15 +998,27 @@ int main(int argc, char* argv[])
     #endif
 
 
+#if 1
     double t_get_fixed_eff;
     Vect mu(n);
 
-    if(MPI_rank == 0){
-        t_get_fixed_eff = - omp_get_wtime();
-        
-        fun->get_mu(theta_original, mu);
+    ArrayXi fact_to_rank_list(2);
+    fact_to_rank_list << 0,0;
+    if(MPI_size >= 2){
+        fact_to_rank_list[1] = 1; 
+    }
 
+    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
+        std::cout << "MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
+        t_get_fixed_eff = - omp_get_wtime();
+        fun->get_mu(theta_original, mu, fact_to_rank_list);
         t_get_fixed_eff += omp_get_wtime();
+    }
+
+    // CAREFUL! at the moment mu is in rank 1 ... how to do this properly??
+    if(MPI_rank == fact_to_rank_list[1]){
+
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
         std::cout << "estimated mean random effects: " << mu.head(10).transpose() << std::endl;
         //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
@@ -1001,6 +1028,7 @@ int main(int argc, char* argv[])
             std::cout << "Dxy*mu : " << (Dxy*mu).transpose() << ", \nshould be : " << e.transpose() << std::endl;
 #endif
     }
+
 
     // ============================================ validate ============================================= //
     if(validate && MPI_rank == 0){
@@ -1027,6 +1055,8 @@ int main(int argc, char* argv[])
         std::cout << "difference w_i = 1 : " << diff_w1 << std::endl;
         std::cout << "difference w_i = 0 : " << diff_w0 << std::endl;
     }
+#endif
+
     
 #endif
 
@@ -1034,26 +1064,26 @@ int main(int argc, char* argv[])
   
     // =================================== compute marginal variances =================================== //
 #if 1
-
     double t_get_marginals;
     Vect marg(n);
 
     // when the range of u is large the variance of b0 is large.
     if(MPI_rank == 0){
-
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
+        std::cout << "\nUSING ESTIMATED THETA : " << theta_original.transpose() << std::endl;
+    }
 
-        t_get_marginals = -omp_get_wtime();
-        fun->get_marginals_f(theta, marg);
-        t_get_marginals += omp_get_wtime();
+    t_get_marginals = -omp_get_wtime();
+    fun->get_marginals_f(theta_original, marg);
+    t_get_marginals += omp_get_wtime();
 
+    if(MPI_rank == 0){
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
-
+    }
 /*
 #ifdef DATA_SYNTHETIC
         // ============================================ //
@@ -1097,7 +1127,6 @@ int main(int argc, char* argv[])
         std::cout << "est. std dev random eff      : " << marg_INLA.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
    */
-    }
 
 #endif  // #if 0/1 for marginals
 
