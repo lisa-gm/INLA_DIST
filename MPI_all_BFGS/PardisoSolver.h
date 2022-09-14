@@ -89,7 +89,7 @@ public:
      /**
      * @brief constructor. initialises parameters, check pardiso license.
      */
-    PardisoSolver(int MPI_rank, int threads_level1, int threads_level2);
+    PardisoSolver(int MPI_rank);
 
 
     /* ======================================================================== */

@@ -45,8 +45,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);
@@ -104,17 +104,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	threads_level1 = omp_get_max_threads();
-	threads_level2;
-
-	#pragma omp parallel
-    {  
-   	threads_level2 = omp_get_max_threads();
-    }
+	threads_level2 = omp_get_max_threads();
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
-		printf("threads level 1 : %d\n", threads_level1);
 		printf("threads level 2 : %d\n", threads_level2);
 	}
 #endif
@@ -122,31 +115,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
 
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	#ifdef PRINT_MSG
-		printf("num solvers     : %d\n", num_solvers);
-	#endif
-
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
-#pragma omp parallel
-#pragma omp single
-{
-#pragma omp task
 		solverQ   = new RGFSolver(ns, nt, nb, no);
-}
-#pragma omp task
-{
 		solverQst = new RGFSolver(ns, nt, 0, no);
-}
 	}  
 
 	prior = "gaussian";
@@ -219,20 +193,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	threads_level1 = omp_get_max_threads();
-	//threads_level1 = 2;
-
-	threads_level2;
-
-	#pragma omp parallel
-    {  
-   		threads_level2 = omp_get_max_threads();
-    }
+   	threads_level2 = omp_get_max_threads();
 
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
-		printf("threads level 1 : %d\n", threads_level1);
 		printf("threads level 2 : %d\n", threads_level2);
 	}
 #endif
@@ -240,19 +205,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval          = 2*dim_th + 1;
 
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	#ifdef PRINT_MSG
-		printf("num solvers     : %d\n", num_solvers);
-	#endif
-
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 
@@ -370,15 +325,25 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
 
 	// ===================================== compute f(theta) ===================================== //
-	if(MPI_rank == task_to_rank_list[0])
+	if(MPI_rank % no_f_eval == task_to_rank_list[0])
 	{ 
 		mu.setZero(n);
+
+    	ArrayXi fact_to_rank_list(2); 
+        fact_to_rank_list << task_to_rank_list[0], task_to_rank_list[0];
+        if(MPI_size > no_f_eval + 0){
+            fact_to_rank_list[1] = no_f_eval + 0; 
+        }
+#ifdef PRINT_MSG
+        if(iter_count == 1)
+        	std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
+#endif
 
 		timespent_f_theta_eval = -omp_get_wtime();
 #ifdef RECORD_TIMES
 		t_Ftheta_ext = -omp_get_wtime();
 #endif
-		f_temp_list_loc(0) = eval_post_theta(theta, mu);
+		f_temp_list_loc(0) = eval_post_theta(theta, mu, fact_to_rank_list);
 		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
 		//std::cout << "before record times section." << std::endl;
 #ifdef RECORD_TIMES		
@@ -402,15 +367,22 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 		// compute all FORWARD DIFFERENCES
 		if(i / divd == 0){
-			if(MPI_rank == task_to_rank_list[i])
+			if(MPI_rank % no_f_eval == task_to_rank_list[i])
 			{
 				int k = i-1; 
-
 #ifdef PRINT_MSG
 				//std::cout <<"i = " << i << ", i / divd = " << i / divd << ", rank " << MPI_rank << std::endl;
 					std::cout << "i : " << i << " and k : " << k << std::endl;
 #endif
-
+    			ArrayXi fact_to_rank_list(2); 
+                fact_to_rank_list << task_to_rank_list[i], task_to_rank_list[i];
+                if(MPI_size > no_f_eval + i){
+                    fact_to_rank_list[1] = no_f_eval + i; 
+                }
+#ifdef PRINT_MSG
+                if(iter_count == 1)
+                	std::cout << "i = " << i << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
+#endif
 				Vect theta_forw(dim_th);
 				Vect mu_dummy(n);
 
@@ -418,21 +390,19 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #ifdef RECORD_TIMES
 		                t_Ftheta_ext = -omp_get_wtime();
 #endif			
-	
-				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy);
-
+				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy, fact_to_rank_list);
 #ifdef RECORD_TIMES
-                               t_Ftheta_ext += omp_get_wtime();
-                		// for now write to file. Not sure where the best spot would be.
-                		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-                		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-                                                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+                t_Ftheta_ext += omp_get_wtime();
+        		// for now write to file. Not sure where the best spot would be.
+        		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+        		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                                        t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 			} // end MPI if
 		
 		// compute all BACKWARD DIFFERENCES
 		} else if (i / divd > 0){
-			if(MPI_rank == task_to_rank_list[i])
+			if(MPI_rank % no_f_eval == task_to_rank_list[i])
 			{				
 				int k = i-1-dim_th; // backward difference in the k-th direction
 
@@ -441,14 +411,25 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 					//std::cout << "i : " << i << " and k : " << k << std::endl;
 #endif
 
+    			ArrayXi fact_to_rank_list(2); 
+                fact_to_rank_list << task_to_rank_list[i], task_to_rank_list[i];
+                if(MPI_size > no_f_eval + i){
+                    fact_to_rank_list[1] = no_f_eval + i; 
+                }
+#ifdef PRINT_MSG                
+                if(iter_count == 1)
+                	std::cout << "i = " << i << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
+#endif
 				Vect theta_backw(dim_th);
 				Vect mu_dummy(n);
 
 				theta_backw = theta - eps*G.col(k);
 #ifdef RECORD_TIMES
-                                t_Ftheta_ext = -omp_get_wtime();
+                t_Ftheta_ext = -omp_get_wtime();
 #endif
-				f_temp_list_loc(i) = eval_post_theta(theta_backw, mu_dummy);
+                // write result only once, otherwise problems when calling Allreduce ...
+				f_temp_list_loc(i) = eval_post_theta(theta_backw, mu_dummy, fact_to_rank_list);
+
 #ifdef RECORD_TIMES
                 		t_Ftheta_ext += omp_get_wtime();
       			        // for now write to file. Not sure where the best spot would be.
@@ -473,6 +454,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	// distribute the results among all processes
 	Vect f_temp_list(no_f_eval);
 
+	// f_temp_list_loc needs to be zero for MPI_rank >= no_f_eval
 	MPI_Allreduce(f_temp_list_loc.data(), f_temp_list.data(), no_f_eval, MPI_DOUBLE, MPI_SUM,
               MPI_COMM_WORLD);
 
@@ -669,13 +651,13 @@ void PostTheta::convert_interpret2theta(double ranT, double ranS, double sigU, d
 // FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED
 
 
-void PostTheta::get_mu(Vect& theta, Vect& mu){
+void PostTheta::get_mu(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_list){
 
 #ifdef PRINT_MSG
 		std::cout << "get_mu()" << std::endl;
 #endif
 
-	double f_theta = eval_post_theta(theta, mu);
+	double f_theta = eval_post_theta(theta, mu, fact_to_rank_list);
 
 #ifdef PRINT_MSG
 		std::cout << "mu(-10:end) :" << mu.tail(10) << std::endl;
@@ -806,9 +788,6 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 
 	if(constr == true){
-		#pragma omp parallel
-		#pragma omp single
-		{
 			MatrixXd V(n, Dxy.rows());
 			solverQ->selected_inversion_w_constr(Q, Dxy, vars, V);
 			MatrixXd W = Dxy*V;
@@ -824,15 +803,9 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 			vars = vars - update_vars;
 			//std::cout << "vars        = " << vars.tail(10).transpose() << std::endl;			
 
-		}
 
 	} else {
-		// nested parallelism, want to call this with 1 thread of omp level 1
-		#pragma omp parallel
-		#pragma omp single
-		{
 			solverQ->selected_inversion(Q, vars);
-		}
 	}
 	
 #ifdef PRINT_TIMES
@@ -923,7 +896,13 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 		
 		Vect mu_tmp(n);
 		//double f_theta = f_eval(theta);
-		double f_theta = eval_post_theta(theta, mu_tmp);
+		// assume for now that there are never enough ranks to execute factorizations
+		// on different GPUs
+		ArrayXi fact_to_rank_list(2);
+    	fact_to_rank_list << MPI_rank, MPI_rank;
+    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
+		double f_theta = eval_post_theta(theta, mu_tmp, fact_to_rank_list);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
     }
     counter++;
@@ -940,19 +919,29 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
         	// compute f(theta+eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+		    	fact_to_rank_list << MPI_rank, MPI_rank;
+		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i = theta+epsG.col(i);
 	            //f_i_i(0,i) = f_eval(theta_forw_i);
-	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
+	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta-eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+       		ArrayXi fact_to_rank_list(2);
+	    	fact_to_rank_list << MPI_rank, MPI_rank;
+	    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+	     	
 	            Vect mu_tmp(n);
 	            Vect theta_back_i = theta-epsG.col(i);
 	            //f_i_i(2,i) = f_eval(theta_back_i);
-	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp);
+	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp, fact_to_rank_list);
             }
             counter++;
 
@@ -963,38 +952,58 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
         } else if(j > i) {
 
         	// compute f(theta+eps_i+eps_j)
-            if(MPI_rank == task_to_rank_list[counter]){             
+            if(MPI_rank == task_to_rank_list[counter]){      
+
+            	ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+       
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i_j 	   = theta+epsG.col(i)+epsG.col(j);
 	            //f_i_j(0,k) = f_eval(theta_forw_i_j);
-	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
+	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta+eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+		    	fact_to_rank_list << MPI_rank, MPI_rank;
+		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i_back_j = theta+epsG.col(i)-epsG.col(j);
 	            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
-	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
+	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta-eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+		    	fact_to_rank_list << MPI_rank, MPI_rank;
+		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 	            Vect theta_back_i_forw_j = theta-epsG.col(i)+epsG.col(j);
 	            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
-	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
+	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta-eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+		    	fact_to_rank_list << MPI_rank, MPI_rank;
+		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 	            Vect theta_back_i_j 	   = theta-epsG.col(i)-epsG.col(j);
 	            //f_i_j(3,k) = f_eval(theta_back_i_j);
-	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
+	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;            
         }
@@ -1141,12 +1150,17 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
     // compute f(theta) only once.
 	if(MPI_rank == task_to_rank_list[0]){
+
+		ArrayXi fact_to_rank_list(2);
+    	fact_to_rank_list << MPI_rank, MPI_rank;
+    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 		Vect mu_tmp(n); 
 		// convert interpret_theta to theta
 		Vect theta(4);
 		theta[0] = interpret_theta[0];
 		convert_interpret2theta(interpret_theta[1], interpret_theta[2], interpret_theta[3], theta[1], theta[2], theta[3]);
-		double f_theta = eval_post_theta(theta, mu_tmp);
+		double f_theta = eval_post_theta(theta, mu_tmp, fact_to_rank_list);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
     }
     counter++;
@@ -1163,23 +1177,33 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
         	// compute f(theta+eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
             	Vect interpret_theta_forw_i = interpret_theta+epsG.col(i);
             	Vect theta_forw_i(4);
 				theta_forw_i[0] = interpret_theta_forw_i[0];
 				convert_interpret2theta(interpret_theta_forw_i[1], interpret_theta_forw_i[2], interpret_theta_forw_i[3], theta_forw_i[1], theta_forw_i[2], theta_forw_i[3]);
-	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
+	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta-eps_i)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+            	ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 				Vect interpret_theta_back_i = interpret_theta-epsG.col(i);
             	Vect theta_back_i(4);
 				theta_back_i[0] = interpret_theta_back_i[0];
 				convert_interpret2theta(interpret_theta_back_i[1], interpret_theta_back_i[2], interpret_theta_back_i[3], theta_back_i[1], theta_back_i[2], theta_back_i[3]);
-	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp);
+	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp, fact_to_rank_list);
             }
             counter++;
 
@@ -1189,46 +1213,66 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
         } else if(j > i) {
 
         	// compute f(theta+eps_i+eps_j)
-            if(MPI_rank == task_to_rank_list[counter]){             
+            if(MPI_rank == task_to_rank_list[counter]){     
+
+            	ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+        
 	            Vect mu_tmp(n);
 				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsG.col(i)+epsG.col(j);
             	Vect theta_forw_i_j(4);
 				theta_forw_i_j[0] = interpret_theta_forw_i_j[0];
 				convert_interpret2theta(interpret_theta_forw_i_j[1], interpret_theta_forw_i_j[2], interpret_theta_forw_i_j[3], theta_forw_i_j[1], theta_forw_i_j[2], theta_forw_i_j[3]);
-	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
+	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta+eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsG.col(i)-epsG.col(j);
             	Vect theta_forw_i_back_j(4);
 				theta_forw_i_back_j[0] = interpret_theta_forw_i_back_j[0];
 				convert_interpret2theta(interpret_theta_forw_i_back_j[1], interpret_theta_forw_i_back_j[2], interpret_theta_forw_i_back_j[3], theta_forw_i_back_j[1], theta_forw_i_back_j[2], theta_forw_i_back_j[3]);
-	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
+	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta-eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+				ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsG.col(i)+epsG.col(j);
             	Vect theta_back_i_forw_j(4);
 				theta_back_i_forw_j[0] = interpret_theta_back_i_forw_j[0];
 				convert_interpret2theta(interpret_theta_back_i_forw_j[1], interpret_theta_back_i_forw_j[2], interpret_theta_back_i_forw_j[3], theta_back_i_forw_j[1], theta_back_i_forw_j[2], theta_back_i_forw_j[3]);
-	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
+	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;
 
         	// compute f(theta-eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
+
+            	ArrayXi fact_to_rank_list(2);
+    			fact_to_rank_list << MPI_rank, MPI_rank;
+    			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+	
 	            Vect mu_tmp(n);
             	Vect interpret_theta_back_i_j 	   = interpret_theta-epsG.col(i)-epsG.col(j);
             	Vect theta_back_i_j(4);
 				theta_back_i_j[0] = interpret_theta_back_i_j[0];
 				convert_interpret2theta(interpret_theta_back_i_j[1], interpret_theta_back_i_j[2], interpret_theta_back_i_j[3], theta_back_i_j[1], theta_back_i_j[2], theta_back_i_j[3]);
-	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
+	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp, fact_to_rank_list); 
             }
             counter++;            
         }
@@ -1336,11 +1380,7 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 // ============================================================================================ //
 // ALL FOLLOWING FUNCTIONS CONTRIBUTE TO THE EVALUATION OF F(THETA) & GRADIENT
 // INCLUDE: OpenMP division for computation of nominator & denominator : ie. 2 tasks -> 2 threads!
-double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
-
-	if(omp_get_thread_num() == 0){
-		fct_count += 1;
-	}			
+double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_list){
 
 	// =============== set up ================= //
 	int dim_th = theta.size();
@@ -1351,6 +1391,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		std::cout << "nt : " << nt << std::endl;			
 		std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
 #endif
+
+	// important that initialized to zero!!
+	double val = 0;
 
 	// sum log prior, log det spat-temp prior
 	double log_prior_sum;
@@ -1363,19 +1406,25 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	// value : pi(x | theta, y) or constraint problem pi(x | theta, y, Ax = e)
 	double val_d;
 
-	#pragma omp parallel 
-	#pragma omp single
-	{
+	// intermediate sums for MPI 
+	double sum_nom = 0;
+	double sum_denom = 0;
+
+	MPI_Request request1;
+    MPI_Status status;
 
 	// =============== evaluate NOMINATOR ================= //
+    // task 1 (evaluate nominator)
+    if(MPI_rank == fact_to_rank_list[0]){
+
+    	fct_count += 1;		
+
 		
 #ifdef RECORD_TIMES
 	t_thread_nom = -omp_get_wtime();
 #endif
 
 	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
-	#pragma omp task
-	{
 
 #ifdef PRINT_MSG
 		std::cout << "prior : " << prior << std::endl;
@@ -1418,7 +1467,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 #ifdef PRINT_MSG
-		std::cout << "log prior sum : " << log_prior_sum << std::endl;
+		std::cout << "MPI rank = " << MPI_rank << ", log prior sum : " << log_prior_sum << std::endl;
 #endif
 
 	// =============== evaluate prior of random effects : need log determinant ================= //
@@ -1443,7 +1492,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 
 #ifdef PRINT_MSG
-		std::cout << "val prior lat : "  << val_prior_lat << std::endl;
+		std::cout << "MPI rank = " << MPI_rank << ", val prior lat : "  << val_prior_lat << std::endl;
 #endif
 
 	// =============== evaluate likelihood ================= //
@@ -1459,19 +1508,27 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 #ifdef PRINT_MSG
-		std::cout << "log det likelihood : "  << log_det_l << std::endl;
-		std::cout << "val likelihood     : " << val_l << std::endl;
+		std::cout << "MPI rank = " << MPI_rank << ", log det likelihood : "  << log_det_l << std::endl;
+		std::cout << "MPI rank = " << MPI_rank << ", val likelihood     : " << val_l << std::endl;
 #endif
 
 #ifdef RECORD_TIMES
 	t_thread_nom += omp_get_wtime();
 #endif
 
-	} // end pragma omp task, evaluating nominator
+
+	sum_nom = log_prior_sum + val_prior_lat + log_det_l + val_l;
+	//std::cout << "MPI rank = " << MPI_rank << ", sum nominator          : " << sum_nom << std::endl;
 
 
-	#pragma omp task
-	{
+    MPI_Irecv(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[1], 2, MPI_COMM_WORLD, &request1);
+
+	} // end evaluate nominator fact_to_task MPI
+
+
+    // task 2 (factorization Q)
+    if(MPI_rank == fact_to_rank_list[1]){
+    	//std::cout << "in eval denominator" << std::endl;
 
 #ifdef RECORD_TIMES
 	t_thread_denom = -omp_get_wtime();
@@ -1494,31 +1551,40 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 #ifdef PRINT_MSG
-		std::cout << "val d     : " <<  val_d << std::endl;
+		std::cout << "MPI rank = " << MPI_rank << ", val d     : " <<  val_d << std::endl;
 #endif
 
 #ifdef RECORD_TIMES
 	t_thread_denom += omp_get_wtime();
 #endif
 
-	}
+		sum_denom = val_d;
 
-    #pragma omp taskwait
+        //MPI_Send(&logDet_Q, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD);
+        MPI_Isend(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD, &request1);
+    }
 
-	} // closing omp parallel region
+    // wait until values exchanged 
+    MPI_Wait(&request1, &status);
 
-	// =============== add everything together ================= //
-	//std::cout << " val d = " << val_d << std::endl;
-  	double val = -1 * (log_prior_sum + val_prior_lat + log_det_l + val_l - val_d);
+
+    if(MPI_rank == fact_to_rank_list[0]){
+		// =============== add everything together ================= //
+		//std::cout << " val d = " << val_d << std::endl;
+	  	val = -1 * (sum_nom - sum_denom);
 
 #ifdef PRINT_MSG
-  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
-  	std::cout << " " << std::fixed << std::setprecision(12);
-  	std::cout << log_prior_sum << " ";
-  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
+	  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
+	  	std::cout << " " << std::fixed << std::setprecision(12);
+	  	std::cout << log_prior_sum << " ";
+	  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
 
-  	//std::cout << "f theta : " << val << std::endl;
+	  	//std::cout << "f theta : " << val << std::endl;
 #endif
+
+	  }
+
+  	//std::cout << "MPI_rank = " << MPI_rank << ", val = " << val << std::endl;
 
   	return val;
 }

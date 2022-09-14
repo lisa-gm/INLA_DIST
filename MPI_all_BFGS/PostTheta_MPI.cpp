@@ -45,8 +45,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);
@@ -104,17 +104,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	threads_level1 = omp_get_max_threads();
-	threads_level2;
-
-	#pragma omp parallel
-    {  
-   	threads_level2 = omp_get_max_threads();
-    }
+	threads_level2 = omp_get_max_threads();
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
-		printf("threads level 1 : %d\n", threads_level1);
 		printf("threads level 2 : %d\n", threads_level2);
 	}
 #endif
@@ -122,31 +115,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
 
-
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	#ifdef PRINT_MSG
-		printf("num solvers     : %d\n", num_solvers);
-	#endif
-
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
-#pragma omp parallel
-#pragma omp single
-{
-#pragma omp task
 		solverQ   = new RGFSolver(ns, nt, nb, no);
-}
-#pragma omp task
-{
 		solverQst = new RGFSolver(ns, nt, 0, no);
-}
 	}  
 
 	prior = "gaussian";
@@ -219,20 +193,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	threads_level1 = omp_get_max_threads();
-	//threads_level1 = 2;
-
-	threads_level2;
-
-	#pragma omp parallel
-    {  
-   		threads_level2 = omp_get_max_threads();
-    }
+   	threads_level2 = omp_get_max_threads();
 
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
-		printf("threads level 1 : %d\n", threads_level1);
 		printf("threads level 2 : %d\n", threads_level2);
 	}
 #endif
@@ -240,19 +205,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval          = 2*dim_th + 1;
 
-	// one solver per thread, but not more than required
-	//num_solvers        = std::min(threads_level1, dim_grad_loop);
-	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
-	// if num_solver < threads_level1 hess_eval will fail!
-	num_solvers        = threads_level1;
-
-	#ifdef PRINT_MSG
-		printf("num solvers     : %d\n", num_solvers);
-	#endif
-
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 

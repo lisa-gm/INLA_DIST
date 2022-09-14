@@ -22,8 +22,8 @@
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
-#include "RGFSolver.h"
-//#include "RGFSolver_dummy.h"
+//#include "RGFSolver.h"
+#include "RGFSolver_dummy.h"
 
 #define SMART_GRAD
 
@@ -265,7 +265,7 @@ class PostTheta{
      * @param [in]    theta hyperparameter vector
      * @param [inout] mu vector of the conditional mean
      */	
-	void get_mu(Vect& theta, Vect& mu);
+	void get_mu(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_list);
 
 	/**
      * @brief returns current gradient of theta.
@@ -320,7 +320,7 @@ class PostTheta{
  	 * @param[inout] mu vector of the conditional mean
  	 * @return 		 f(theta) value
      */
-	double eval_post_theta(Vect& theta, Vect& mu);
+	double eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_list);
 
 	/**
      * @brief evaluate log prior of the hyperparameters using original theta value
