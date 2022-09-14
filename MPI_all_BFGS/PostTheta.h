@@ -30,6 +30,7 @@
 //#define PRINT_MSG
 //#define PRINT_TIMES
 //#define RECORD_TIMES
+#define DATA_SYNTHETIC
 
 using namespace Eigen;
 using namespace std;
@@ -285,6 +286,8 @@ class PostTheta{
 	MatrixXd get_Cov_interpret_param(Vect& interpret_theta, double eps);
 
 	double f_eval(Vect& theta);
+
+	double compute_error_bfgs(Vect& theta);
 
 	/**
      * @brief Compute the marginal variances of the latent parameters at theta. 

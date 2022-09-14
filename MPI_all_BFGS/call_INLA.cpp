@@ -12,7 +12,7 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-#define RGF_SOLVER
+//#define RGF_SOLVER
 
 #ifdef RGF_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -884,7 +884,7 @@ int main(int argc, char* argv[])
 
 #endif
 
-#if 1
+#if 0
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -946,7 +946,7 @@ int main(int argc, char* argv[])
 
     #endif
 
-#if 1
+#if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -956,7 +956,7 @@ int main(int argc, char* argv[])
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 1
+    #if 0
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -1072,13 +1072,11 @@ int main(int argc, char* argv[])
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
         std::cout << "\nUSING ESTIMATED THETA : " << theta_original.transpose() << std::endl;
-    }
+        
+        t_get_marginals = -omp_get_wtime();
+        fun->get_marginals_f(theta_original, marg);
+        t_get_marginals += omp_get_wtime();
 
-    t_get_marginals = -omp_get_wtime();
-    fun->get_marginals_f(theta_original, marg);
-    t_get_marginals += omp_get_wtime();
-
-    if(MPI_rank == 0){
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
@@ -1208,7 +1206,7 @@ int main(int argc, char* argv[])
 #endif
 
     // =================================== print times =================================== //
-#if 1
+#if 0
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 

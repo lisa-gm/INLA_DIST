@@ -1,6 +1,6 @@
 #include "PardisoSolver.h"
 
-PardisoSolver::PardisoSolver(int MPI_rank){
+PardisoSolver::PardisoSolver(int MPI_rank_) : MPI_rank(MPI_rank_){
 
     mtype  = -2;             /* set to positive semi-definite */
 
@@ -898,7 +898,7 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
     //printf("\nFactorization completed ...\n");
 
     if(MPI_rank == 0)
-        std::cout << "Calling PARDISO with " << iparm[2] << " threads."<< std::endl;
+        std::cout << "MPI rank : " << MPI_rank << ". Calling PARDISO with " << iparm[2] << " threads."<< std::endl;
 
     /* -------------------------------------------------------------------- */    
     /* ... Inverse factorization.                                           */                                       

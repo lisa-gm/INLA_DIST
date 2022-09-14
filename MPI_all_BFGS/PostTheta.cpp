@@ -495,7 +495,14 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
+#ifdef DATA_SYNTHETIC
+			// compute error = norm(theta - theta_original)
+			double err = compute_error_bfgs(theta);
+			std::cout << std::right << std::fixed << ",    error : " << err << std::endl;
+#else
+			std::cout << std::endl;
+#endif
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
 			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
@@ -521,6 +528,19 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	return f_theta;
 
 }
+
+
+#ifdef DATA_SYNTHETIC
+
+double PostTheta::compute_error_bfgs(Vect& theta){
+	Vect theta_original(4);
+	theta_original << 1.386294, -5.882541,  1.039721,  3.688879;
+	double err = (theta - theta_original).norm();
+	
+	return err;
+}
+
+#endif
 
 
 #ifdef SMART_GRAD
@@ -680,6 +700,11 @@ MatrixXd PostTheta::get_Covariance(Vect& theta, double eps){
 
 
 	timespent_hess_eval += omp_get_wtime();
+
+	if(MPI_rank == 0){
+		std::cout << "estimated hessian         : \n" << hess << std::endl; 
+		std::cout << "eigenvalues hessian : \n" << hess.eigenvalues().real() << std::endl;
+	}
 
 #ifdef PRINT_TIMES
 	if(MPI_rank == 0)
@@ -882,11 +907,11 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 		task_to_rank_list[i] = i / divd;
 	}
 
-	#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
 	}
-	#endif
+#endif
 
     double time_omp_task_hess = - omp_get_wtime();
 
@@ -900,8 +925,9 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 		// on different GPUs
 		ArrayXi fact_to_rank_list(2);
     	fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG
     	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 		double f_theta = eval_post_theta(theta, mu_tmp, fact_to_rank_list);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
     }
@@ -922,8 +948,10 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 				ArrayXi fact_to_rank_list(2);
 		    	fact_to_rank_list << MPI_rank, MPI_rank;
-		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+#ifdef PRINT_MSG
 
+		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+#endif
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i = theta+epsG.col(i);
 	            //f_i_i(0,i) = f_eval(theta_forw_i);
@@ -936,8 +964,9 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
        		ArrayXi fact_to_rank_list(2);
 	    	fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG
 	    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-	     	
+#endif	     	
 	            Vect mu_tmp(n);
 	            Vect theta_back_i = theta-epsG.col(i);
 	            //f_i_i(2,i) = f_eval(theta_back_i);
@@ -956,8 +985,9 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
             	ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-       
+#endif       
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i_j 	   = theta+epsG.col(i)+epsG.col(j);
 	            //f_i_j(0,k) = f_eval(theta_forw_i_j);
@@ -970,8 +1000,9 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 				ArrayXi fact_to_rank_list(2);
 		    	fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG
 		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
 	            Vect theta_forw_i_back_j = theta+epsG.col(i)-epsG.col(j);
 	            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
@@ -984,8 +1015,9 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 				ArrayXi fact_to_rank_list(2);
 		    	fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG		  
 		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
 	            Vect theta_back_i_forw_j = theta-epsG.col(i)+epsG.col(j);
 	            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
@@ -998,8 +1030,9 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 				ArrayXi fact_to_rank_list(2);
 		    	fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG		    	
 		    	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
 	            Vect theta_back_i_j 	   = theta-epsG.col(i)-epsG.col(j);
 	            //f_i_j(3,k) = f_eval(theta_back_i_j);
@@ -1153,8 +1186,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
 		ArrayXi fact_to_rank_list(2);
     	fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG    	
     	std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 		Vect mu_tmp(n); 
 		// convert interpret_theta to theta
 		Vect theta(4);
@@ -1180,8 +1214,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
 				ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG    	
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
             	Vect interpret_theta_forw_i = interpret_theta+epsG.col(i);
             	Vect theta_forw_i(4);
@@ -1196,8 +1231,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
             	ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG    	
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
 				Vect interpret_theta_back_i = interpret_theta-epsG.col(i);
             	Vect theta_back_i(4);
@@ -1217,8 +1253,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
             	ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-        
+#endif        
 	            Vect mu_tmp(n);
 				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsG.col(i)+epsG.col(j);
             	Vect theta_forw_i_j(4);
@@ -1233,8 +1270,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
 				ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG    	
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsG.col(i)-epsG.col(j);
             	Vect theta_forw_i_back_j(4);
@@ -1249,8 +1287,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
 				ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG    	
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+#endif
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsG.col(i)+epsG.col(j);
             	Vect theta_back_i_forw_j(4);
@@ -1265,8 +1304,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 
             	ArrayXi fact_to_rank_list(2);
     			fact_to_rank_list << MPI_rank, MPI_rank;
+#ifdef PRINT_MSG    	
     			std::cout << "counter = " << counter << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-	
+#endif	
 	            Vect mu_tmp(n);
             	Vect interpret_theta_back_i_j 	   = interpret_theta-epsG.col(i)-epsG.col(j);
             	Vect theta_back_i_j(4);
