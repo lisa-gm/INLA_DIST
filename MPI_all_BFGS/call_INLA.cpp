@@ -856,7 +856,7 @@ int main(int argc, char* argv[])
     double fx;
 
 #if 0
-	double t_f_eval = -omp_get_wtime();
+    double t_f_eval = -omp_get_wtime();
 
     ArrayXi fact_to_rank_list(2);
     fact_to_rank_list << 0,0;
@@ -868,23 +868,27 @@ int main(int argc, char* argv[])
     if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
 
     	// single function evaluation
-    	for(int i=0; i<1; i++){
+    	for(int i=0; i<5; i++){
 
     		Vect mu_dummy(n);
+		double t_temp = -omp_get_wtime();
     		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
             //fx = fun->eval_post_theta(theta_original, mu_dummy);
+		t_temp += omp_get_wtime();
 
-    		std::cout <<  "f(x) = " << fx << std::endl;
+    	        if(MPI_rank == fact_to_rank_list[0])
+			std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
 
         }
     }
 
 	t_f_eval += omp_get_wtime();
-	std::cout << "time in f eval loop : " << t_f_eval << std::endl;
+	if(MPI_rank == fact_to_rank_list[0])
+		std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
 #endif
 
-#if 0
+#if 1
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -950,13 +954,13 @@ int main(int argc, char* argv[])
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    theta_max = theta_original;
+    theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 0
+    #if 1
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -998,7 +1002,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-#if 1
+#if 0
     double t_get_fixed_eff;
     Vect mu(n);
 
@@ -1072,10 +1076,10 @@ int main(int argc, char* argv[])
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
         std::cout << "\nUSING ESTIMATED THETA : " << theta_original.transpose() << std::endl;
-        
-        t_get_marginals = -omp_get_wtime();
-        fun->get_marginals_f(theta_original, marg);
-        t_get_marginals += omp_get_wtime();
+
+    	t_get_marginals = -omp_get_wtime();
+    	fun->get_marginals_f(theta_original, marg);
+    	t_get_marginals += omp_get_wtime();
 
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
