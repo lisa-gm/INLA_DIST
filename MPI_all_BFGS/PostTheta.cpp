@@ -161,6 +161,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	n           = nb + ns*nt;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
 
+#ifdef PRINT_MSG
+	std::cout << "In PostTheta, spatial-temporal constructor. n = " << n << "." << std::endl;
+#endif
+
 	// slow for large datasets!!
 	if(validate){
 		// CAREFUL: overwriting y here!
@@ -180,7 +184,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	} else {
 		yTy         = y.dot(y);
+		//std::cout << "yTy = " << yTy << ", dim(y) = " << y.size() << ", dim(Ax) = " << Ax.rows() << " " << Ax.cols() << std::endl;
 		AxTy		= Ax.transpose()*y;
+		//std::cout << "AxTy = " << AxTy << std::endl;
 		AxTAx       = Ax.transpose()*Ax;
 	}
 
