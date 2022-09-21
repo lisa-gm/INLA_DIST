@@ -1,0 +1,169 @@
+
+============== PARALLELISM & NUMERICAL SOLVERS ==============
+total no MPI ranks  : 9
+OMP threads level 1 : 2
+OMP threads level 2 : 1
+available GPUs      : 8
+Solver : RGF
+Memory Usage of each Cholesky factor on CPU = 63.983912 GB
+
+
+==================== MODEL SPECIFICATIONS ===================
+spatial-temporal model.
+sum(y) = -2.00616e+06
+using SYNTHETIC DATASET
+
+call spatial-temporal constructor.
+new RGFSolver Class version.
+new RGFSolver Class version.
+Prior : pc
+Smart gradient enabled.
+
+======================= HYPERPARAMETERS =====================
+theta original     :  1.386294 -5.882541  1.039721  3.688879
+theta prior param  : 0.233333 0.098000 0.700000 0.233333
+initial theta      :  4.000000 -3.344954  1.039721  1.386294
+initial theta interpret. param. : 4.000000 0.000000 0.000000 0.000000
+
+====================== CALL BFGS SOLVER =====================
+lineserach condition : Wolfe. m = 4, delta = 0.001000, epsilon = 0.100000, rel eps = 0.001000, max iter = 200
+Finite Difference    : h = 1.000000e-03
+theta   :  4.000000 -3.344954  1.039721  1.386294,    f_theta : 15278356.326456
+time f + grad f eval : 40.343300
+theta   :  3.121284 -3.811719  0.939793  1.384799,    f_theta : 4818190.704999
+time f + grad f eval : 23.159179
+theta   :  2.598899 -4.102893  0.898550  1.383992,    f_theta : 2102085.703597
+time f + grad f eval : 23.104676
+theta   :  2.042007 -4.463482  0.859146  1.383206,    f_theta : 634701.327865
+time f + grad f eval : 23.077430
+theta   :  1.647445 -4.803245  0.830123  1.382821,    f_theta : 136325.074590
+time f + grad f eval : 23.167968
+theta   :  1.404950 -5.144671  0.806733  1.382970,    f_theta : -26648.425317
+time f + grad f eval : 22.811276
+theta   :  1.322660 -5.451685  0.790592  1.383857,    f_theta : -73424.073361
+time f + grad f eval : 22.112643
+theta   :  1.349953 -5.696879  0.785346  1.385918,    f_theta : -87088.662383
+time f + grad f eval : 22.043394
+theta   :  1.383268 -5.782245  0.805015  1.390074,    f_theta : -88406.418446
+time f + grad f eval : 22.987387
+theta   :  1.380000 -5.796415  0.826144  1.393398,    f_theta : -88558.269894
+time f + grad f eval : 21.956351
+theta   :  1.373590 -5.839196  0.944904  1.411416,    f_theta : -89185.782474
+time f + grad f eval : 21.815442
+theta   :  1.359918 -5.975598  1.467261  1.488974,    f_theta : -91459.441497
+time f + grad f eval : 22.036379
+time f + grad f eval : 20.868380
+iter = 0, first Wolfe condition not met.
+theta   :  1.372706 -5.998455  1.584746  1.506191,    f_theta : -91735.023871
+time f + grad f eval : 20.681276
+theta   :  1.410002 -5.934463  1.459029  1.489372,    f_theta : -92248.435893
+time f + grad f eval : 21.991631
+theta   :  1.389753 -5.922083  1.470989  1.490814,    f_theta : -92535.648574
+time f + grad f eval : 21.699629
+theta   :  1.386811 -5.914048  1.480815  1.492523,    f_theta : -92563.070307
+time f + grad f eval : 22.245517
+theta   :  1.387219 -5.911193  1.478937  1.493006,    f_theta : -92564.145174
+time f + grad f eval : 21.878999
+theta   :  1.387254 -5.911021  1.478917  1.493705,    f_theta : -92564.302196
+time f + grad f eval : 21.706403
+theta   :  1.387293 -5.910831  1.478894  1.494473,    f_theta : -92564.463707
+time f + grad f eval : 23.280383
+theta   :  1.387913 -5.908601  1.479350  1.515383,    f_theta : -92567.975324
+time f + grad f eval : 23.324273
+theta   :  1.388600 -5.905862  1.480391  1.564563,    f_theta : -92575.182074
+time f + grad f eval : 23.048687
+theta   :  1.390283 -5.899719  1.485127  1.755525,    f_theta : -92602.324015
+time f + grad f eval : 23.140831
+theta   :  1.396967 -5.875597  1.509386  2.756578,    f_theta : -92724.349042
+time f + grad f eval : 23.062564
+theta   :  1.394226 -5.887441  1.499991  2.460761,    f_theta : -92803.056397
+time f + grad f eval : 23.572535
+theta   :  1.392696 -5.894670  1.491735  3.011170,    f_theta : -93370.628450
+time f + grad f eval : 23.444186
+time f + grad f eval : 23.643907
+iter = 0, first Wolfe condition not met.
+time f + grad f eval : 23.347600
+iter = 1, first Wolfe condition not met.
+time f + grad f eval : 23.484907
+iter = 2, first Wolfe condition not met.
+time f + grad f eval : 23.302366
+iter = 3, first Wolfe condition not met.
+theta   :  1.397390 -5.901384  1.479209  3.318765,    f_theta : -93536.422159
+time f + grad f eval : 23.367967
+time f + grad f eval : 23.393322
+iter = 0, first Wolfe condition not met.
+theta   :  1.369260 -5.913624  1.454929  3.415615,    f_theta : -93739.772198
+time f + grad f eval : 23.561520
+theta   :  1.388750 -5.941963  1.410110  3.385615,    f_theta : -94229.621511
+time f + grad f eval : 23.551579
+theta   :  1.392745 -5.942385  1.381439  3.512733,    f_theta : -94333.985646
+time f + grad f eval : 23.326824
+theta   :  1.392968 -5.912780  1.292550  3.575864,    f_theta : -94621.544732
+time f + grad f eval : 23.230910
+theta   :  1.387413 -5.886807  1.189730  3.590062,    f_theta : -94796.212878
+time f + grad f eval : 23.333574
+time f + grad f eval : 23.242711
+iter = 0, first Wolfe condition not met.
+time f + grad f eval : 23.259438
+iter = 1, first Wolfe condition not met.
+theta   :  1.383054 -5.890889  1.167234  3.632399,    f_theta : -94812.764690
+time f + grad f eval : 23.426240
+theta   :  1.384789 -5.883328  1.105265  3.646711,    f_theta : -94856.454739
+time f + grad f eval : 23.034784
+theta   :  1.387835 -5.884423  1.057078  3.683965,    f_theta : -94868.013695
+time f + grad f eval : 23.270342
+theta   :  1.386424 -5.880007  1.035826  3.682777,    f_theta : -94871.462837
+time f + grad f eval : 23.407669
+theta   :  1.386171 -5.879803  1.029219  3.684263,    f_theta : -94871.654485
+time f + grad f eval : 23.674353
+theta   :  1.386196 -5.879691  1.027505  3.685377,    f_theta : -94871.662519
+time f + grad f eval : 23.104760
+time f + grad f eval : 23.245734
+iter = 0, first Wolfe condition not met.
+time f + grad f eval : 23.402224
+iter = 1, first Wolfe condition not met.
+theta   :  1.386166 -5.879765  1.027490  3.685781,    f_theta : -94871.662914
+time f + grad f eval : 22.989838
+theta   :  1.386180 -5.879716  1.027340  3.685748,    f_theta : -94871.663251
+time f + grad f eval : 23.423683
+convergence criterion met abs(f(x_k) - f(x_k-1)) = 0.00073153
+37 iterations and 441 fn calls.
+
+f(x)                         : -94871.66325092
+grad                         :  0.11037852 -0.44254989 -0.07778417 -0.06837015
+
+orig. mean parameters        :  1.38629400 -5.88254100  1.03972100  3.68887900
+est.  mean parameters        :  1.38617974 -5.87971568  1.02734012  3.68574815
+
+orig. mean interpret. param. : 1.38629400 2.30258418 -0.00000023 1.38629479
+est.  mean interpret. param. : 1.38617974 2.32421509 0.01238065 1.39741577
+estimated hessian         : 
+ 854561.68371869  -36932.19204848  146549.29354903  -75141.92433436
+ -36932.19204849   53569.94775300 -207035.88652570  107714.40476040
+ 146549.29354906 -207035.88652574  835156.77995807 -461930.64677579
+ -75141.92433434  107714.40476042 -461930.64677577  283179.96091521
+eigenvalues hessian : 
+1224001.59999414
+ 777634.91636051
+  24357.18084024
+    474.67515009
+
+covariance interpr. param.  : 
+ 0.00000121 -0.00000179 -0.00000104 -0.00000070
+-0.00000179  0.00173865  0.00066770  0.00042736
+-0.00000104  0.00066770  0.00026877  0.00018418
+-0.00000070  0.00042736  0.00018418  0.00014123
+
+estimated mean fixed effects : -1.00910644  2.99987758  0.50068113  2.00054601  0.99962880 -1.99943439
+estimated mean random effects: -1.62364416 -2.01758149 -1.04621137 -0.87264148 -1.68706321 -2.01456265 -2.70751301 -1.69824964 -0.70944870 -0.13755142
+
+==================== compute marginal variances ================
+
+USING ESTIMATED THETA :  1.38629400 -5.88254100  1.03972100  3.68887900
+est. standard dev fixed eff  : 0.27787450 0.00037416 0.00037447 0.00037472 0.00037460 0.00074915
+est. std dev random eff      : 0.35047881 0.39734013 0.35594549 0.36649686 0.35825002 0.35534137 0.41006198 0.37179895 0.35716268 0.36026266
+
+time BFGS solver             : 1139.58804143 sec
+time get covariance          : 96.48859711 sec
+time get marginals FE        : 30.87783283 sec
+total time                   : 1301.58768361 sec
