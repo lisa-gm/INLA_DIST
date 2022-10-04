@@ -196,7 +196,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 
     // map solution back
     memcpy(V.data(), x, nrhs*n*sizeof(double));
-    //std::cout << "norm(Qst*V   - t(Dx)) = " << (Q*V - D.transpose()).norm() << std::endl;
+    std::cout << "norm(Qst*V   - t(Dx)) = " << (Q*V - D.transpose()).norm() << ", norm(V) = " << V.norm() << std::endl;
 
 
 #ifdef PRINT_TIMES
