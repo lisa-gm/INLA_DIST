@@ -9,14 +9,16 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
 #ifdef PRINT_MSG
-        std::cout << "constructing RGF solver. MPI rank = " << MPI_rank << ", MPI size = " << MPI_size << std::endl;
+    std::cout << "constructing RGF solver. MPI rank = " << MPI_rank << ", MPI size = " << MPI_size << std::endl;
 #endif
 
-    threads_level1 = omp_get_max_threads();
+    threads_level1 = omp_get_num_threads();  // get number of threads of current level. not one below.
     //std::cout << "threads level 1 : " << threads_level1 << std::endl;
 
+    MPI_Get_processor_name(processor_name, &name_len);
+
     // CAREFUL USING N in both functions ..
-   	n  = ns_t*nt_t + nb_t;
+    n  = ns_t*nt_t + nb_t;
 
     // assign GPU
     int noGPUs;
@@ -24,12 +26,26 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
 #ifdef PRINT_MSG
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
+
     // allocate devices as numThreads mod noGPUs
-    int counter = threads_level1*MPI_rank + omp_get_thread_num();
-    int GPU_rank = counter % noGPUs;
+    //int counter = threads_level1*MPI_rank + omp_get_thread_num();
+    //std::cout << "omp get nested : " << omp_get_nested() << std::endl;
+
+    if(omp_get_nested() == 1){
+	int counter = threads_level1*MPI_rank + omp_get_thread_num();
+	GPU_rank = counter % noGPUs;
+	    //std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << ", counter : " << counter << ", tid : " << omp_get_thread_num() << std::endl;
+    } else {
+	  
+        GPU_rank = MPI_rank % noGPUs;
+	//std::cout << "omp nested false. In RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
+    }
+    
+    //GPU_rank = MPI_rank % noGPUs;
     cudaSetDevice(GPU_rank);
+
 #ifdef PRINT_MSG
-    std::cout << "RGF constructor -- counter : " << counter << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
+    std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
 #endif	
 
     solver = new RGF<double>(ns_t, nt_t, nb_t);
@@ -89,6 +105,8 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     printf("Calling RGF solver in RGF factorize now.\n");
 #endif
 
+       // std::cout << "RGF factorzie, nb = " << nb_t << " , MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
+
     t_priorLatChol = get_time(0.0);
     double gflops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
@@ -101,6 +119,8 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     /*if(MPI_rank == 0){
         std::cout << "Gflop/s for the numerical factorization Qu: " << gflops_factorize << std::endl;
     }*/
+
+     //std::cout << "In factorize. hostname : " << processor_name << ", MPI_rank : " << MPI_rank << ", GPU rank : " << GPU_rank << ", time Chol : " << t_priorLatChol << std::endl;
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -267,6 +287,8 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
     printf("Calling RGF solver in RGF factorize_solver now.\n");
 #endif
 
+       // std::cout << "RGF factorize solve, nb = " << nb_t << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
+
     t_condLatChol = get_time(0.0);
 
 	double gflops_factorize = solver->factorize(ia, ja, a);
@@ -314,6 +336,8 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	printf("RGF factorise time: %lg\n",t_condLatChol);
   	printf("RGF solve     time: %lg\n",t_condLatSolve);
 #endif
+
+	//std::cout << "In factorize_solve. hostname : " << processor_name << ", MPI_rank : " << MPI_rank << ", GPU rank : " << GPU_rank << ", time Chol : " << t_condLatChol << ", time Solve : " << t_condLatSolve << std::endl;
 
   	// assign b to correct format
   	for (i = 0; i < n; i++){

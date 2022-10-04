@@ -12,7 +12,7 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-//#define RGF_SOLVER
+#define RGF_SOLVER
 
 #ifdef RGF_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -122,12 +122,18 @@ int main(int argc, char* argv[])
     // Get the total number ranks in this communicator
     MPI_Comm_size(MPI_COMM_WORLD, &MPI_size); 
 
-    int threads_level1 = omp_get_max_threads();
+    int threads_level1;
     int threads_level2;
 
-    #pragma omp parallel
-    {  
-    threads_level2 = omp_get_max_threads();
+    if(omp_get_nested() == true){
+	threads_level1 = omp_get_max_threads();
+	#pragma omp parallel
+	{
+	threads_level2 = omp_get_max_threads();
+	}
+    } else {
+	threads_level1 = 0;
+	threads_level2 = omp_get_max_threads();
     }
 
     // overwrite in case RGF is used
@@ -796,7 +802,7 @@ int main(int argc, char* argv[])
     param.delta = 1e-3;
     //param.delta = 1e-10;
     // maximum line search iterations
-    param.max_iterations = 200;
+    param.max_iterations = 5;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -868,12 +874,12 @@ int main(int argc, char* argv[])
     if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
 
     	// single function evaluation
-    	for(int i=0; i<5; i++){
+    	for(int i=0; i<3; i++){
 
     		Vect mu_dummy(n);
 		double t_temp = -omp_get_wtime();
     		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
-            //fx = fun->eval_post_theta(theta_original, mu_dummy);
+            	//fx = fun->eval_post_theta(theta_original, mu_dummy);
 		t_temp += omp_get_wtime();
 
     	        if(MPI_rank == fact_to_rank_list[0])
@@ -960,7 +966,7 @@ int main(int argc, char* argv[])
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 1
+    #if 0
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -989,8 +995,8 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    //double t_get_covariance = -omp_get_wtime();
-    t_get_covariance = -omp_get_wtime();
+    double t_get_covariance = -omp_get_wtime();
+    //t_get_covariance = -omp_get_wtime();
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
     t_get_covariance += omp_get_wtime();
 
@@ -1002,7 +1008,7 @@ int main(int argc, char* argv[])
     #endif
 
 
-#if 0
+#if 1
     double t_get_fixed_eff;
     Vect mu(n);
 
@@ -1013,7 +1019,7 @@ int main(int argc, char* argv[])
     }
 
     if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
-        std::cout << "MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+        //std::cout << "MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
 
         t_get_fixed_eff = - omp_get_wtime();
         fun->get_mu(theta_original, mu, fact_to_rank_list);
@@ -1067,7 +1073,7 @@ int main(int argc, char* argv[])
 
   
     // =================================== compute marginal variances =================================== //
-#if 1
+#if 0
     double t_get_marginals;
     Vect marg(n);
 

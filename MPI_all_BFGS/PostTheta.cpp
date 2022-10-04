@@ -193,7 +193,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-   	threads_level2 = omp_get_max_threads();
+   	threads_level1 = 0;
+	threads_level2 = omp_get_max_threads();
 
 	
 #ifdef PRINT_MSG
@@ -238,12 +239,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 
 #ifdef RECORD_TIMES
-    if((MPI_rank) == 0){
-    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
+ /*   if((MPI_rank) == 0){
+    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + "_MPI_newRGFSolverClass.txt";
     	std::ofstream log_file(log_file_name);
     	log_file << "MPI_rank threads_level1 threads_level_2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     	log_file.close();
-    }	
+    }*/	
 #endif
 
 }
@@ -314,15 +315,21 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	// if e.g. 9 tasks and mpi_size = 3, then task 1: rank 0, task 2: rank 1, task 3: rank 2, task 4: rank 0, etc.
 	ArrayXi task_to_rank_list(no_f_eval);
 
-	for(int i=0; i<no_f_eval; i++){
-		task_to_rank_list[i] = i % MPI_size;
+	if(MPI_size < 2*(dim_th+1)){
+		for(int i=0; i<no_f_eval; i++){
+			task_to_rank_list[i] = i % MPI_size;
+		}
+	} else {
+		for(int i=0; i<no_f_eval; i++){
+                        task_to_rank_list[i] = 2*i;
+		}
 	}
 
-#ifdef PRINT_MSG
-	if(MPI_rank == 0){  
+//#ifdef PRINT_MSG
+	if(MPI_rank == 0 && iter_count == 1){  
 		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
 	}
-#endif
+//#endif
 
 	// ===================================== compute f(theta) ===================================== //
 	if(MPI_rank % no_f_eval == task_to_rank_list[0])
@@ -331,13 +338,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
     	ArrayXi fact_to_rank_list(2); 
         fact_to_rank_list << task_to_rank_list[0], task_to_rank_list[0];
-        if(MPI_size > no_f_eval + 0){
-            fact_to_rank_list[1] = no_f_eval + 0; 
+        if(MPI_size >= 2*no_f_eval){
+            fact_to_rank_list[1] = task_to_rank_list[0]+1; 
         }
-#ifdef PRINT_MSG
+//#ifdef PRINT_MSG
         if(iter_count == 1)
         	std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
-#endif
+//#endif
 
 		timespent_f_theta_eval = -omp_get_wtime();
 #ifdef RECORD_TIMES
@@ -348,11 +355,14 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		//std::cout << "before record times section." << std::endl;
 #ifdef RECORD_TIMES		
 		t_Ftheta_ext += omp_get_wtime();
+		
+		if(MPI_rank == fact_to_rank_list[0])
+			std::cout << "i = 0, time f(theta) eval : " << t_Ftheta_ext << std::endl;
 
 		// for now write to file. Not sure where the best spot would be.
 		// file contains : MPI_rank iter_count l1t l2t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-						t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+		//record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+		//				t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 		
 		timespent_f_theta_eval += omp_get_wtime();
@@ -376,13 +386,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
     			ArrayXi fact_to_rank_list(2); 
                 fact_to_rank_list << task_to_rank_list[i], task_to_rank_list[i];
-                if(MPI_size > no_f_eval + i){
-                    fact_to_rank_list[1] = no_f_eval + i; 
+                if(MPI_size >= 2*no_f_eval){
+                    fact_to_rank_list[1] = task_to_rank_list[i] + 1; 
                 }
-#ifdef PRINT_MSG
+//#ifdef PRINT_MSG
                 if(iter_count == 1)
                 	std::cout << "i = " << i << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
-#endif
+//#endif
 				Vect theta_forw(dim_th);
 				Vect mu_dummy(n);
 
@@ -393,10 +403,12 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy, fact_to_rank_list);
 #ifdef RECORD_TIMES
                 t_Ftheta_ext += omp_get_wtime();
-        		// for now write to file. Not sure where the best spot would be.
-        		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-        		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-                                        t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+
+		if(MPI_rank == fact_to_rank_list[0])
+                        std::cout << "i = " << i << ", time f(theta) eval : " << t_Ftheta_ext << std::endl;
+        	// for now write to file. Not sure where the best spot would be.
+        	// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+       		//record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,                                                                //                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 			} // end MPI if
 		
@@ -413,13 +425,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
     			ArrayXi fact_to_rank_list(2); 
                 fact_to_rank_list << task_to_rank_list[i], task_to_rank_list[i];
-                if(MPI_size > no_f_eval + i){
-                    fact_to_rank_list[1] = no_f_eval + i; 
+                if(MPI_size >= 2*no_f_eval){
+                    fact_to_rank_list[1] = task_to_rank_list[i]+1; 
                 }
-#ifdef PRINT_MSG                
+//#ifdef PRINT_MSG                
                 if(iter_count == 1)
                 	std::cout << "i = " << i << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
-#endif
+//#endif
 				Vect theta_backw(dim_th);
 				Vect mu_dummy(n);
 
@@ -432,10 +444,12 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 #ifdef RECORD_TIMES
                 		t_Ftheta_ext += omp_get_wtime();
-      			        // for now write to file. Not sure where the best spot would be.
+      			        if(MPI_rank == fact_to_rank_list[0])
+                        		std::cout << "i = " << i << ", time f(theta) eval : " << t_Ftheta_ext << std::endl;
+				// for now write to file. Not sure where the best spot would be.
                 		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-                		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-                                                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+                		//record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                                //                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 
 			} // end MPI if
@@ -521,9 +535,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	t_f_grad_f += omp_get_wtime();
 
-	/*if(MPI_rank == 0){
+	if(MPI_rank == 0){
 		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
-	}*/
+	}
 
 	return f_theta;
 
@@ -1456,7 +1470,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	// =============== evaluate NOMINATOR ================= //
     // task 1 (evaluate nominator)
     if(MPI_rank == fact_to_rank_list[0]){
-
+     //std::cout << "in factorization Qst. after if. " << std::endl;
     	fct_count += 1;		
 
 		
@@ -1552,17 +1566,20 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 		std::cout << "MPI rank = " << MPI_rank << ", val likelihood     : " << val_l << std::endl;
 #endif
 
-#ifdef RECORD_TIMES
-	t_thread_nom += omp_get_wtime();
-#endif
-
 
 	sum_nom = log_prior_sum + val_prior_lat + log_det_l + val_l;
 	//std::cout << "MPI rank = " << MPI_rank << ", sum nominator          : " << sum_nom << std::endl;
 
 
     MPI_Irecv(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[1], 2, MPI_COMM_WORLD, &request1);
+	//std::cout << "completed factorization Qst." << std::endl;
 
+#ifdef RECORD_TIMES
+        t_thread_nom += omp_get_wtime();
+#endif
+	
+    std::cout << "complete time nominator : " << t_thread_nom << ", tpriorLat : " << t_priorLat << std::endl;
+	
 	} // end evaluate nominator fact_to_task MPI
 
 
@@ -1597,11 +1614,12 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 #ifdef RECORD_TIMES
 	t_thread_denom += omp_get_wtime();
 #endif
-
+	std::cout << "time complete denominator : " << t_thread_denom << ", time eval denom : " << t_condLat << std::endl;
 		sum_denom = val_d;
 
         //MPI_Send(&logDet_Q, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD);
         MPI_Isend(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD, &request1);
+	//std::cout << "completed factorization Q." << std::endl;
     }
 
     // wait until values exchanged 
@@ -1614,12 +1632,12 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	  	val = -1 * (sum_nom - sum_denom);
 
 #ifdef PRINT_MSG
-	  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
-	  	std::cout << " " << std::fixed << std::setprecision(12);
-	  	std::cout << log_prior_sum << " ";
-	  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
+                std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose() << std::endl;
+                std::cout << " " << std::fixed << std::setprecision(12);
+                std::cout << log_prior_sum << " ";
+                std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << sum_denom << " " << val << std::endl;
 
-	  	//std::cout << "f theta : " << val << std::endl;
+                std::cout << "sum nominator : " << sum_nom << ", sum denominator : " << sum_denom << ", f theta : " << val << std::endl;
 #endif
 
 	  }

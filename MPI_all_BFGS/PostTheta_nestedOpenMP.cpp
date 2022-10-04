@@ -32,7 +32,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	}
 
 	dim_grad_loop      = 2*dim_th;
-	no_f_eval 		   = 2*dim_th + 1;
+	no_f_eval          = 2*dim_th + 1;
 
 	// one solver per thread, but not more than required
 	//num_solvers        = std::min(threads_level1, dim_grad_loop);
@@ -45,8 +45,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		#pragma omp parallel
+		{
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
+		}
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);
@@ -134,19 +137,21 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		#pragma omp parallel
+		{
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
+		}
 	} else if(solver_type == "RGF"){
-#pragma omp parallel
-#pragma omp single
-{
-#pragma omp task
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-}
-#pragma omp task
-{
-		solverQst = new RGFSolver(ns, nt, 0, no);
-}
+                #pragma omp parallel
+                {
+                if(omp_get_thread_num() == 0){
+                        solverQst = new RGFSolver(ns, nt, 0, no);
+                }
+                if(omp_get_thread_num() == 1 || threads_level1 == 1){
+                        solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this?
+                }
+                } // end pragma omp parallel
 	}  
 
 	prior = "gaussian";
@@ -251,11 +256,21 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		#pragma omp parallel
+		{
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
+		}
 	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-		solverQst = new RGFSolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 
+		#pragma omp parallel
+		{	
+		if(omp_get_thread_num() == 0){	
+			solverQst = new RGFSolver(ns, nt, 0, no);
+		} 
+		if(omp_get_thread_num() == 1 || threads_level1 == 1){
+			solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
+		}
+		}
 	} 
 
 	// set prior to be gaussian
@@ -532,9 +547,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	t_f_grad_f += omp_get_wtime();
 
-	/*if(MPI_rank == 0){
+	if(MPI_rank == 0){
 		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
-	}*/
+	}
 
 	return f_theta;
 
@@ -807,7 +822,8 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 
 	if(constr == true){
 		#pragma omp parallel
-		#pragma omp single
+		{
+		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			MatrixXd V(n, Dxy.rows());
 			solverQ->selected_inversion_w_constr(Q, Dxy, vars, V);
@@ -823,15 +839,17 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 			//std::cout << "update_vars = " << update_vars.tail(10).transpose() << std::endl;
 			vars = vars - update_vars;
 			//std::cout << "vars        = " << vars.tail(10).transpose() << std::endl;			
-
+		}
 		}
 
 	} else {
 		// nested parallelism, want to call this with 1 thread of omp level 1
 		#pragma omp parallel
-		#pragma omp single
+		{
+		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			solverQ->selected_inversion(Q, vars);
+		}
 		}
 	}
 	
@@ -1364,7 +1382,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	double val_d;
 
 	#pragma omp parallel 
-	#pragma omp single
+	//#pragma omp single
 	{
 
 	// =============== evaluate NOMINATOR ================= //
@@ -1374,7 +1392,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
-	#pragma omp task
+	if(omp_get_thread_num() == 0) // instead of #pragma omp task -> want always the same thread to do same task
 	{
 
 #ifdef PRINT_MSG
@@ -1469,8 +1487,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	} // end pragma omp task, evaluating nominator
 
-
-	#pragma omp task
+	if(omp_get_thread_num() == 1 || threads_level1 == 1)//#pragma omp task
 	{
 
 #ifdef RECORD_TIMES
@@ -1503,7 +1520,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	}
 
-    #pragma omp taskwait
+    //#pragma omp taskwait -> implicit barrier at the end of parallel region
 
 	} // closing omp parallel region
 
@@ -1517,7 +1534,8 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
   	std::cout << log_prior_sum << " ";
   	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
 
-  	//std::cout << "f theta : " << val << std::endl;
+
+        std::cout << "sum nominator : " << log_prior_sum + val_prior_lat + log_det_l + val_l  << ", sum denominator : " << val_d << ", f theta : " << val << std::endl;
 #endif
 
   	return val;
