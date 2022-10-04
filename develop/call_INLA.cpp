@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-#define DATA_SYNTHETIC
-//#define DATA_TEMPERATURE
+//#define DATA_SYNTHETIC
+#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF_SOLVER
@@ -122,12 +122,18 @@ int main(int argc, char* argv[])
     // Get the total number ranks in this communicator
     MPI_Comm_size(MPI_COMM_WORLD, &MPI_size); 
 
-    int threads_level1 = omp_get_max_threads();
+    int threads_level1;
     int threads_level2;
 
-    #pragma omp parallel
-    {  
-    threads_level2 = omp_get_max_threads();
+    if(omp_get_nested() == true){
+	threads_level1 = omp_get_max_threads();
+	#pragma omp parallel
+	{
+	threads_level2 = omp_get_max_threads();
+	}
+    } else {
+	threads_level1 = 0;
+	threads_level2 = omp_get_max_threads();
     }
 
     // overwrite in case RGF is used
@@ -233,8 +239,8 @@ int main(int argc, char* argv[])
     Vect y;
 
     int num_constr = 1;
-    bool constr = false;
-    //bool constr = true;
+    //bool constr = false;
+    bool constr = true;
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -425,9 +431,9 @@ int main(int argc, char* argv[])
     // at this point no is set ... 
     // not a pretty solution. 
     y = read_matrix(y_file, no, 1);  
-    /*if(MPI_rank == 0) 
+    if(MPI_rank == 0) 
         std::cout << "sum(y) = " << y.sum() << std::endl;
-    */
+
 //#endif
 
 
@@ -629,19 +635,28 @@ int main(int argc, char* argv[])
                 std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
         }
         //theta << 4, 4, 4, 4;    //
-        //theta_param << -1.500, 7.000, 7.00, 3.000;
-        theta_param << -2.201569, 8.010112, 7.026133, 2.720725;
+        //theta_param << 4, 0, 0, 0;
         //theta_param << -1.308664,  0.498426,  4.776162,  1.451209;
-        //theta_param << -1.270, 12.132, 9.773, 4.710;
-        //theta_param << -1.25, 13.6, 10.4, 5.4;
-        theta_original_param << -2.461, 6.279, 3.394, 3.257;  // estimated from INLA / same for my code varies a bit according to problem size
-
+        //theta_param << -1.5, 7, 7, 3;
+        //theta_param << -2.091, 9.241, 11.973, 2.994;
+	theta_param << -1.688, 7.575, 6.888, 2.789;
+	//theta_param << -1.500, 7.000, 7.00, 3.000;
+        //theta_param << -2.201569, 8.010112, 7.026133, 2.720725;
+	//theta_param << -1.25, 13.6, 10.4, 5.4;
+        //theta_original << -1.269613,  5.424197, -8.734293, -6.026165;  // estimated from INLA / same for my code varies a bit according to problem size
+	theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
 
         // using PC prior, choose lambda  
-        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
-        // TODO: update prior ....
-        // theta_prior_param << 
-
+	// previous order : interpret_theta & lambda order : sigma.e, range t, range s, sigma.u -> doesn't match anymore
+	// NEW ORDER sigma.e, range s, range t, sigma.u 
+        //theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+	// NEW ORDER sigma.e, range s, range t, sigma.u
+	// -log(p)/u where c(u, p)
+	theta_prior_param[0] = -log(0.01)/5; 	      //prior.sigma obs : 5, 0.01
+	theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
+	theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
+	theta_prior_param[3] = -log(0.5)/10;	      //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
+	
         //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << -0.2, -2, -2, 3;
         /*if(MPI_rank == 0){
@@ -856,20 +871,16 @@ int main(int argc, char* argv[])
     }
 
 
-
-    double fx;
-
-
 #if 0
 
 if(MPI_rank == 0){
     std::cout << "\n================== Comparison Q matrices. =====================\n" << std::endl;
     //theta_param << -2.21506094147639, 8.01123771552475, 7.007131066306, 3.09174134657989;
     //theta_param << -2.48703929737538, 7.83456608733632, 6.89882091727513, 2.84522770375556;
-    //theta_param << -2.485177, 7.860605, 7.066556,  2.555450; 
+    //theta_param << -2.485177, 7.860605, 7.066556,  2.555450;
     //theta_param << -2.17010036733188, 9.06814137004373, 10.3337426479875, 3.21366330420807;
     //theta_param << -2.48041519338178, 7.68975975256294, 6.91277775656503, 2.70184818295968;
-    theta_param << -2.484481, 7.836006, 7.023295, 2.504872; 
+    theta_param << -2.484481, 7.836006, 7.023295, 2.504872;
 
     std::cout << "theta param : " << theta_param.transpose() << std::endl;
     theta[0] = theta_param[0];
@@ -897,7 +908,7 @@ if(MPI_rank == 0){
     std::cout << "Q_INLA(bottomRightCorner) : \n" << Q_INLA_dense.bottomRightCorner(10,10) << std::endl;
 
     SpMat Q(n,n);
-    //theta << 
+    //theta <<
     fun->construct_Q(theta, Q);
     MatrixXd Q_dense = MatrixXd(Q);
     std::cout << "Q[1:10,1:10] = \n" << Q.block(0,0,9,9) << std::endl;
@@ -910,56 +921,7 @@ if(MPI_rank == 0){
 
 #endif
 
-#if 0
-
-    if(MPI_rank == 0){
-
-    double estLogDetQst;
-    int nt_approx;
-    SpMat Qst_approx;
-
-    //theta << 1, -3, 2, 4;
-    //theta = theta_original;
-
-    // construct Qst_approx 
-    nt_approx = 5; //floor(nt/10.0); //nt-2;
-    fun->eval_log_prior_lat_approx(theta, nt_approx, estLogDetQst);
-    std::cout << "\nnt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-
-    /*
-    nt_approx = 10; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-
-    nt_approx = 20; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    
-    nt_approx = 50; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    */
-
-    /*
-    nt_approx = 200; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    */
-
-    double val;
-    fun->eval_log_prior_lat(theta, val);
-    std::cout << "nt : " << nt << ", true LogDet    : " << 2*val << std::endl;
-
-    //std::cout << "\nnorm(Qst - Qst_approx) : " << (Qst - Qst_approx).norm() << std::endl;
-
-    }
-
-#endif // #if true/false
-
+    double fx;
 
 #if 0
     double t_f_eval = -omp_get_wtime();
@@ -971,15 +933,15 @@ if(MPI_rank == 0){
         }
     std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
             
-    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
+    if(MPI_rank == fact_to_rank_list[0]){ // || MPI_rank == fact_to_rank_list[1]){
 
     	// single function evaluation
-    	for(int i=0; i<5; i++){
+    	for(int i=0; i<1; i++){
 
     		Vect mu_dummy(n);
 		double t_temp = -omp_get_wtime();
-    		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
-            //fx = fun->eval_post_theta(theta_original, mu_dummy);
+    		//fx = fun->eval_post_theta(theta, mu_dummy, fact_to_rank_list);
+            	fx = fun->eval_post_theta(theta, mu_dummy);
 		t_temp += omp_get_wtime();
 
     	        if(MPI_rank == fact_to_rank_list[0])
@@ -1001,13 +963,15 @@ if(MPI_rank == 0){
     //LIKWID_MARKER_INIT;
     //LIKWID_MARKER_THREADINIT;
 
-    /*
-    theta_param << -1.5, 7, 7, 3;
+    //theta_param << -1.5, 7, 7, 3;
+    //theta_param << -2.484481  7.836006  7.023295  2.504872
+    theta_param << -1.5, 8, 8, 3;
+
     std::cout << "theta param : " << theta_param.transpose() << std::endl;
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     std::cout << "theta       : " << theta.transpose() << std::endl;
-    */
+
 
     double time_bfgs = -omp_get_wtime();
     int niter = solver.minimize(*fun, theta, fx, MPI_rank);
@@ -1052,17 +1016,15 @@ if(MPI_rank == 0){
 
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
-        theta_original_param[0] = theta_original[0];
         double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
+        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
         //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
         std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
 
-
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranS, ranT, sigU);
-        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
+        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranT, ranS, sigU);
+        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranT << " " << ranS << " " << sigU << std::endl;
     }
 
     #endif
@@ -1071,14 +1033,13 @@ if(MPI_rank == 0){
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
-    //theta_max = theta_original;
-    theta_max   = theta;
+    theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 1
+    #if 0
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -1120,22 +1081,23 @@ if(MPI_rank == 0){
     #endif
 
 
-#if 0
+#if 1
     double t_get_fixed_eff;
     Vect mu(n);
 
     ArrayXi fact_to_rank_list(2);
     fact_to_rank_list << 0,0;
-    if(MPI_size >= 2){
+    /*if(MPI_size >= 2){
         fact_to_rank_list[1] = 1; 
-    }
+    }*/
 
     if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
         //std::cout << "MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
 
         t_get_fixed_eff = - omp_get_wtime();
-        fun->get_mu(theta_original, mu, fact_to_rank_list);
-        t_get_fixed_eff += omp_get_wtime();
+        //fun->get_mu(theta, mu, fact_to_rank_list);
+        fun->get_mu(theta, mu);
+	t_get_fixed_eff += omp_get_wtime();
     }
 
     // CAREFUL! at the moment mu is in rank 1 ... how to do this properly??
@@ -1193,11 +1155,11 @@ if(MPI_rank == 0){
     if(MPI_rank == 0){
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
-        
-        t_get_marginals = -omp_get_wtime();
-        fun->get_marginals_f(theta, marg);
-        t_get_marginals += omp_get_wtime();
+        std::cout << "\nUSING ESTIMATED THETA : " << theta_max.transpose() << std::endl;
+
+    	t_get_marginals = -omp_get_wtime();
+    	fun->get_marginals_f(theta, marg);
+    	t_get_marginals += omp_get_wtime();
 
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
@@ -1327,14 +1289,16 @@ if(MPI_rank == 0){
     }    
 #endif
 
-    int total_fn_call = fun->get_fct_count();
 
     // =================================== print times =================================== //
 #if 1
+
+    int total_fn_call = fun->get_fct_count();
+
     t_total +=omp_get_wtime();
     if(MPI_rank == 0){
         // total number of post_theta_eval() calls 
-        std::cout << "\ntotal number fn calls        : " << total_fn_call << "\n" << std::endl;
+        std::cout << "\ntotal number fn calls        : " << total_fn_call << std::endl;
         std::cout << "\ntime BFGS solver             : " << time_bfgs << " sec" << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
