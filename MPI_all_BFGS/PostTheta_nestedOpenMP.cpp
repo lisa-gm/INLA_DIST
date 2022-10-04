@@ -32,7 +32,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	}
 
 	dim_grad_loop      = 2*dim_th;
-	no_f_eval 		   = 2*dim_th + 1;
+	no_f_eval          = 2*dim_th + 1;
 
 	// one solver per thread, but not more than required
 	//num_solvers        = std::min(threads_level1, dim_grad_loop);
@@ -45,8 +45,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		#pragma omp parallel
+		{
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
+		}
 	} else if(solver_type == "RGF"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);
@@ -134,20 +137,25 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		#pragma omp parallel
+		{
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
+		}
 	} else if(solver_type == "RGF"){
-#pragma omp parallel
-#pragma omp single
-{
-#pragma omp task
+		//#pragma omp parallel
+		//#pragma omp single
+		//{
+		//#pragma omp task
+		//{
 		solverQ   = new RGFSolver(ns, nt, nb, no);
-}
-#pragma omp task
-{
+		//}
+		//#pragma omp task
+		//{
 		solverQst = new RGFSolver(ns, nt, 0, no);
-}
-	}  
+		//}
+		//}
+}  
 
 	prior = "gaussian";
 
@@ -251,11 +259,21 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	#endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
-		solverQst = new PardisoSolver(MPI_rank, threads_level1, threads_level2);
+		#pragma omp parallel
+		{
+		solverQ   = new PardisoSolver(MPI_rank);
+		solverQst = new PardisoSolver(MPI_rank);
+		}
 	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-		solverQst = new RGFSolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 
+		#pragma omp parallel
+		{	
+		if(omp_get_thread_num() == 0){	
+			solverQst = new RGFSolver(ns, nt, 0, no);
+		} 
+		if(omp_get_thread_num() == 1 || threads_level1 == 1){
+			solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
+		}
+		}
 	} 
 
 	// set prior to be gaussian
@@ -513,13 +531,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
-			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
+			Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			*/
+			
 		}
 	}
 
@@ -532,9 +550,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	t_f_grad_f += omp_get_wtime();
 
-	/*if(MPI_rank == 0){
+	if(MPI_rank == 0){
 		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
-	}*/
+	}
 
 	return f_theta;
 
@@ -630,6 +648,41 @@ int PostTheta::get_fct_count(){
 // ============================================================================================ //
 // CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
 
+void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& ranS, double& ranT, double& sigU){
+	double alpha_t = 1; 
+	double alpha_s = 2;
+	double alpha_e = 1;
+
+	double alpha = alpha_e + alpha_s*(alpha_t - 0.5);
+	double nu_s  = alpha   - 1;
+	double nu_t  = alpha_t - 0.5;
+
+	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*8*pow(M_PI,1.5));
+	double gE = exp(lgamE);
+	double gS = exp(lgamS);
+	double gT = exp(lgamT);
+
+	sigU = log(sqrt(c1)/((gE*sqrt(gT))*pow(gS,alpha-1)));
+	ranS = log(sqrt(8*nu_s)/gS);
+	ranT = log(gT*sqrt(8*nu_t)/(pow(gS, alpha_s)));
+}
+
+void PostTheta::convert_interpret2theta(double ranS, double ranT, double sigU, double& lgamE, double& lgamS, double& lgamT){
+	double alpha_t = 1; 
+	double alpha_s = 2;
+	double alpha_e = 1;
+
+	double alpha = alpha_e + alpha_s*(alpha_t - 0.5);
+	double nu_s  = alpha   - 1;
+	double nu_t  = alpha_t - 0.5;
+
+	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*8*pow(M_PI,1.5));
+	lgamS = 0.5*log(8*nu_s) - ranS;
+	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
+	lgamE = 0.5*log(c1) - 0.5*lgamT - nu_s*lgamS - sigU;
+}
+
+#if 0
 void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& ranT, double& ranS, double& sigU){
 	double alpha_t = 1; 
 	double alpha_s = 2;
@@ -664,6 +717,7 @@ void PostTheta::convert_interpret2theta(double ranT, double ranS, double sigU, d
 	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
 	lgamE = 0.5*log(c1) - 0.5*lgamT - nu_s*lgamS - sigU;
 }
+#endif
 
 // ============================================================================================ //
 // FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED
@@ -807,7 +861,8 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 
 	if(constr == true){
 		#pragma omp parallel
-		#pragma omp single
+		{
+		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			MatrixXd V(n, Dxy.rows());
 			solverQ->selected_inversion_w_constr(Q, Dxy, vars, V);
@@ -823,15 +878,17 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 			//std::cout << "update_vars = " << update_vars.tail(10).transpose() << std::endl;
 			vars = vars - update_vars;
 			//std::cout << "vars        = " << vars.tail(10).transpose() << std::endl;			
-
+		}
 		}
 
 	} else {
 		// nested parallelism, want to call this with 1 thread of omp level 1
 		#pragma omp parallel
-		#pragma omp single
+		{
+		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			solverQ->selected_inversion(Q, vars);
+		}
 		}
 	}
 	
@@ -1364,7 +1421,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	double val_d;
 
 	#pragma omp parallel 
-	#pragma omp single
+	//#pragma omp single
 	{
 
 	// =============== evaluate NOMINATOR ================= //
@@ -1374,7 +1431,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 	// =============== evaluate theta prior based on original solution & variance = 1 ================= //
-	#pragma omp task
+	if(omp_get_thread_num() == 0) // instead of #pragma omp task -> want always the same thread to do same task
 	{
 
 #ifdef PRINT_MSG
@@ -1469,8 +1526,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	} // end pragma omp task, evaluating nominator
 
-
-	#pragma omp task
+	if(omp_get_thread_num() == 1 || threads_level1 == 1)//#pragma omp task
 	{
 
 #ifdef RECORD_TIMES
@@ -1503,7 +1559,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	}
 
-    #pragma omp taskwait
+    //#pragma omp taskwait -> implicit barrier at the end of parallel region
 
 	} // closing omp parallel region
 
@@ -1517,7 +1573,8 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
   	std::cout << log_prior_sum << " ";
   	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
 
-  	//std::cout << "f theta : " << val << std::endl;
+
+        std::cout << "sum nominator : " << log_prior_sum + val_prior_lat + log_det_l + val_l  << ", sum denominator : " << val_d << ", f theta : " << val << std::endl;
 #endif
 
   	return val;
@@ -1533,7 +1590,7 @@ void PostTheta::eval_log_gaussian_prior_hp(double& log_prior, double* thetai, do
 	#endif
 }
 
-// assume interpret_theta order : sigma.e, range t, range s, sigma.u
+// NEW ORDER sigma.e, range s, range t, sigma.u
 void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interpret_theta){
 
   double prior_se = log(lambda[0]) - lambda[0] * exp(interpret_theta[0]) + interpret_theta[0];
@@ -1541,11 +1598,11 @@ void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interp
   double prior_su = log(lambda[3]) - lambda[3] * exp(interpret_theta[3]) + interpret_theta[3];
   //printf("prior su = %f\n", prior_su);
 
-  
-  double prior_rt = log(lambda[1]) - lambda[1] * exp(-0.5*interpret_theta[1]) + log(0.5) - 0.5*interpret_theta[1];
-  //printf("prior rt = %f\n", prior_rt);
-  double prior_rs = log(lambda[2]) - lambda[2] * exp(-interpret_theta[2]) - interpret_theta[2];
+  double prior_rs = log(lambda[1]) - lambda[1] * exp(-interpret_theta[1]) - interpret_theta[1];
   //printf("prior rs = %f\n", prior_rs);
+  
+  double prior_rt = log(lambda[2]) - lambda[2] * exp(-0.5*interpret_theta[2]) + log(0.5) - 0.5*interpret_theta[2];
+  //printf("prior rt = %f\n", prior_rt);
 
   log_sum = prior_rt + prior_rs + prior_su + prior_se;
 
@@ -1559,6 +1616,7 @@ void PostTheta::update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, Matrix
 
     // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
     W = D*V;
+    std::cout << "MPI rank : " << MPI_rank << ", norm(V) = " << V.norm() << ", W = " << W << std::endl;
     //std::cout << "W = " << W << std::endl;
     // U = W^-1*V^T, W is spd and small
     // TODO: use proper solver ...
@@ -1588,6 +1646,10 @@ void PostTheta::eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det
     //std::cout << "log_pi_Ax_x = " << log_pi_Ax_x << std::endl;
     // log(pi(Ax)), W1 is covariance matrix
     double log_pi_Ax   = - 0.5*D.rows()*log(2*M_PI) - 0.5*log(W.determinant()) - 0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu);
+    if(isnan(log_pi_Ax)){
+    	std::cout << "Log p(Ax) is NaN. log(det(W)) : " << log(W.determinant()) << ", (Dx - Dmu)*inv(W)*(Dx - Dmu) : " << (D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) << std::endl;
+    	std::cout << "norm(mu) = " << mu.norm() << ", norm(x) = " << x.norm() << ", W = " << W << ", inv(W) = " << W.inverse() << std::endl;
+    }
     //std::cout << "W = " << W << std::endl;
     //std::cout << "log_pi_Ax = " << log_pi_Ax << ", log(W.determinant()) = " << log(W.determinant()) << "0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) = " << 0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) << std::endl;
 
@@ -1625,6 +1687,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	if(constr == true){
 		//std::cout << "in eval log det Qu in constr true" << std::endl;
 		MatrixXd V(nu, Dx.rows());
+		//std::cout << "before factorize w constraint. theta = " << theta.transpose() << std::endl;
 		solverQst->factorize_w_constr(Qu, Dx, log_det, V);
 
 		Vect constr_mu(nu);
@@ -1633,6 +1696,8 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		MatrixXd W(Dx.rows(), Dx.rows());
 		Vect mu_tmp = Vect::Zero(nu);
 		update_mean_constr(Dx, e, mu_tmp, V, W, U, constr_mu);
+		//std::cout << "MPI rank : " << MPI_rank << ". In Log Prior Lat. W = " << W << std::endl;
+
 		Vect unconstr_mu = mu_tmp;
 		mu_tmp = constr_mu;
 		//std::cout << "mu = " << mu_tmp.head(10).transpose() << std::endl;
@@ -1775,8 +1840,10 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
 }
 
+/*
 void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W){
 
+    std::cout << "in update mean constr. " << std::endl;
     // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
     W = D*V;
     std::cout << "W = " << W << std::endl;
@@ -1791,7 +1858,7 @@ void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V,
     std::cout << "sum(sol) = " << (D*sol).sum() << std::endl;
 
 }
-
+*/
 
 void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
