@@ -301,12 +301,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 
 #ifdef RECORD_TIMES
-    if((MPI_rank) == 0){
-    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
+    //if((MPI_rank) == 0){
+    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_rank) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     	std::ofstream log_file(log_file_name);
     	log_file << "MPI_rank threads_level1 threads_level_2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     	log_file.close();
-    }	
+    //}	
 #endif
 
 }
@@ -1709,6 +1709,8 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	} else{
 
 		solverQst->factorize(Qu, log_det, t_priorLatChol);
+		if(MPI_rank == 0)
+			std::cout << "t_priorLatChol : " << t_priorLatChol << std::endl;
 		val = 0.5 * (log_det);
 
 	}

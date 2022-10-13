@@ -1,6 +1,6 @@
 #include "PardisoSolver.h"
 
-PardisoSolver::PardisoSolver(int MPI_rank_) : MPI_rank(MPI_rank_){
+PardisoSolver::PardisoSolver(int& MPI_rank_) : MPI_rank(MPI_rank_){
 
     mtype  = -2;             /* set to positive semi-definite */
 
@@ -256,17 +256,13 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol)
     phase = 22;
     iparm[32] = 1; /* compute determinant */
 
-#ifdef RECORD_TIMES
-    t_priorLatChol = get_time(0.0);
-#endif
+    t_priorLatChol = -omp_get_wtime();
 
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
 
-#ifdef RECORD_TIMES
-    t_priorLatChol = get_time(t_priorLatChol);
-#endif
+    t_priorLatChol += omp_get_wtime();
    
     if (error != 0) {
         printf("\nERROR during numerical factorization: %d", error);
@@ -548,17 +544,13 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     phase = 22;
     iparm[32] = 1; /* compute determinant */
 
-#ifdef RECORD_TIMES
-    t_condLatChol = get_time(0.0);
-#endif
+    t_condLatChol = -omp_get_wtime();
 
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, &ddum, &ddum, &error,  dparm);
 
-#ifdef RECORD_TIMES
-    t_condLatChol = get_time(t_condLatChol);
-#endif
+    t_condLatChol += omp_get_wtime();
    
     if (error != 0) {
         printf("\nERROR during numerical factorization: %d", error);
@@ -579,17 +571,13 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
 
     iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
 
-#ifdef RECORD_TIMES
-    t_condLatSolve = get_time(0.0);
-#endif    
+    t_condLatSolve = -omp_get_wtime();
    
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
              &n, a, ia, ja, &idum, &nrhs,
              iparm, &msglvl, b, x, &error,  dparm);
 
-#ifdef RECORD_TIMES
-    t_condLatSolve = get_time(t_condLatSolve);
-#endif  
+    t_condLatSolve += omp_get_wtime();
    
     if (error != 0) {
         printf("\nERROR during solution: %d", error);
