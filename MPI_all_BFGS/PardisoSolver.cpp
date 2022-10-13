@@ -397,10 +397,10 @@ void PardisoSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_
     //std::cout << "time factorise : " << t_factorise << std::endl;
     //printf("\nFactorization completed ...\n");
 
-#ifdef PRINT_PAR
+//#ifdef PRINT_PAR
     std::cout << std::fixed << std::setprecision(12) << "in factorize. log det       : " << dparm[32] << std::endl;
     
-#endif
+//#endif
     log_det = dparm[32];
 
     /* -------------------------------------------------------------------- */    

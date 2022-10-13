@@ -59,7 +59,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 
 	// set global counter to count function evaluations
 	fct_count          = 0;	// initialise min_f_theta, min_theta
-	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+	iter_count         = 0; // have internal iteration count equivalent to operator() calls
+        iter_acc           = 0;
 
 #ifdef SMART_GRAD
 	thetaDiff_initialized = false;
@@ -161,7 +162,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
-	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+	iter_count         = 0; // have internal iteration count equivalent to operator() calls
+        iter_acc           = 0;
+
 
 #ifdef SMART_GRAD
 	thetaDiff_initialized = false;
@@ -286,7 +289,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
-	iter_count 		   = 0; // have internal iteration count equivalent to operator() calls
+	iter_count         = 0; // have internal iteration count equivalent to operator() calls
+	iter_acc           = 0;
 
 #ifdef SMART_GRAD
 	thetaDiff_initialized = false;
@@ -307,6 +311,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
     	log_file << "MPI_rank threads_level1 threads_level_2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     	log_file.close();
     }	
+
 #endif
 
 }
@@ -322,6 +327,10 @@ call all eval_post_theta() evaluations from here. This way all 9 can run in para
 
 */
 double PostTheta::operator()(Vect& theta, Vect& grad){
+
+	if(iter_count == 0){
+		t_bfgs_iter = -omp_get_wtime();
+	}
 
 	double t_f_grad_f = -omp_get_wtime();
 
@@ -404,8 +413,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 		// for now write to file. Not sure where the best spot would be.
 		// file contains : MPI_rank iter_count l1t l2t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-						t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+		//std::cout << log_file_name << " " << iter_count << " " << t_Ftheta_ext << " " << t_thread_nom << " " << t_priorHyp << " " << t_priorLat << " " << t_priorLatAMat << " ";
+		//std::cout << t_priorLatChol << " " << t_likel << " " << t_thread_denom << " " << t_condLat << " " << t_condLatAMat << " " << t_condLatChol << " " << t_condLatSolve << std::endl;
+		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol, t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 		
 		timespent_f_theta_eval += omp_get_wtime();
@@ -529,15 +539,24 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	// print all theta's who result in a new minimum value for f(theta)
 	if(f_theta < min_f_theta){
 		min_f_theta = f_theta;
+		iter_acc += 1;
+		double t_bfgs_iter_temp = omp_get_wtime() + t_bfgs_iter; 
 		if(MPI_rank == 0){
+			
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
 			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
 			Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
-			
+			std::cout << "iter: " << std::right << std::fixed << iter_acc << "   time: " << t_bfgs_iter_temp <<  "   theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta; // << std::endl;
+#ifdef DATA_SYNTHETIC
+                        // compute error = norm(theta - theta_original)
+                        double err = compute_error_bfgs(theta);
+                        std::cout << std::right << std::fixed << "    error: " << err << std::endl;
+#else
+                        std::cout << std::endl;
+#endif			
 		}
 	}
 
@@ -558,6 +577,17 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 }
 
+#ifdef DATA_SYNTHETIC
+
+double PostTheta::compute_error_bfgs(Vect& theta){
+        Vect theta_original(4);
+        theta_original << 1.386294, -5.882541,  1.039721,  3.688879;
+        double err = (theta - theta_original).norm();
+
+        return err;
+}
+
+#endif
 
 #ifdef SMART_GRAD
 // compute transformation of derivative directions smart gradient

@@ -14,6 +14,8 @@
 // enable RGF solver or not
 #define RGF_SOLVER
 
+//#define EST_LOGDET_QST   
+
 #ifdef RGF_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
@@ -122,18 +124,12 @@ int main(int argc, char* argv[])
     // Get the total number ranks in this communicator
     MPI_Comm_size(MPI_COMM_WORLD, &MPI_size); 
 
-    int threads_level1;
+    int threads_level1 = omp_get_max_threads();
     int threads_level2;
 
-    if(omp_get_nested() == true){
-        threads_level1 = omp_get_max_threads();
     #pragma omp parallel
-    {
-        threads_level2 = omp_get_max_threads();
-    }
-    } else {
-        threads_level1 = 0;
-        threads_level2 = omp_get_max_threads();
+    {  
+    threads_level2 = omp_get_max_threads();
     }
 
     // overwrite in case RGF is used
@@ -499,15 +495,16 @@ int main(int argc, char* argv[])
         // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
         theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
-
+        //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
         // using PC prior, choose lambda  
         theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
+        //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
+        //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
         theta_param << 4, 0, 0, 0;
         //theta_param << 4,4,4,4;
         //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
-
-        /*
+        /*theta << 2, -3, 1.5, 5;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }*/
@@ -915,7 +912,9 @@ if(MPI_rank == 0){
 
 #endif
 
-#if 0
+#if 1
+
+#ifdef EST_LOGDET_QST
 
     if(MPI_rank == 0){
 
@@ -963,39 +962,37 @@ if(MPI_rank == 0){
 
     }
 
+#endif // #ifdef EST_LOGDET_QST
+
 #endif // #if true/false
 
 
 #if 0
-    double t_f_eval = -omp_get_wtime();
+	double t_f_eval = -omp_get_wtime();
 
-    ArrayXi fact_to_rank_list_feval(2);
-    fact_to_rank_list_feval << 0,0;
+    ArrayXi fact_to_rank_list(2);
+    fact_to_rank_list << 0,0;
     if(MPI_size >= 2){
-        fact_to_rank_list_feval[1] = 1; 
+        fact_to_rank_list[1] = 1; 
         }
-    std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list_feval.transpose() << std::endl;
+    std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
             
-    if(MPI_rank == fact_to_rank_list_feval[0] || MPI_rank == fact_to_rank_list_feval[1]){
+    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
 
     	// single function evaluation
     	for(int i=0; i<3; i++){
 
     		Vect mu_dummy(n);
-		double t_temp = -omp_get_wtime();
-    		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list_feval);
-            	//fx = fun->eval_post_theta(theta_original, mu_dummy);
-		t_temp += omp_get_wtime();
+    		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
+            //fx = fun->eval_post_theta(theta_original, mu_dummy);
 
-    	        if(MPI_rank == fact_to_rank_list_feval[0])
-			std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
+    		std::cout <<  "f(x) = " << fx << std::endl;
 
         }
     }
 
 	t_f_eval += omp_get_wtime();
-	if(MPI_rank == fact_to_rank_list_feval[0])
-		std::cout << "time in f eval loop : " << t_f_eval << std::endl;
+	std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
 #endif
 
@@ -1058,6 +1055,7 @@ if(MPI_rank == 0){
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
         theta_original_param[0] = theta_original[0];
+        double prior_sigU; double prior_ranS; double prior_ranT;
         fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
         //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
         std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
@@ -1124,7 +1122,7 @@ if(MPI_rank == 0){
     #endif
 
 
-#if 1
+#if 0
     double t_get_fixed_eff;
     Vect mu(n);
 
