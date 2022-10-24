@@ -32,9 +32,9 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     //std::cout << "omp get nested : " << omp_get_nested() << std::endl;
 
     if(omp_get_nested() == 1){
-	int counter = threads_level1*MPI_rank + omp_get_thread_num();
+	int counter = threads_level1*MPI_rank + omp_get_thread_num() + 1; // test shift by 1 ... to not be on the same NUMA domains ...
 	GPU_rank = counter % noGPUs;
-	    //std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << ", counter : " << counter << ", tid : " << omp_get_thread_num() << std::endl;
+	std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << ", counter : " << counter << ", tid : " << omp_get_thread_num() << std::endl;
     } else {
 	  
         GPU_rank = MPI_rank % noGPUs;
@@ -66,6 +66,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 #ifdef PRINT_MSG
 	std::cout << "in RGF FACTORIZE()." << std::endl;
 #endif
+
 
     // check if n and Q.size() match
     if(n != Q.rows()){
@@ -110,7 +111,7 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     t_priorLatChol = get_time(0.0);
     double gflops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
-	
+
     //double gflops_factorize = solver->factorize();
     //log_det = solver->logDet();
     //std::cout << "log_det original = " << log_det << std::endl;
@@ -187,9 +188,11 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 
     log_det = solver->logDet(ia, ja, a);
 
-#ifdef PRINT_MSG
+//#ifdef PRINT_MSG
     printf("logdet: %f\n", log_det);
-#endif
+    if(isnan(log_det))
+	    exit(1);
+//#endif
 
 #ifdef PRINT_TIMES
     printf("RGF factorise time: %lg\n",t_factorise);

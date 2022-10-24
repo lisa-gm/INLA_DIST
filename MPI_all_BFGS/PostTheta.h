@@ -31,11 +31,13 @@
 //#define PRINT_MSG
 //#define PRINT_TIMES
 #define RECORD_TIMES
+
 //#define DATA_SYNTHETIC
 
 #ifdef EST_LOGDET_QST
 #include "generate_1D_fem.h"
 #endif
+
 
 using namespace Eigen;
 using namespace std;
@@ -296,7 +298,9 @@ class PostTheta{
 
 	double f_eval(Vect& theta);
 
+#ifdef DATA_SYNTHETIC
 	double compute_error_bfgs(Vect& theta);
+#endif
 
 	/**
      * @brief Compute the marginal variances of the latent parameters at theta. 

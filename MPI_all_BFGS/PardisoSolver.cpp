@@ -897,9 +897,10 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
     }
     //printf("\nFactorization completed ...\n");
 
+#ifdef PRINT_MSG
     if(MPI_rank == 0)
         std::cout << "MPI rank : " << MPI_rank << ". Calling PARDISO with " << iparm[2] << " threads."<< std::endl;
-
+#endif
     /* -------------------------------------------------------------------- */    
     /* ... Inverse factorization.                                           */                                       
     /* -------------------------------------------------------------------- */  

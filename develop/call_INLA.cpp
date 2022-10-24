@@ -18,6 +18,8 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
+//#define WRITE_RESULTS
+
 //#define WRITE_LOG
 
 #include "mpi.h"
@@ -132,8 +134,9 @@ int main(int argc, char* argv[])
 	threads_level2 = omp_get_max_threads();
 	}
     } else {
-	threads_level1 = 0;
-	threads_level2 = omp_get_max_threads();
+	threads_level1 = omp_get_max_threads();
+	//threads_level2 = omp_get_max_threads();
+    	threads_level2 = 1;
     }
 
     // overwrite in case RGF is used
@@ -143,7 +146,8 @@ int main(int argc, char* argv[])
         printf("\n============== PARALLELISM & NUMERICAL SOLVERS ==============\n");
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
-        printf("OMP threads level 2 : %d\n", threads_level2);
+        //printf("OMP threads level 2 : %d\n", threads_level2);
+	printf("OMP threads level 2 FIXED TO 1!!\n");
 #ifdef RGF_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
@@ -792,7 +796,7 @@ int main(int argc, char* argv[])
     }
 
     //exit(1);
-
+ 
     // ============================ set up BFGS solver ======================== //
 
     // Set up parameters
@@ -814,7 +818,7 @@ int main(int argc, char* argv[])
     param.delta = 1e-3;
     //param.delta = 1e-10;
     // maximum line search iterations
-    param.max_iterations = 5;
+    param.max_iterations = 200; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -869,6 +873,13 @@ int main(int argc, char* argv[])
         }
     }
 
+
+#ifdef WRITE_RESULTS
+   string results_folder = base_path + "/results_param";
+   if(MPI_rank == 0){
+    	create_folder(results_folder);
+   }
+#endif
 
 #if 0
 
@@ -1051,6 +1062,15 @@ if(MPI_rank == 0){
         std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
 
+#ifdef WRITE_RESULTS
+    if(MPI_rank == 0){
+    	std::string file_name_theta = results_folder + "/mode_theta_interpret_param.txt";
+    	theta_param[0] = theta[0];
+    	fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_param[1], theta_param[2], theta_param[3]);
+    	write_vector(file_name_theta, theta_param, dim_th);
+    }
+#endif
+
     /*std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
     std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;*/
 
@@ -1130,8 +1150,15 @@ if(MPI_rank == 0){
     if(MPI_rank == 0){
         std::cout << "\ncovariance interpr. param.  : \n" << cov << std::endl;
         //std::cout << "time get covariance         : " << t_get_covariance << " sec" << std::endl;
+
+#ifdef WRITE_RESULTS
+    std::string file_name_cov = results_folder + "/inv_hessian_mode_theta_interpret_param.txt";
+    write_matrix(file_name_cov, cov);
+#endif
     }
-    #endif
+
+#endif
+
 
 
 #if 1
@@ -1164,6 +1191,13 @@ if(MPI_rank == 0){
         if(constr == true)
             std::cout << "Dxy*mu : " << (Dxy*mu).transpose() << ", \nshould be : " << e.transpose() << std::endl;
 #endif
+
+#ifdef WRITE_RESULTS
+    std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
+    write_vector(file_name_fixed_eff, mu, n);
+#endif
+
+
     }
 
 
@@ -1218,6 +1252,13 @@ if(MPI_rank == 0){
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
+
+#ifdef WRITE_RESULTS
+    	std::string file_name_marg = results_folder + "/sd_latent_parameters.txt";
+    	write_vector(file_name_marg, marg.cwiseSqrt(), n);
+#endif
+
+
     }
 /*
 #ifdef DATA_SYNTHETIC

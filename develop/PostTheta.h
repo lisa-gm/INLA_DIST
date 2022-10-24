@@ -30,6 +30,7 @@
 //#define PRINT_MSG
 //#define PRINT_TIMES
 #define RECORD_TIMES
+#define DATA_SYNTHETIC
 
 using namespace Eigen;
 using namespace std;
@@ -77,7 +78,7 @@ class PostTheta{
 
 	int fct_count;      /**< count total number of function evaluations 	*/
 	int iter_count;		/**< count total number of operator() call        	*/
-
+        int iter_acc;
     Vect y; 		/**<  vector of observations y. has length no. 		*/
     Vect theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */
@@ -155,6 +156,7 @@ class PostTheta{
 	double t_condLatChol;
 	double t_condLatSolve;
 
+	double t_bfgs_iter;
 	public:
 	 /**
      * @brief constructor for regression model (no random effects). 
@@ -222,10 +224,13 @@ class PostTheta{
 	 */
     double operator()(Vect& theta, Vect& grad);
 
+#ifdef DATA_SYNTHETIC
+    double compute_error_bfgs(Vect& theta);
+#endif
+
 	/**
 	 * @brief overwriting G every time, not explicitly listed, better way to do this? needs to be 
-	 * stored after every iteration for smart hessian ... 		
-	 */
+	 * stored after every iteration for smart hessian ... 		*/
     void computeG(Vect& theta);
 
     int get_fct_count();

@@ -516,13 +516,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
+			std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
 #ifdef DATA_SYNTHETIC
 			// compute error = norm(theta - theta_original)
 			double err = compute_error_bfgs(theta);
 			std::cout << std::right << std::fixed << ",    error : " << err << std::endl;
 #else
-			//std::cout << std::endl;
+			std::cout << std::endl;
 #endif
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
@@ -1518,7 +1518,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	// =============== evaluate NOMINATOR ================= //
     // task 1 (evaluate nominator)
     if(MPI_rank == fact_to_rank_list[0]){
-
+     //std::cout << "in factorization Qst. after if. " << std::endl;
     	fct_count += 1;		
 
 		
@@ -1639,7 +1639,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 
 
     MPI_Irecv(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[1], 2, MPI_COMM_WORLD, &request1);
-
+	//std::cout << "completed factorization Qst." << std::endl;
 	} // end evaluate nominator fact_to_task MPI
 
 
@@ -1679,6 +1679,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 
         //MPI_Send(&logDet_Q, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD);
         MPI_Isend(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD, &request1);
+	//std::cout << "completed factorization Q." << std::endl;
     }
 
     // wait until values exchanged 
@@ -1691,12 +1692,12 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	  	val = -1 * (sum_nom - sum_denom);
 
 #ifdef PRINT_MSG
-	  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
-	  	std::cout << " " << std::fixed << std::setprecision(12);
-	  	std::cout << log_prior_sum << " ";
-	  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
+                std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose() << std::endl;
+                std::cout << " " << std::fixed << std::setprecision(12);
+                std::cout << log_prior_sum << " ";
+                std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << sum_denom << " " << val << std::endl;
 
-	  	//std::cout << "f theta : " << val << std::endl;
+                std::cout << "sum nominator : " << sum_nom << ", sum denominator : " << sum_denom << ", f theta : " << val << std::endl;
 #endif
 
 	  }

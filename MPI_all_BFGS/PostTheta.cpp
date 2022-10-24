@@ -526,19 +526,18 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
 			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
+            Vect theta_interpret(4); theta_interpret[0] = theta[0];
+            convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+            std::cout << "theta interpret : " << std::right << std::fixed <<  std::setprecision(4) << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta;
 #ifdef DATA_SYNTHETIC
 			// compute error = norm(theta - theta_original)
 			double err = compute_error_bfgs(theta);
 			std::cout << std::right << std::fixed << ",    error : " << err << std::endl;
 #else
-			//std::cout << std::endl;
+			std::cout << std::endl;
 #endif
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
-			Vect theta_interpret(4); theta_interpret[0] = theta[0];
-			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-			std::cout << "theta interpret : " << std::right << std::fixed <<  std::setprecision(4) << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
-			
 		}
 	}
 
@@ -551,9 +550,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	t_f_grad_f += omp_get_wtime();
 
-	/*if(MPI_rank == 0){
+	if(MPI_rank == 0){
 		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
-	}*/
+	}
 
 	return f_theta;
 
@@ -2413,5 +2412,6 @@ PostTheta::~PostTheta(){
 // -> swap sign, invert, get covariance
 
 // once converged call again : extract -> Q.xy -> selected inverse (diagonal), gives me variance wrt mode theta & data y
+
 
 

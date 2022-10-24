@@ -969,32 +969,32 @@ if(MPI_rank == 0){
 #if 0
     double t_f_eval = -omp_get_wtime();
 
-    ArrayXi fact_to_rank_list(2);
-    fact_to_rank_list << 0,0;
+    ArrayXi fact_to_rank_list_feval(2);
+    fact_to_rank_list_feval << 0,0;
     if(MPI_size >= 2){
-        fact_to_rank_list[1] = 1; 
+        fact_to_rank_list_feval[1] = 1; 
         }
-    std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
+    std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list_feval.transpose() << std::endl;
             
-    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
+    if(MPI_rank == fact_to_rank_list_feval[0] || MPI_rank == fact_to_rank_list_feval[1]){
 
     	// single function evaluation
-    	for(int i=0; i<5; i++){
+    	for(int i=0; i<3; i++){
 
     		Vect mu_dummy(n);
 		double t_temp = -omp_get_wtime();
-    		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
-            //fx = fun->eval_post_theta(theta_original, mu_dummy);
+    		fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list_feval);
+            	//fx = fun->eval_post_theta(theta_original, mu_dummy);
 		t_temp += omp_get_wtime();
 
-    	        if(MPI_rank == fact_to_rank_list[0])
+    	        if(MPI_rank == fact_to_rank_list_feval[0])
 			std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
 
         }
     }
 
 	t_f_eval += omp_get_wtime();
-	if(MPI_rank == fact_to_rank_list[0])
+	if(MPI_rank == fact_to_rank_list_feval[0])
 		std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
 #endif
@@ -1124,7 +1124,7 @@ if(MPI_rank == 0){
     #endif
 
 
-#if 0
+#if 1
     double t_get_fixed_eff;
     Vect mu(n);
 
