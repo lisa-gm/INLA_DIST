@@ -204,6 +204,19 @@ void write_vector(std::string full_file_name, Eigen::VectorXd x, int n){
   std::cout << "wrote to file : " << full_file_name << std::endl;
 }
 
+void write_matrix(std::string full_file_name, Eigen::MatrixXd A){
+   
+    ofstream sol_file(full_file_name);
+    if(sol_file){
+    	sol_file << A;
+    	sol_file.close();
+        std::cout << "wrote to file : " << full_file_name << std::endl;
+    } else {
+    	std::cout << "There was an error writing " << full_file_name << " to file." << std::endl;
+        exit(1);
+    }
+}
+
 void write_log_file(std::string full_file_name, int ns, int nt, int nb, int no, int nnz, \
                     std::string solver_type, double log_det, \
                     double t_sym_fact, double t_factorise, double t_solve, double t_inv, \
@@ -231,6 +244,48 @@ void write_log_file(std::string full_file_name, int ns, int nt, int nb, int no, 
   log_file.close();
 }
 
+
+void create_folder(std::string dir_name){
+    
+    char dir_name_char[dir_name.length() + 1]; 
+    strcpy(dir_name_char, dir_name.c_str());
+
+    if(mkdir(dir_name_char, 0777) == -1){
+            cerr << "Error :  " << strerror(errno) << endl;
+    } else {
+            cout << "Results parameters directory created under name : " << dir_name << std::endl;
+    }
+
+}
+
+
+// create folder -> don't overwrite, create new one if already exists
+/*
+std::string create_folder(std::string initial_dir_name){
+    
+    int n = 0;
+    bool dir_created = false;
+    string dir_name = initial_dir_name;
+
+    while(!dir_created){
+
+        char dir_name_char[dir_name.length() + 1];
+        strcpy(dir_name_char, dir_name.c_str());
+        if(mkdir(dir_name_char, 0777) == -1){
+            cerr << "Error :  " << strerror(errno) << endl;
+            n += 1;
+            dir_name = initial_dir_name + "_" + to_string(n);
+        } else {
+            dir_created = true;
+            cout << "Results parameters directory created under name : " << dir_name << std::endl;
+            return dir_name;
+	}
+
+    }
+
+    return "Problem. Something went wrong in create folder."; 	
+}
+*/
 
 /*
 int main(int argc, char** argv)
