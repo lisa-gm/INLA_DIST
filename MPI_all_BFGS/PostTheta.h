@@ -287,7 +287,9 @@ class PostTheta{
 
 	double f_eval(Vect& theta);
 
+#ifdef DATA_SYNTHETIC
 	double compute_error_bfgs(Vect& theta);
+#endif
 
 	/**
      * @brief Compute the marginal variances of the latent parameters at theta. 

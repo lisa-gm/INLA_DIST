@@ -140,6 +140,13 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	}
 #endif
 
+#ifdef EST_LOGDET_QST
+	nt_approx = 5;
+	if(MPI_rank == 0){
+		std::cout << "Estimating normalizing constant of prior latent field. nt_approx = " << nt_approx << std::endl;
+	}
+#endif
+
 #ifdef RECORD_TIMES
 	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     std::ofstream log_file(log_file_name);
@@ -199,8 +206,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-   	threads_level1 = 0;
-	threads_level2 = omp_get_max_threads();
+   	threads_level2 = omp_get_max_threads();
 
 	
 #ifdef PRINT_MSG
@@ -244,13 +250,21 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 #endif
 
 
+#ifdef EST_LOGDET_QST
+	nt_approx = 5;
+	if(MPI_rank == 0){
+		std::cout << "Estimating normalizing constant of prior latent field. nt_approx = " << nt_approx << std::endl;
+	}
+#endif
+
+
 #ifdef RECORD_TIMES
- /*   if((MPI_rank) == 0){
-    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + "_MPI_newRGFSolverClass.txt";
+    if((MPI_rank) == 0){
+    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     	std::ofstream log_file(log_file_name);
     	log_file << "MPI_rank threads_level1 threads_level_2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     	log_file.close();
-    }*/	
+    }	
 #endif
 
 }
@@ -321,21 +335,15 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	// if e.g. 9 tasks and mpi_size = 3, then task 1: rank 0, task 2: rank 1, task 3: rank 2, task 4: rank 0, etc.
 	ArrayXi task_to_rank_list(no_f_eval);
 
-	if(MPI_size < 2*(dim_th+1)){
-		for(int i=0; i<no_f_eval; i++){
-			task_to_rank_list[i] = i % MPI_size;
-		}
-	} else {
-		for(int i=0; i<no_f_eval; i++){
-                        task_to_rank_list[i] = 2*i;
-		}
+	for(int i=0; i<no_f_eval; i++){
+		task_to_rank_list[i] = i % MPI_size;
 	}
 
-//#ifdef PRINT_MSG
-	if(MPI_rank == 0 && iter_count == 1){  
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){  
 		std::cout << "task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;
 	}
-//#endif
+#endif
 
 	// ===================================== compute f(theta) ===================================== //
 	if(MPI_rank % no_f_eval == task_to_rank_list[0])
@@ -344,13 +352,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
     	ArrayXi fact_to_rank_list(2); 
         fact_to_rank_list << task_to_rank_list[0], task_to_rank_list[0];
-        if(MPI_size >= 2*no_f_eval){
-            fact_to_rank_list[1] = task_to_rank_list[0]+1; 
+        if(MPI_size > no_f_eval + 0){
+            fact_to_rank_list[1] = no_f_eval + 0; 
         }
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
         if(iter_count == 1)
         	std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
-//#endif
+#endif
 
 		timespent_f_theta_eval = -omp_get_wtime();
 #ifdef RECORD_TIMES
@@ -361,14 +369,11 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		//std::cout << "before record times section." << std::endl;
 #ifdef RECORD_TIMES		
 		t_Ftheta_ext += omp_get_wtime();
-		
-		if(MPI_rank == fact_to_rank_list[0])
-			std::cout << "i = 0, time f(theta) eval : " << t_Ftheta_ext << std::endl;
 
 		// for now write to file. Not sure where the best spot would be.
 		// file contains : MPI_rank iter_count l1t l2t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-		//record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-		//				t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+						t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 		
 		timespent_f_theta_eval += omp_get_wtime();
@@ -392,13 +397,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
     			ArrayXi fact_to_rank_list(2); 
                 fact_to_rank_list << task_to_rank_list[i], task_to_rank_list[i];
-                if(MPI_size >= 2*no_f_eval){
-                    fact_to_rank_list[1] = task_to_rank_list[i] + 1; 
+                if(MPI_size > no_f_eval + i){
+                    fact_to_rank_list[1] = no_f_eval + i; 
                 }
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
                 if(iter_count == 1)
                 	std::cout << "i = " << i << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
-//#endif
+#endif
 				Vect theta_forw(dim_th);
 				Vect mu_dummy(n);
 
@@ -409,12 +414,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy, fact_to_rank_list);
 #ifdef RECORD_TIMES
                 t_Ftheta_ext += omp_get_wtime();
-
-		if(MPI_rank == fact_to_rank_list[0])
-                        std::cout << "i = " << i << ", time f(theta) eval : " << t_Ftheta_ext << std::endl;
-        	// for now write to file. Not sure where the best spot would be.
-        	// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-       		//record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,                                                                //                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+        		// for now write to file. Not sure where the best spot would be.
+        		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+        		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                                        t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 			} // end MPI if
 		
@@ -431,13 +434,13 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
     			ArrayXi fact_to_rank_list(2); 
                 fact_to_rank_list << task_to_rank_list[i], task_to_rank_list[i];
-                if(MPI_size >= 2*no_f_eval){
-                    fact_to_rank_list[1] = task_to_rank_list[i]+1; 
+                if(MPI_size > no_f_eval + i){
+                    fact_to_rank_list[1] = no_f_eval + i; 
                 }
-//#ifdef PRINT_MSG                
+#ifdef PRINT_MSG                
                 if(iter_count == 1)
                 	std::cout << "i = " << i << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;	
-//#endif
+#endif
 				Vect theta_backw(dim_th);
 				Vect mu_dummy(n);
 
@@ -450,12 +453,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 #ifdef RECORD_TIMES
                 		t_Ftheta_ext += omp_get_wtime();
-      			        if(MPI_rank == fact_to_rank_list[0])
-                        		std::cout << "i = " << i << ", time f(theta) eval : " << t_Ftheta_ext << std::endl;
-				// for now write to file. Not sure where the best spot would be.
+      			        // for now write to file. Not sure where the best spot would be.
                 		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-                		//record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
-                                //                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
+                		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                                                t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 
 			} // end MPI if
@@ -515,7 +516,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
+			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
+                        Vect theta_interpret(4); theta_interpret[0] = theta[0];
+                        convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+                        std::cout << "theta interpret : " << std::right << std::fixed <<  std::setprecision(4) << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta;
 #ifdef DATA_SYNTHETIC
 			// compute error = norm(theta - theta_original)
 			double err = compute_error_bfgs(theta);
@@ -525,9 +529,10 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
-			/*Vect theta_interpret(4); theta_interpret[0] = theta[0];
+			/*
+			Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			std::cout << "theta interpret : " << std::right << std::fixed <<  std::setprecision(4) << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta << std::endl;
 			*/
 		}
 	}
@@ -652,6 +657,43 @@ int PostTheta::get_fct_count(){
 // ============================================================================================ //
 // CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
 
+
+void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& ranS, double& ranT, double& sigU){
+	double alpha_t = 1; 
+	double alpha_s = 2;
+	double alpha_e = 1;
+
+	double alpha = alpha_e + alpha_s*(alpha_t - 0.5);
+	double nu_s  = alpha   - 1;
+	double nu_t  = alpha_t - 0.5;
+
+	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*8*pow(M_PI,1.5));
+	double gE = exp(lgamE);
+	double gS = exp(lgamS);
+	double gT = exp(lgamT);
+
+	sigU = log(sqrt(c1)/((gE*sqrt(gT))*pow(gS,alpha-1)));
+	ranS = log(sqrt(8*nu_s)/gS);
+	ranT = log(gT*sqrt(8*nu_t)/(pow(gS, alpha_s)));
+}
+
+void PostTheta::convert_interpret2theta(double ranS, double ranT, double sigU, double& lgamE, double& lgamS, double& lgamT){
+	double alpha_t = 1; 
+	double alpha_s = 2;
+	double alpha_e = 1;
+
+	double alpha = alpha_e + alpha_s*(alpha_t - 0.5);
+	double nu_s  = alpha   - 1;
+	double nu_t  = alpha_t - 0.5;
+
+	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*8*pow(M_PI,1.5));
+	lgamS = 0.5*log(8*nu_s) - ranS;
+	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
+	lgamE = 0.5*log(c1) - 0.5*lgamT - nu_s*lgamS - sigU;
+}
+
+
+#if 0 
 void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& ranT, double& ranS, double& sigU){
 	double alpha_t = 1; 
 	double alpha_s = 2;
@@ -671,7 +713,6 @@ void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT
 	ranT = log(gT*sqrt(8*nu_t)/(pow(gS, alpha_s)));
 }
 
-
 void PostTheta::convert_interpret2theta(double ranT, double ranS, double sigU, double& lgamE, double& lgamS, double& lgamT){
 	double alpha_t = 1; 
 	double alpha_s = 2;
@@ -686,6 +727,7 @@ void PostTheta::convert_interpret2theta(double ranT, double ranS, double sigU, d
 	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
 	lgamE = 0.5*log(c1) - 0.5*lgamT - nu_s*lgamS - sigU;
 }
+#endif
 
 // ============================================================================================ //
 // FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED
@@ -950,6 +992,7 @@ MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 #endif
 		double f_theta = eval_post_theta(theta, mu_tmp, fact_to_rank_list);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
+
     }
     counter++;
 
@@ -1473,10 +1516,13 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	MPI_Request request1;
     MPI_Status status;
 
+    // for approximating logDet
+    double estLogDetQst;
+
 	// =============== evaluate NOMINATOR ================= //
     // task 1 (evaluate nominator)
     if(MPI_rank == fact_to_rank_list[0]){
-     //std::cout << "in factorization Qst. after if. " << std::endl;
+
     	fct_count += 1;		
 
 		
@@ -1542,7 +1588,22 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 #endif
 
 	if(ns > 0){
+
+#ifdef EST_LOGDET_QST
+		if(nt < 5){
+			std::cout << "Doesn't make sense to approximate logDet Qst. Choose full scheme!" << std::endl;
+			exit(1);
+		}
+
+		// evaluate approximate logDet
+		eval_log_prior_lat_approx(theta, nt_approx, estLogDetQst);
+		val_prior_lat = 0.5*estLogDetQst;
+		//std::cout << "MPI_rank : " << MPI_rank << ", val approx prior latent p. : " << std::setprecision(12) << 0.5*estLogDetQst << std::endl;
+#else
 		eval_log_prior_lat(theta, val_prior_lat);
+		//std::cout << "MPI_rank : " << MPI_rank << ", val prior latent p.        : " << std::setprecision(12) << val_prior_lat << std::endl;
+#endif
+
 	}
 
 #ifdef RECORD_TIMES
@@ -1572,20 +1633,17 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 		std::cout << "MPI rank = " << MPI_rank << ", val likelihood     : " << val_l << std::endl;
 #endif
 
+#ifdef RECORD_TIMES
+	t_thread_nom += omp_get_wtime();
+#endif
+
 
 	sum_nom = log_prior_sum + val_prior_lat + log_det_l + val_l;
 	//std::cout << "MPI rank = " << MPI_rank << ", sum nominator          : " << sum_nom << std::endl;
 
 
     MPI_Irecv(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[1], 2, MPI_COMM_WORLD, &request1);
-	//std::cout << "completed factorization Qst." << std::endl;
 
-#ifdef RECORD_TIMES
-        t_thread_nom += omp_get_wtime();
-#endif
-	
-    std::cout << "complete time nominator : " << t_thread_nom << ", tpriorLat : " << t_priorLat << std::endl;
-	
 	} // end evaluate nominator fact_to_task MPI
 
 
@@ -1620,12 +1678,11 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 #ifdef RECORD_TIMES
 	t_thread_denom += omp_get_wtime();
 #endif
-	std::cout << "time complete denominator : " << t_thread_denom << ", time eval denom : " << t_condLat << std::endl;
+
 		sum_denom = val_d;
 
         //MPI_Send(&logDet_Q, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD);
         MPI_Isend(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD, &request1);
-	//std::cout << "completed factorization Q." << std::endl;
     }
 
     // wait until values exchanged 
@@ -1638,17 +1695,37 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	  	val = -1 * (sum_nom - sum_denom);
 
 #ifdef PRINT_MSG
-                std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose() << std::endl;
-                std::cout << " " << std::fixed << std::setprecision(12);
-                std::cout << log_prior_sum << " ";
-                std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << sum_denom << " " << val << std::endl;
+	  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
+	  	std::cout << " " << std::fixed << std::setprecision(12);
+	  	std::cout << log_prior_sum << " ";
+	  	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
 
-                std::cout << "sum nominator : " << sum_nom << ", sum denominator : " << sum_denom << ", f theta : " << val << std::endl;
+	  	//std::cout << "f theta : " << val << std::endl;
 #endif
 
 	  }
 
+	 // check if there is a nan here
+	if(isnan(val)){
+		std::cout << "\nfx is NaN!\n" << std::endl;
+		std::cout << "Log prior sum : " << log_prior_sum << ", val Prior Lat : ";
+	  	std::cout << val_prior_lat << ", Log det Likelihood : " << log_det_l << ", Val Likelihood : " << val_l << ", Val Denom : " << val_d << std::endl;
+		exit(1);
+	}
+
   	//std::cout << "MPI_rank = " << MPI_rank << ", val = " << val << std::endl;
+
+/*
+	if(MPI_size > 2*dim_th+1){
+		std::cout << "printing estLogDet doesn't work for MPI size > 2*dim_th+1 !" << std::endl;
+		exit(1);
+	} else {
+	  	//std::cout << "rank : " << MPI_rank << ", val prior latent p.        : " << std::setprecision(12) << val_prior_lat << ", f : " << val << std::endl;
+		//double val_approxLogDet = -1 * (log_prior_sum + 0.5*estLogDetQst + log_det_l + val_l - sum_denom);
+		//std::cout << "rank : " << MPI_rank << ", val approx prior latent p. : " << std::setprecision(12) << 0.5*estLogDetQst << ", f : " << val_approxLogDet << std::endl;
+		//val = val_approxLogDet;
+	}
+*/
 
   	return val;
 }
@@ -1689,7 +1766,7 @@ void PostTheta::update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, Matrix
 
     // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
     W = D*V;
-    //std::cout << "W = " << W << std::endl;
+    std::cout << "MPI rank : " << MPI_rank << ", norm(V) = " << V.norm() << ", W = " << W << std::endl;
     // U = W^-1*V^T, W is spd and small
     // TODO: use proper solver ...
     U = W.inverse()*V.transpose();
@@ -1701,6 +1778,26 @@ void PostTheta::update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, Matrix
     //std::cout << "sum(updated_sol) = " << (D*updated_sol).sum() << std::endl;
 
 }
+
+/*
+void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W){
+
+    // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
+    W = D*V;
+    std::cout << "W = " << W << std::endl;
+    // U = W^-1*V^T, W is spd and small
+    // TODO: use proper solver ...
+    MatrixXd U = W.inverse()*V.transpose();
+    //std::cout << "U = " << U << std::endl;
+
+    Vect c = D*sol - e;
+    sol = sol - U.transpose()*c;
+
+    std::cout << "sum(sol) = " << (D*sol).sum() << std::endl;
+
+}
+*/
+
 
 void PostTheta::eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, const MatrixXd& D, MatrixXd& W, double& val_log_dens){
 
@@ -1718,12 +1815,24 @@ void PostTheta::eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det
     //std::cout << "log_pi_Ax_x = " << log_pi_Ax_x << std::endl;
     // log(pi(Ax)), W1 is covariance matrix
     double log_pi_Ax   = - 0.5*D.rows()*log(2*M_PI) - 0.5*log(W.determinant()) - 0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu);
+    if(isnan(log_pi_Ax)){
+    	std::cout << "Log p(Ax) is NaN. log(det(W)) : " << log(W.determinant()) << ", (Dx - Dmu)*inv(W)*(Dx - Dmu) : " << (D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) << std::endl;
+    	std::cout << "norm(mu) = " << mu.norm() << ", norm(x) = " << x.norm() << ", W = " << W << ", inv(W) = " << W.inverse() << std::endl;
+    }
+
     //std::cout << "W = " << W << std::endl;
     //std::cout << "log_pi_Ax = " << log_pi_Ax << ", log(W.determinant()) = " << log(W.determinant()) << "0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) = " << 0.5*(D*x - D*mu).transpose()*W.inverse()*(D*x - D*mu) << std::endl;
 
     val_log_dens = log_pi_x + log_pi_Ax_x - log_pi_Ax;
     //std::cout << - 0.5*rowsQ*log(2*M_PI) - (- 0.5*D.rows()*log(2*M_PI)) << " " << - 0.5*(rowsQ-D.rows())*log(2*M_PI) << std::endl;
     //std::cout << "log val Bayes cond = " << val_log_dens << std::endl;  
+
+	// check if there is a nan here
+	if(isnan(val_log_dens)){
+		std::cout << "\nval Log dens is NaN!\n" << std::endl;
+		std::cout << "MPI rank : " << MPI_rank << ", Log p(x) : " << log_pi_x << ", Log p(Ax | x ) : " <<  log_pi_Ax_x << ", Log p(Ax) : " << log_pi_Ax << std::endl;
+		exit(1);
+	} 
 
 }
 
@@ -1757,23 +1866,36 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		MatrixXd V(nu, Dx.rows());
 		solverQst->factorize_w_constr(Qu, Dx, log_det, V);
 
+		//if(V.norm() < 1e-4){
+		std::cout << "MPI rank : " << MPI_rank << ". In Log Prior Lat. After factorize w Constr. norm(V) = " << V.norm() << ", log Det = " << log_det << std::endl;
+		//}
+
 		Vect constr_mu(nu);
 		Vect e = Vect::Zero(Dx.rows());
 		MatrixXd U(Dx.rows(), nu);
 		MatrixXd W(Dx.rows(), Dx.rows());
 		Vect mu_tmp = Vect::Zero(nu);
 		update_mean_constr(Dx, e, mu_tmp, V, W, U, constr_mu);
+		std::cout << "MPI rank : " << MPI_rank << ". In Log Prior Lat. W = " << W << std::endl;
 		Vect unconstr_mu = mu_tmp;
 		mu_tmp = constr_mu;
 		//std::cout << "mu = " << mu_tmp.head(10).transpose() << std::endl;
 
 		Vect x = Vect::Zero(nu);
+
+		// check if there is a nan here
+		if(isnan(log_det)){
+			std::cout << "\nlog Det Qst is NaN!\n" << std::endl;
+			exit(1);
+		}
+
 		// multiplication with 0.5 is already included
 		eval_log_dens_constr(x, unconstr_mu, Qu, log_det, Dx, W, val);
 
 	} else{
 
 		solverQst->factorize(Qu, log_det, t_priorLatChol);
+		//std::cout << "Log det : " << log_det << std::endl;
 		val = 0.5 * (log_det);
 
 	}
@@ -1784,6 +1906,11 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	std::cout << "val log prior lat " << val << std::endl;
 #endif
 
+	// check if there is a nan here
+	if(isnan(val)){
+		std::cout << "\nlog Det Qst is NaN!\n" << std::endl;
+		exit(1);
+	}
 
 #ifdef PRINT_TIMES
 	if(MPI_rank ==0){
@@ -1905,22 +2032,143 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
 }
 
-void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W){
 
-    // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
-    W = D*V;
-    std::cout << "W = " << W << std::endl;
-    // U = W^-1*V^T, W is spd and small
-    // TODO: use proper solver ...
-    MatrixXd U = W.inverse()*V.transpose();
-    //std::cout << "U = " << U << std::endl;
+#ifdef EST_LOGDET_QST
 
-    Vect c = D*sol - e;
-    sol = sol - U.transpose()*c;
+// NEW FUNCTION Qst_approx -> to estimate log det
+void PostTheta::eval_log_prior_lat_approx(Vect& theta, int nt_approx, double& estLogDetQst){
 
-    std::cout << "sum(sol) = " << (D*sol).sum() << std::endl;
+	if(nt_approx < 3){
+		std::cout << "nt_approx too small!! Please increase." << std::endl;
+		exit(1);
+	}
+
+	int h = 1;
+
+	double exp_theta1 = exp(theta[1]);
+	double exp_theta2 = exp(theta[2]);
+	double exp_theta3 = exp(theta[3]);
+
+	// generate M0, M1, M2 for nt_approx
+	SpMat M0_approx(nt_approx, nt_approx);
+	construct_1D_lumped_massMat_nb(h, nt_approx, M0_approx);
+
+	SpMat M1_approx(nt_approx, nt_approx);
+	construct_1D_boundaryMat(nt_approx, M1_approx);
+
+	SpMat M2_approx(nt_approx, nt_approx);
+	construct_1D_stiffnessMat(h, nt_approx, M2_approx);
+
+	// construct Qst_approx
+	// g^2 * fem$c0 + fem$g1
+	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
+
+	// g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
+	SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
+
+	// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
+	SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+
+		std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
+		std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
+
+		std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
+	    std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
+	    std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;
+
+	    std::cout << "M0  : \n" << M0.block(0,0,10,10) << std::endl;
+	    std::cout << "M1  : \n" << M1.block(0,0,10,10) << std::endl;
+	    std::cout << "M2  : \n" << M2.block(0,0,10,10) << std::endl;
+	   }
+#endif
+
+	SpMat Qst_approx(ns*nt_approx, ns*nt_approx);
+
+	// assemble overall precision matrix Q.st
+	Qst_approx = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0_approx, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1_approx, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2_approx, q1s));
+	//if(MPI_rank == 0)
+	//	std::cout << "Qst_approx : \n" << Qst_approx.block(0,0,10,10) << std::endl;
+
+#if 0
+	// check for NaN values in matrix
+	SpMat Qst_approx_lower = Qst.triangularView<Lower>(); 
+	int nnz = Qst_lower.nonZeros();
+
+	for(int i= 0; i<nnz; i++){
+		if(isnan(Qst_lower.valuePtr()[i])){
+			std::cout << "In construct_Qst! Found NaN value in Qst. Qst[" << i << "] = " << Qst_lower.valuePtr()[i] << std::endl;
+			std::cout << "exp(theta_u) = " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+		}
+	}	
+#endif
+
+#if 1
+	/*
+	Eigen::SimplicialLDLT<SpMat> solverEigen;
+
+    solverEigen.analyzePattern(Qst_approx);
+    solverEigen.factorize(Qst_approx);
+    MatrixXd D_perm  = (solverEigen.vectorD()).asDiagonal();
+    //SpMat L         = solverEigen.matrixL();
+    auto P            = solverEigen.permutationP();
+    Vect D            = (P*D_perm*P.transpose()).diagonal();
+	*/
+
+	LLT<MatrixXd> lltOfA(Qst_approx); // compute the Cholesky decomposition of A
+	MatrixXd L  = lltOfA.matrixL();
+	Vect L_diag = L.diagonal();
+
+	//std::cout << "L_diag(1:10) : " << L_diag.head(10).transpose() << std::endl;
+
+    double LogDetQstApprox = 0;
+
+    
+    //std::cout << "\nD perm : " << solverEigen.vectorD().transpose() << std::endl;
+
+    //std::cout << "\nD      : " << D.transpose() << std::endl;
+   
+    for(int i=0; i<Qst_approx.rows(); i++){
+    	LogDetQstApprox+= 2*log(L_diag.data()[i]);   //2*std::log(D[i]);
+    	//printf("%f ", log(D.data()[i]));
+    }
+    //std::cout << "\nLogDetApprox   : " << LogDetQstApprox << std::endl;
+
+    // now use D compute estimate for logdeterminant
+    int len_ind_fill =  ns*(nt - nt_approx); // ns*(nt - nt_approx)
+    Eigen::ArrayXi ind_fill(len_ind_fill);
+
+    for(int i = 0; i<len_ind_fill; i++){
+    	ind_fill[i] = ns*nt_approx-ns + i;
+    	//printf("%d ", ind_fill[i]);
+    }
+
+    // create new Diagonal to estimate logDet
+    Vect estDiag(ns*nt);
+    estDiag << L_diag.head(ns*nt_approx-ns), L_diag.segment(ns*nt_approx-2*ns,ns).replicate(nt-nt_approx,1), L_diag.tail(ns);
+
+    //std::cout << "nt approx  : " << nt_approx << std::endl;
+    //std::cout << "\nDest all : " << estDiag.transpose() << std::endl;
+
+    //std::cout << "\nnt approx : " << nt_approx << ". Printing estDiag[i] : " << std::endl;
+	
+
+    estLogDetQst = 0;
+    for(int i=0; i<estDiag.size(); i++){
+    	estLogDetQst+= 2*log(estDiag.data()[i]);   //2*std::log(D[i]);
+    	//printf("%f ", estDiag.data()[i]);
+    }	
+    //std::cout << "\nestLogDet   : " << estLogDetQst << std::endl;
+
+#endif
 
 }
+
+
+#endif
 
 
 void PostTheta::construct_Q(Vect& theta, SpMat& Q){
@@ -1941,13 +2189,14 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 		////////////////////////////////////////////////////////////// 
 		// here to stabilize the model ... theoretically shouldn't be here ...
 		// is in INLA
-		/*if(constr){
+		// is it in Q & Qst??
+		if(constr){
 			SpMat epsId(nu,nu);
 			epsId.setIdentity();
 			epsId = 1e-4*epsId;
 
 			Qu = Qu + epsId;
-		}*/
+		}
 		////////////////////////////////////////////////////////////// 
 
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
@@ -1991,6 +2240,8 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			std::cout << "theta : \n" << theta.transpose() << std::endl;
 
 		#endif
+
+
 	}
 
 	if(ns == 0){
@@ -2090,6 +2341,17 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 
 	time_solve_Q += omp_get_wtime();
 
+	// check if there is a nan here
+	if(isnan(log_det)){
+		std::cout << "\nlog Det Q is NaN!\n" << std::endl;
+		exit(1);
+	}
+
+	if(isnan(val)){
+		std::cout << "\nval denominator is NaN! But log Det is : " << log_det << "\n" << std::endl;
+		exit(1);
+	}
+
 #ifdef PRINT_MSG
 	std::cout << "log det d : " << log_det << std::endl;
 #endif
@@ -2144,5 +2406,6 @@ PostTheta::~PostTheta(){
 // -> swap sign, invert, get covariance
 
 // once converged call again : extract -> Q.xy -> selected inverse (diagonal), gives me variance wrt mode theta & data y
+
 
 
