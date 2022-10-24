@@ -819,7 +819,6 @@ MatrixXd PostTheta::get_Cov_interpret_param(Vect& interpret_theta, double eps){
 	return cov;
 }
 
-
 void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 	
 	SpMat Q(n, n);
@@ -1567,6 +1566,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	//std::cout << " val d = " << val_d << std::endl;
   	double val = -1 * (log_prior_sum + val_prior_lat + log_det_l + val_l - val_d);
 
+
 #ifdef PRINT_MSG
   	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
   	std::cout << " " << std::fixed << std::setprecision(12);
@@ -1574,7 +1574,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
   	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
 
 
-        std::cout << "sum nominator : " << log_prior_sum + val_prior_lat + log_det_l + val_l  << ", sum denominator : " << val_d << ", f theta : " << val << std::endl;
+    std::cout << "sum nominator : " << log_prior_sum + val_prior_lat + log_det_l + val_l  << ", sum denominator : " << val_d << ", f theta : " << val << std::endl;
 #endif
 
   	return val;
@@ -1709,8 +1709,9 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	} else{
 
 		solverQst->factorize(Qu, log_det, t_priorLatChol);
-		if(MPI_rank == 0)
+		if(MPI_rank == 0){
 			std::cout << "t_priorLatChol : " << t_priorLatChol << std::endl;
+		}
 		val = 0.5 * (log_det);
 
 	}

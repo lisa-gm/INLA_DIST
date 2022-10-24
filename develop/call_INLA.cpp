@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-//#define DATA_SYNTHETIC
-#define DATA_TEMPERATURE
+#define DATA_SYNTHETIC
+//#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF_SOLVER
@@ -239,8 +239,8 @@ int main(int argc, char* argv[])
     Vect y;
 
     int num_constr = 1;
-    //bool constr = false;
-    bool constr = true;
+    bool constr = false;
+    //bool constr = true;
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -499,16 +499,15 @@ int main(int argc, char* argv[])
         // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
         theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
-        //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
         // using PC prior, choose lambda  
         theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
         //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
-        //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
         theta_param << 4, 0, 0, 0;
         //theta_param << 4,4,4,4;
         //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
-        /*theta << 2, -3, 1.5, 5;
+        
+        /*
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }*/
@@ -815,7 +814,7 @@ int main(int argc, char* argv[])
     param.delta = 1e-3;
     //param.delta = 1e-10;
     // maximum line search iterations
-    param.max_iterations = 200;
+    param.max_iterations = 5;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -921,6 +920,58 @@ if(MPI_rank == 0){
 
 #endif
 
+
+#if 0
+
+    if(MPI_rank == 0){
+
+    double estLogDetQst;
+    int nt_approx;
+    SpMat Qst_approx;
+
+    //theta << 1, -3, 2, 4;
+    //theta = theta_original;
+
+    // construct Qst_approx 
+    nt_approx = 5; //floor(nt/10.0); //nt-2;
+    fun->eval_log_prior_lat_approx(theta, nt_approx, estLogDetQst);
+    std::cout << "\nnt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+
+    /*
+    nt_approx = 10; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+
+    nt_approx = 20; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+    
+    nt_approx = 50; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+    */
+
+    /*
+    nt_approx = 200; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+    */
+
+    double val;
+    fun->eval_log_prior_lat(theta, val);
+    std::cout << "nt : " << nt << ", true LogDet    : " << 2*val << std::endl;
+
+    //std::cout << "\nnorm(Qst - Qst_approx) : " << (Qst - Qst_approx).norm() << std::endl;
+
+    }
+
+#endif // #if true/false
+
+
     double fx;
 
 #if 0
@@ -933,26 +984,26 @@ if(MPI_rank == 0){
         }
     std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
             
-    if(MPI_rank == fact_to_rank_list[0]){ // || MPI_rank == fact_to_rank_list[1]){
+    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
 
-    	// single function evaluation
-    	for(int i=0; i<1; i++){
+        // single function evaluation
+        for(int i=0; i<5; i++){
 
-    		Vect mu_dummy(n);
-		double t_temp = -omp_get_wtime();
-    		//fx = fun->eval_post_theta(theta, mu_dummy, fact_to_rank_list);
-            	fx = fun->eval_post_theta(theta, mu_dummy);
-		t_temp += omp_get_wtime();
+            Vect mu_dummy(n);
+        double t_temp = -omp_get_wtime();
+            fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
+            //fx = fun->eval_post_theta(theta_original, mu_dummy);
+        t_temp += omp_get_wtime();
 
-    	        if(MPI_rank == fact_to_rank_list[0])
-			std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
+                if(MPI_rank == fact_to_rank_list[0])
+            std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
 
         }
     }
 
-	t_f_eval += omp_get_wtime();
-	if(MPI_rank == fact_to_rank_list[0])
-		std::cout << "time in f eval loop : " << t_f_eval << std::endl;
+    t_f_eval += omp_get_wtime();
+    if(MPI_rank == fact_to_rank_list[0])
+        std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
 #endif
 
@@ -965,13 +1016,15 @@ if(MPI_rank == 0){
 
     //theta_param << -1.5, 7, 7, 3;
     //theta_param << -2.484481  7.836006  7.023295  2.504872
-    theta_param << -1.5, 8, 8, 3;
+    //theta_param << -1.5, 8, 8, 3;
 
-    std::cout << "theta param : " << theta_param.transpose() << std::endl;
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-    std::cout << "theta       : " << theta.transpose() << std::endl;
 
+    if(MPI_rank == 0){    
+        std::cout << "theta param : " << theta_param.transpose() << std::endl;
+        std::cout << "theta       : " << theta.transpose() << std::endl;
+    }
 
     double time_bfgs = -omp_get_wtime();
     int niter = solver.minimize(*fun, theta, fx, MPI_rank);
@@ -1016,20 +1069,20 @@ if(MPI_rank == 0){
 
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
-        double prior_sigU; double prior_ranS; double prior_ranT;
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
+        theta_original_param[0] = theta_original[0];
+        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
         //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
         std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranT, ranS, sigU);
-        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranT << " " << ranS << " " << sigU << std::endl;
+        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranS, ranT, sigU);
+        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
     }
 
     #endif
 
-#if 1
+#if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -1147,7 +1200,7 @@ if(MPI_rank == 0){
 
   
     // =================================== compute marginal variances =================================== //
-#if 1
+#if 0
     double t_get_marginals;
     Vect marg(n);
 
@@ -1291,7 +1344,7 @@ if(MPI_rank == 0){
 
 
     // =================================== print times =================================== //
-#if 1
+#if 0
 
     int total_fn_call = fun->get_fct_count();
 

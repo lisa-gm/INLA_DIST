@@ -25,12 +25,17 @@
 #include "RGFSolver.h"
 //#include "RGFSolver_dummy.h"
 
-#define SMART_GRAD
+//#define SMART_GRAD
+//#define EST_LOGDET_QST
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
-//#define RECORD_TIMES
-#define DATA_SYNTHETIC
+#define RECORD_TIMES
+//#define DATA_SYNTHETIC
+
+#ifdef EST_LOGDET_QST
+#include "generate_1D_fem.h"
+#endif
 
 using namespace Eigen;
 using namespace std;
@@ -60,6 +65,10 @@ class PostTheta{
     int no;				/**<  number of observations 						*/
     int nu;				/**<  number of random effects, that ns*nu 			*/
     int n;				/**<  total number of unknowns, i.e. ns*nt + nb 	*/
+
+#ifdef EST_LOGDET_QST
+    int nt_approx;      /**< only relevant when est_logDet_Qst is active    */
+#endif
 
 	int dim_th;			/**<  dimension of hyperparameter vector theta 		*/
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
@@ -346,6 +355,9 @@ class PostTheta{
 
 	void update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W, MatrixXd& U, Vect& updated_sol);
 
+	//void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W);
+
+
 	void eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, const MatrixXd& D, MatrixXd& W, double& val_log_dens);
 
 
@@ -379,6 +391,11 @@ class PostTheta{
      */
 	void construct_Q_spat_temp(Vect& theta, SpMat& Qst);
 
+#ifdef EST_LOGDET_QST
+	// preliminary function -- make proper later ...
+	void eval_log_prior_lat_approx(Vect& theta, int nt_approx, double& estLogDetQst);
+#endif
+
 	/** @brief construct precision matrix. 
 	 * Calls spatial, spatial-temporal, etc.
      * @param[in] theta current theta vector
@@ -392,8 +409,6 @@ class PostTheta{
  	 * /todo Could compute Ax^T*y once, and only multiply with appropriate exp_theta.
      */	
 	void construct_b(Vect& theta, Vect &rhs);
-
-	void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W);
 
 	/** @brief Evaluate denominator: conditional probability of Qx|y
      * @param[in] theta current theta vector

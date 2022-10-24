@@ -403,9 +403,9 @@ int main(int argc, char* argv[])
         M0 = read_sym_CSC(M0_file);
         //arma::mat(M0).submat(0,0,nt-1,nt-1).print();
         M1 = read_sym_CSC(M1_file);
-        //arma::mat(M1).submat(0,0,nt-1,nt-1).print();
+        //std::cout << "M1 : \n" << M1.block(0,0,10,10) << std::endl;
         M2 = read_sym_CSC(M2_file);
-        //arma::mat(M2).submat(0,0,nt-1,nt-1).print();
+        //std::cout << "M2 : \n" << M2.block(0,0,10,10) << std::endl;
 
         Ax = readCSC(Ax_file);
         // get rows from the matrix directly
