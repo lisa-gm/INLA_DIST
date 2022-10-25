@@ -83,7 +83,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 }
 
 
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
 	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -188,7 +188,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 }
 
 // constructor for spatial-temporal case
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -551,11 +551,11 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
 			//std::cout << "iter: " << std::right << std::fixed << iter_acc << "   time: " << t_bfgs_iter_temp <<  "   theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta; // << std::endl;
 #ifdef DATA_SYNTHETIC
-                        // compute error = norm(theta - theta_original)
-                        double err = compute_error_bfgs(theta);
-                        std::cout << std::right << std::fixed << "    error: " << err << std::endl;
+            // compute error = norm(theta - theta_original)
+            double err = compute_error_bfgs(theta);
+            std::cout << std::right << std::fixed << "    error: " << err << std::endl;
 #else
-                        std::cout << std::endl;
+            std::cout << std::endl;
 #endif			
 		}
 	}
@@ -687,7 +687,8 @@ void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT
 	double nu_s  = alpha   - 1;
 	double nu_t  = alpha_t - 0.5;
 
-	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*8*pow(M_PI,1.5));
+	double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0);
+	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
 	double gE = exp(lgamE);
 	double gS = exp(lgamS);
 	double gT = exp(lgamT);
@@ -706,7 +707,9 @@ void PostTheta::convert_interpret2theta(double ranS, double ranT, double sigU, d
 	double nu_s  = alpha   - 1;
 	double nu_t  = alpha_t - 0.5;
 
-	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*8*pow(M_PI,1.5));
+	double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0);
+	std::cout << "c1_scaling_const : " << c1_scaling_const << std::endl;
+	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
 	lgamS = 0.5*log(8*nu_s) - ranS;
 	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
 	lgamE = 0.5*log(c1) - 0.5*lgamT - nu_s*lgamS - sigU;

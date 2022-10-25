@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-#define DATA_SYNTHETIC
-//#define DATA_TEMPERATURE
+//#define DATA_SYNTHETIC
+#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF_SOLVER
@@ -225,6 +225,7 @@ int main(int argc, char* argv[])
 
     // dimension hyperparamter vector
     int dim_th;
+    int dim_spatial_domain;
 
     // spatial component
     SpMat c0; 
@@ -498,6 +499,10 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }     
+        // constant in conversion between parametrisations changes dep. on spatial dim
+        // assuming sphere -> assuming R^3
+        dim_spatial_domain = 3;
+
         // sigma.e (noise observations), sigma.u, range s, range t
         //theta_original_param << 0.5, 4, 1, 10;
         // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
@@ -637,6 +642,11 @@ int main(int argc, char* argv[])
             if(constr)
                 std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
         }
+
+        // constant in conversion between parametrisations changes dep. on spatial dim
+        // assuming sphere -> assuming R^3
+        dim_spatial_domain = 2;
+
         //theta << 4, 4, 4, 4;    //
         //theta_param << 4, 0, 0, 0;
         //theta_param << -1.308664,  0.498426,  4.776162,  1.451209;
@@ -843,12 +853,12 @@ int main(int argc, char* argv[])
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
     } else {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
     }
 
     if(MPI_rank == 0)
@@ -1102,7 +1112,7 @@ if(MPI_rank == 0){
 
     #endif
 
-#if 0
+#if 1
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -1234,7 +1244,7 @@ if(MPI_rank == 0){
 
   
     // =================================== compute marginal variances =================================== //
-#if 0
+#if 1
     double t_get_marginals;
     Vect marg(n);
 
