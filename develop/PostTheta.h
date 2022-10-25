@@ -29,8 +29,8 @@
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
-#define RECORD_TIMES
-#define DATA_SYNTHETIC
+//#define RECORD_TIMES
+//#define DATA_SYNTHETIC
 
 using namespace Eigen;
 using namespace std;
@@ -62,6 +62,7 @@ class PostTheta{
     int n;				/**<  total number of unknowns, i.e. ns*nt + nb 	*/
 
 	int dim_th;			/**<  dimension of hyperparameter vector theta 		*/
+	int dim_spatial_domain; 
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
@@ -188,6 +189,7 @@ class PostTheta{
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2,
 		Vect theta_prior, string solver_type, 
+		int dim_spatial_domain,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w);
 
@@ -212,6 +214,7 @@ class PostTheta{
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
 		SpMat M0, SpMat M1, SpMat M2, 
 		Vect theta_prior, string solver_type, 
+		int dim_spatial_domain,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w); 
 
