@@ -16,14 +16,14 @@ RGF_PATH      = ../RGF
 include $(RGF_PATH)/make.inc
 #############################################################################################################
 
-#CXX=mpic++    # kaust
-CXX=mpicxx     # FAU
+CXX=ccache mpic++    # kaust
+#CXX=mpicxx     # FAU
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
 
-DEBUG= -g #-Wall
+DEBUG= #-g #-Wall
 
 # LIBRARIES
-LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv		#version with deterministic determinant! 
+LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv		#version with deterministic determinant! & fixed selected inversion
 							#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
 LIBMKL=-L$(MKLROOT)/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 #LIBRGF=-lrgf
@@ -35,9 +35,9 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
-#INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.3.9
-INCBFGS=-I$(BASE_PATH)/applications/LBFGSpp/include
+INCEIGEN=-I/usr/include/eigen3
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.3.9
+INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
@@ -84,7 +84,7 @@ $(RGF_PATH)/CWC_utility.o: $(RGF_PATH)/CWC_utility.cu
 call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver.o $(RGF_CC_FILES) $(RGF_CU_FILES) #solver_cholmod.o 
 	$(CXX) $^ $(LIBS) $(RGF_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
-call_INLA.o: call_INLA.cpp
+call_INLA.o: call_INLA.cpp #call_INLA.cpp
 	$(CXX) -c $< $(CXXFLAGS) $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCLUDES) $(RGF_INCLUDEDIR) -o $@ 
 
 %.o : %.cpp %.h
