@@ -18,7 +18,7 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
-//#define WRITE_RESULTS
+#define WRITE_RESULTS
 
 //#define WRITE_LOG
 
@@ -243,9 +243,20 @@ int main(int argc, char* argv[])
     SpMat Ax; 
     Vect y;
 
-    int num_constr = 1;
-    bool constr = false;
-    //bool constr = true;
+    bool constr;
+    int num_constr;
+
+#ifdef DATA_SYNTHETIC
+    constr = false;
+#elif defined(DATA_TEMPERATURE)
+    constr = true;
+    //constr = false;
+    num_constr = 1;
+#else 
+    printf("Invalid dataset.");
+    exit(1);
+#endif
+    
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -398,6 +409,9 @@ int main(int argc, char* argv[])
         // check projection matrix for A.st
         std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
         file_exists(Ax_file);
+
+	/// need to allocate cores here
+	
 
         // read in matrices
         c0 = read_sym_CSC(c0_file);
@@ -651,13 +665,13 @@ int main(int argc, char* argv[])
         //theta_param << 4, 0, 0, 0;
         //theta_param << -1.308664,  0.498426,  4.776162,  1.451209;
         //theta_param << -1.5, 7, 7, 3;
-        //theta_param << -2.091, 9.241, 11.973, 2.994;
-	theta_param << -1.688, 7.575, 6.888, 2.789;
-	//theta_param << -1.500, 7.000, 7.00, 3.000;
-        //theta_param << -2.201569, 8.010112, 7.026133, 2.720725;
-	//theta_param << -1.25, 13.6, 10.4, 5.4;
+        //theta_param << -1.7, 7, 7, 2;
+	//theta_param << -1.688, 7.575, 6.888, 2.789;
+	theta_param << -1.500, 7.000, 7.00, 3.000;
+	//theta_param << -1.500, 10.000, 11.005, 3.000;
+
         //theta_original << -1.269613,  5.424197, -8.734293, -6.026165;  // estimated from INLA / same for my code varies a bit according to problem size
-	theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
+	//theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
 
         // using PC prior, choose lambda  
 	// previous order : interpret_theta & lambda order : sigma.e, range t, range s, sigma.u -> doesn't match anymore
@@ -666,9 +680,12 @@ int main(int argc, char* argv[])
 	// NEW ORDER sigma.e, range s, range t, sigma.u
 	// -log(p)/u where c(u, p)
 	theta_prior_param[0] = -log(0.01)/5; 	      //prior.sigma obs : 5, 0.01
-	theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
-	theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
-	theta_prior_param[3] = -log(0.5)/10;	      //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
+	//theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
+	theta_prior_param[1] = -log(0.5)/500;        
+    //theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
+	theta_prior_param[2] = -log(0.5)/10;
+    //theta_prior_param[3] = -log(0.5)/10;          //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
+    theta_prior_param[3] = -log(0.5)/5;	    
 	
         //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << -0.2, -2, -2, 3;
@@ -815,20 +832,23 @@ int main(int argc, char* argv[])
     // stop if norm of gradient smaller than :
     // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
     param.epsilon = 1e-1;
+    // param.epsilon = 1e-2; // ref sol
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
     // stops if grad.norm() < eps_rel*x.norm() 
     param.epsilon_rel=1e-3;
+    //param.epsilon_rel=1e-4; // ref sol
     //param.epsilon_rel = 1e-5;
     // in the past ... steps
     param.past = 2;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    param.delta = 1e-3;
-    //param.delta = 1e-10;
+    //param.delta = 1e-3;
+    param.delta = 1e-7;
+    //param.delta = 1e-9; // ref sol
     // maximum line search iterations
-    param.max_iterations = 5; //200;
+    param.max_iterations = 200; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -871,18 +891,20 @@ int main(int argc, char* argv[])
 
     // convert from interpretable parametrisation to internal one
     if(dim_th == 4){
-        theta[0] = theta_param[0];
+	   theta[0] = theta_param[0];
         fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
 
         if(MPI_rank == 0){
             Vect theta_interpret_initial(dim_th);
             theta_interpret_initial[0] = theta[0];
             fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
-            std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+            std::cout << "theta interpret. param. : " << theta_param.transpose() << std::endl;
+	    std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
             std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
         }
     }
 
+    //exit(1);
 
 #ifdef WRITE_RESULTS
    string results_folder = base_path + "/results_param";
@@ -996,15 +1018,26 @@ if(MPI_rank == 0){
     double fx;
 
 #if 0
+	
+    //theta_param << -2.152, 9.534, 11.927, 3.245;
+   
+    theta[0] = theta_param[0];
+    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+
+    if(MPI_rank == 0){
+        std::cout << "theta param : " << theta_param.transpose() << std::endl;
+        std::cout << "theta       : " << theta.transpose() << std::endl;
+    }
+
     double t_f_eval = -omp_get_wtime();
 
     ArrayXi fact_to_rank_list(2);
     fact_to_rank_list << 0,0;
-    if(MPI_size >= 2){
+    /*if(MPI_size >= 2){
         fact_to_rank_list[1] = 1; 
         }
     std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-            
+      */      
     if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
 
         // single function evaluation
@@ -1012,7 +1045,7 @@ if(MPI_rank == 0){
 
             Vect mu_dummy(n);
         double t_temp = -omp_get_wtime();
-            fx = fun->eval_post_theta(theta_original, mu_dummy, fact_to_rank_list);
+            fx = fun->eval_post_theta(theta, mu_dummy);
             //fx = fun->eval_post_theta(theta_original, mu_dummy);
         t_temp += omp_get_wtime();
 
@@ -1038,6 +1071,8 @@ if(MPI_rank == 0){
     //theta_param << -1.5, 7, 7, 3;
     //theta_param << -2.484481  7.836006  7.023295  2.504872
     //theta_param << -1.5, 8, 8, 3;
+
+    //theta_param << -2.15, 9.57, 11.83, 3.24;
 
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
@@ -1071,6 +1106,7 @@ if(MPI_rank == 0){
     if(MPI_rank == 0){
         std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
+
 
 #ifdef WRITE_RESULTS
     if(MPI_rank == 0){
@@ -1114,7 +1150,7 @@ if(MPI_rank == 0){
 
 #if 1
     Vect theta_max(dim_th);
-    //theta_max << 2.675054, -2.970111, 1.537331;    // theta
+    //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
     //theta_max = theta_prior;
     theta_max = theta;
 
@@ -1145,9 +1181,10 @@ if(MPI_rank == 0){
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
    
+    //interpret_theta << -2.152, 9.679, 12.015, 3.382;
 #ifdef PRINT_MSG 
     if(MPI_rank == 0){
-        std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+        std::cout << "est. Hessian at theta param : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
     }
 #endif
 
@@ -1159,6 +1196,7 @@ if(MPI_rank == 0){
 
     if(MPI_rank == 0){
         std::cout << "\ncovariance interpr. param.  : \n" << cov << std::endl;
+        std::cout << "\nsd hyperparameters interpr. :   " << cov.diagonal().cwiseSqrt().transpose() << std::endl;
         //std::cout << "time get covariance         : " << t_get_covariance << " sec" << std::endl;
 
 #ifdef WRITE_RESULTS
@@ -1395,7 +1433,7 @@ if(MPI_rank == 0){
 
 
     // =================================== print times =================================== //
-#if 0
+#if 1 
 
     int total_fn_call = fun->get_fct_count();
 
