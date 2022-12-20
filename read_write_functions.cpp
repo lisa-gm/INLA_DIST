@@ -7,6 +7,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/stat.h>
 
 // require armadillo for read dense matrix for now
 #include <armadillo>

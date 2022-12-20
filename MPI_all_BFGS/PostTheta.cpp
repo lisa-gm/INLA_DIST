@@ -375,7 +375,8 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		f_temp_list_loc(0) = eval_post_theta(theta, mu, fact_to_rank_list);
 		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
 		//std::cout << "before record times section." << std::endl;
-#ifdef RECORD_TIMES		
+#ifdef RECORD_TIMES
+		std::cout << "in record times." << std::endl;		
 		t_Ftheta_ext += omp_get_wtime();
 
 		// for now write to file. Not sure where the best spot would be.
@@ -424,7 +425,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
                 t_Ftheta_ext += omp_get_wtime();
         		// for now write to file. Not sure where the best spot would be.
         		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-        		std::cout << "before record times function. MPI_rank : " << MPI_rank << std::endl;
+        		//std::cout << "before record times function. MPI_rank : " << MPI_rank << std::endl;
         		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
                                         t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
@@ -525,14 +526,14 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		min_f_theta = f_theta;
 		if(MPI_rank == 0){
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
-            Vect theta_interpret(4); theta_interpret[0] = theta[0];
-            convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-            std::cout << "theta interpret : " << std::right << std::fixed <<  std::setprecision(4) << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta;
+			std::cout << "theta: " << std::right << std::fixed << theta.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
+            //Vect theta_interpret(4); theta_interpret[0] = theta[0];
+            //convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+            //std::cout << "theta interpret : " << std::right << std::fixed <<  std::setprecision(4) << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << std::setprecision(12) << f_theta;
 #ifdef DATA_SYNTHETIC
 			// compute error = norm(theta - theta_original)
 			double err = compute_error_bfgs(theta);
-			std::cout << std::right << std::fixed << ",    error : " << err << std::endl;
+			std::cout << std::right << std::fixed << "    error: " << err << std::endl;
 #else
 			std::cout << std::endl;
 #endif
@@ -1489,6 +1490,8 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 // INCLUDE: OpenMP division for computation of nominator & denominator : ie. 2 tasks -> 2 threads!
 double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_list){
 
+	//printf("Eigen -- number of threads used : %d\n", Eigen::nbThreads( ));
+
 	// =============== set up ================= //
 	int dim_th = theta.size();
 
@@ -1517,7 +1520,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	double sum_nom = 0;
 	double sum_denom = 0;
 
-	MPI_Request request1;
+	MPI_Request request1, request2, request3, request4, request5, request6;
     MPI_Status status;
 
     // for approximating logDet
@@ -1646,7 +1649,12 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 	//std::cout << "MPI rank = " << MPI_rank << ", sum nominator          : " << sum_nom << std::endl;
 
 
-    MPI_Irecv(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[1], 2, MPI_COMM_WORLD, &request1);
+    MPI_Irecv(&sum_denom,      1, MPI_DOUBLE, fact_to_rank_list[1], 2, MPI_COMM_WORLD, &request1);
+    MPI_Irecv(&t_condLat,      1, MPI_DOUBLE, fact_to_rank_list[1], 3, MPI_COMM_WORLD, &request2);
+    MPI_Irecv(&t_condLatAMat,  1, MPI_DOUBLE, fact_to_rank_list[1], 4, MPI_COMM_WORLD, &request3);
+    MPI_Irecv(&t_condLatChol,  1, MPI_DOUBLE, fact_to_rank_list[1], 5, MPI_COMM_WORLD, &request4);
+    MPI_Irecv(&t_condLatSolve, 1, MPI_DOUBLE, fact_to_rank_list[1], 6, MPI_COMM_WORLD, &request5);
+    MPI_Irecv(&t_thread_denom, 1, MPI_DOUBLE, fact_to_rank_list[1], 7, MPI_COMM_WORLD, &request6);
 
 	} // end evaluate nominator fact_to_task MPI
 
@@ -1686,11 +1694,24 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu, ArrayXi& fact_to_rank_l
 		sum_denom = val_d;
 
         //MPI_Send(&logDet_Q, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD);
-        MPI_Isend(&sum_denom, 1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD, &request1);
+        MPI_Isend(&sum_denom,      1, MPI_DOUBLE, fact_to_rank_list[0], 2, MPI_COMM_WORLD, &request1);
+        MPI_Isend(&t_condLat,      1, MPI_DOUBLE, fact_to_rank_list[0], 3, MPI_COMM_WORLD, &request2);
+        MPI_Isend(&t_condLatAMat,  1, MPI_DOUBLE, fact_to_rank_list[0], 4, MPI_COMM_WORLD, &request3);
+        MPI_Isend(&t_condLatChol,  1, MPI_DOUBLE, fact_to_rank_list[0], 5, MPI_COMM_WORLD, &request4);
+        MPI_Isend(&t_condLatSolve, 1, MPI_DOUBLE, fact_to_rank_list[0], 6, MPI_COMM_WORLD, &request5);
+        MPI_Isend(&t_thread_denom, 1, MPI_DOUBLE, fact_to_rank_list[0], 7, MPI_COMM_WORLD, &request6);
+
+
     }
 
     // wait until values exchanged 
     MPI_Wait(&request1, &status);
+    MPI_Wait(&request2, &status);
+    MPI_Wait(&request3, &status);
+    MPI_Wait(&request4, &status);
+    MPI_Wait(&request5, &status);
+    MPI_Wait(&request6, &status);
+
 
 
     if(MPI_rank == fact_to_rank_list[0]){
@@ -2025,6 +2046,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	*/
 
 	// check for NaN values in matrix
+	/*
 	SpMat Qst_lower = Qst.triangularView<Lower>(); 
 	int nnz = Qst_lower.nonZeros();
 
@@ -2034,6 +2056,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 			std::cout << "exp(theta_u) = " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
 		}
 	}
+	*/
 
 		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
 }
@@ -2230,22 +2253,21 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 		Qx.makeCompressed();
 
-		#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 			//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 			//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
-		#endif
+#endif
 
 		Q =  Qx + exp_theta0 * AxTAx;
 
-		#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 			std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
 			std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
 
 			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
 			std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
 			std::cout << "theta : \n" << theta.transpose() << std::endl;
-
-		#endif
+#endif
 
 
 	}
@@ -2385,7 +2407,7 @@ void PostTheta::record_times(std::string file_name, int iter_count, double t_Fth
 								double t_priorLat, double t_priorLatAMat, double t_priorLatChol, double t_likel, 
 								double t_thread_denom, double t_condLat, double t_condLatAMat, double t_condLatChol, double t_condLatSolve){
 
-	std::cout << "in record times function. MPI_rank : " << MPI_rank << std::endl;
+    std::cout << "in record times function. MPI_rank : " << MPI_rank << std::endl;
     std::ofstream log_file(file_name, std::ios_base::app | std::ios_base::out);
     log_file << MPI_rank       << " " << threads_level1 << " " << threads_level2 << " " << iter_count     << " ";
     log_file << t_Ftheta_ext   << " " << t_thread_nom   << " " << t_priorHyp     << " " << t_priorLat     << " " << t_priorLatAMat << " " << t_priorLatChol << " " << t_likel << " ";

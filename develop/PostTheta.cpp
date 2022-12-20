@@ -235,11 +235,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	threads_level2;
 
-	/*#pragma omp parallel
+	#pragma omp parallel
     {  
    		threads_level2 = omp_get_max_threads();
-    }*/
-	threads_level2 = 1;
+    }
+	//threads_level2 = 1;
 
 	
 #ifdef PRINT_MSG
@@ -304,10 +304,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	}
 #endif
 
-
 #ifdef RECORD_TIMES
     //if((MPI_rank) == 0){
-    	log_file_name = "log_file_per_iter_test_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_rank) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
+    	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_rank) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     	std::ofstream log_file(log_file_name);
     	log_file << "MPI_rank threads_level1 threads_level_2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     	log_file.close();
@@ -444,15 +443,15 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 				theta_forw = theta + eps*G.col(k);
 #ifdef RECORD_TIMES
-		                t_Ftheta_ext = -omp_get_wtime();
+		        t_Ftheta_ext = -omp_get_wtime();
 #endif			
 	
 				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy);
 #ifdef RECORD_TIMES
-                               t_Ftheta_ext += omp_get_wtime();
-                		// for now write to file. Not sure where the best spot would be.
-                		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
-                		record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
+                t_Ftheta_ext += omp_get_wtime();
+           		// for now write to file. Not sure where the best spot would be.
+           		// file contains : MPI_rank iter_count l1t t_Ftheta_ext t_priorHyp t_priorLat t_likel t_condLat
+                record_times(log_file_name, iter_count, t_Ftheta_ext, t_thread_nom, t_priorHyp, t_priorLat, t_priorLatAMat, t_priorLatChol,
                                                 t_likel, t_thread_denom, t_condLat, t_condLatAMat, t_condLatChol, t_condLatSolve);
 #endif
 			} // end MPI if
@@ -543,12 +542,12 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		if(MPI_rank == 0){
 			
 			//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-			//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << std::endl;
+			//std::cout << "theta: " << std::right << std::fixed << theta.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
 			//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
 			//std::cout << "grad : " << grad.transpose() << std::endl;
 			Vect theta_interpret(4); theta_interpret[0] = theta[0];
 			convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-			std::cout << "theta interpret : " << std::right << std::fixed << theta_interpret.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta;
+			std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
 			//std::cout << "iter: " << std::right << std::fixed << iter_acc << "   time: " << t_bfgs_iter_temp <<  "   theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta; // << std::endl;
 #ifdef DATA_SYNTHETIC
             // compute error = norm(theta - theta_original)
@@ -684,14 +683,19 @@ void PostTheta::convert_theta2interpret(double lgamE, double lgamS, double lgamT
 	double alpha_e = 1;
 
 	double alpha = alpha_e + alpha_s*(alpha_t - 0.5);
-	double nu_s  = alpha   - 1;
+	//double nu_s  = alpha   - 1;
+	double nu_s  = alpha - 1; 
 	double nu_t  = alpha_t - 0.5;
 
-	double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0);
+	//double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, 1.0/2.0); // second for temporal dim
+	double c1_scaling_const = pow(4*M_PI, 1.5);
+	//std::cout << "c1_scaling_const theta2interpret : " << c1_scaling_const << std::endl;	
 	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
 	double gE = exp(lgamE);
 	double gS = exp(lgamS);
 	double gT = exp(lgamT);
+
+
 
 	sigU = log(sqrt(c1)/((gE*sqrt(gT))*pow(gS,alpha-1)));
 	ranS = log(sqrt(8*nu_s)/gS);
@@ -704,11 +708,13 @@ void PostTheta::convert_interpret2theta(double ranS, double ranT, double sigU, d
 	double alpha_e = 1;
 
 	double alpha = alpha_e + alpha_s*(alpha_t - 0.5);
-	double nu_s  = alpha   - 1;
-	double nu_t  = alpha_t - 0.5;
+	//double nu_s  = alpha   - 1;
+	double nu_s  = alpha - 1; 
+	double nu_t  = alpha_t - 0.5; // because dim temporal domain always 1
 
-	double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0);
-	std::cout << "c1_scaling_const : " << c1_scaling_const << std::endl;
+	//double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, 1.0/2.0); // second for temporal dim
+	double c1_scaling_const = pow(4*M_PI, 1.5);
+	//std::cout << "c1_scaling_const interpret2theta : " << c1_scaling_const << std::endl;
 	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
 	lgamS = 0.5*log(8*nu_s) - ranS;
 	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
@@ -1529,8 +1535,6 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	t_priorLat += omp_get_wtime();
 #endif
 
-
-
 #ifdef PRINT_MSG
 		std::cout << "val prior lat : "  << val_prior_lat << std::endl;
 #endif
@@ -1564,6 +1568,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #ifdef RECORD_TIMES
 	t_thread_denom = -omp_get_wtime();
 #endif
+	// pin Q here
+	
+
 
 	// =============== evaluate denominator ================= //
 	// denominator :
@@ -1649,7 +1656,7 @@ void PostTheta::update_mean_constr(const MatrixXd& D, Vect& e, Vect& sol, Matrix
 
     // now that we have V = Q^-1*t(Dxy), compute W = Dxy*V
     W = D*V;
-    std::cout << "MPI rank : " << MPI_rank << ", norm(V) = " << V.norm() << ", W = " << W << std::endl;
+    //std::cout << "MPI rank : " << MPI_rank << ", norm(V) = " << V.norm() << ", W = " << W << std::endl;
     //std::cout << "W = " << W << std::endl;
     // U = W^-1*V^T, W is spd and small
     // TODO: use proper solver ...
@@ -1840,6 +1847,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
 	SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
+
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
 		std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
@@ -1862,6 +1870,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	/*if(MPI_rank == 0)
 		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;*/
 
+	/*
 	// check for NaN values in matrix
 	SpMat Qst_lower = Qst.triangularView<Lower>(); 
 	int nnz = Qst_lower.nonZeros();
@@ -1872,8 +1881,11 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 			std::cout << "exp(theta_u) = " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
 		}
 	}
+	*/
 
-		//std::cout << "Qst : \n" << Qst->block(0,0,10,10) << std::endl;
+#ifdef PRINT_MSG
+		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
+#endif
 }
 
 /*
@@ -1914,13 +1926,13 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 		////////////////////////////////////////////////////////////// 
 		// here to stabilize the model ... theoretically shouldn't be here ...
 		// is in INLA
-		/*if(constr){
+		if(constr){
 			SpMat epsId(nu,nu);
 			epsId.setIdentity();
 			epsId = 1e-4*epsId;
 
 			Qu = Qu + epsId;
-		}*/
+		}
 		////////////////////////////////////////////////////////////// 
 
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
@@ -1948,14 +1960,14 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 		Qx.makeCompressed();
 
-		#ifdef PRINT_MSG
-			//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
-			//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
-		#endif
+#ifdef PRINT_MSG
+		std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
+		//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
+#endif
 
 		Q =  Qx + exp_theta0 * AxTAx;
 
-		#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 			std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
 			std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
 
@@ -1963,7 +1975,7 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
 			std::cout << "theta : \n" << theta.transpose() << std::endl;
 
-		#endif
+#endif
 	}
 
 	if(ns == 0){

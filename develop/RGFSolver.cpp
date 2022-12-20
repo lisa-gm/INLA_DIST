@@ -20,6 +20,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     // CAREFUL USING N in both functions ..
     n  = ns_t*nt_t + nb_t;
 
+    // take out 
     // assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
@@ -27,31 +28,101 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
 
+    // assume max 3 ranks per node
+    int max_rank_per_node = 4;
+    int MPI_rank_mod = MPI_rank % max_rank_per_node; 
+
+    if(MPI_rank_mod == 0){
+	   GPU_rank = 2 + omp_get_thread_num(); // GPU2 & 3 attached to NUMA 1
+    } else if(MPI_rank_mod == 1){
+	   GPU_rank = 0 + omp_get_thread_num(); // GPU0 & 1 attached to NUMA 3
+    } else if(MPI_rank_mod == 2){
+	   GPU_rank = 6 + omp_get_thread_num(); // GPU6 & 7 attached to NUMA 5
+    } else if(MPI_rank_mod == 3){
+        GPU_rank = 4 + omp_get_thread_num(); // GPU4 & 5 attached to NUMA 7
+    } else {
+       printf("too many MPI ranks per node ...\n");
+       exit(1);
+    } 
+    
+    /*
+     int max_rank_per_node = 8;
+    int GPU_rank = MPI_rank % max_rank_per_node;
+    */
+
     // allocate devices as numThreads mod noGPUs
     //int counter = threads_level1*MPI_rank + omp_get_thread_num();
     //std::cout << "omp get nested : " << omp_get_nested() << std::endl;
-
-    if(omp_get_nested() == 1){
-	int counter = threads_level1*MPI_rank + omp_get_thread_num();
+/*
+    if(omp_get_nested() == 1 || threads_level1 == 2){
+	//int counter = 4;
+	// assume that not more than 3 ranks per node ... mod 3
+	// first 3 ranks on first node, second 3 on second, etc
+	int counter = 2*(MPI_rank % 3) + omp_get_thread_num(); // test shift by 1 ... to not be on the same NUMA domains ...
 	GPU_rank = counter % noGPUs;
-	    //std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << ", counter : " << counter << ", tid : " << omp_get_thread_num() << std::endl;
+	//std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << ", counter : " << counter << ", tid : " << omp_get_thread_num() << std::endl;
     } else {
-	  
-        GPU_rank = MPI_rank % noGPUs;
+	int counter = 2*(MPI_rank % 3) + omp_get_thread_num();  
+        GPU_rank = counter % noGPUs;
 	//std::cout << "omp nested false. In RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
     }
-    
+*/    
     //GPU_rank = MPI_rank % noGPUs;
     cudaSetDevice(GPU_rank);
+
+    int numa_node = topo_get_numNode(GPU_rank);
+    
+    //int numa_node = GPU_rank;
+    /*
+     int numa_node;
+
+    if(GPU_rank == 0){
+	numa_node = 2;
+    } else if(GPU_rank == 1){
+	numa_node = 3;
+    } else if(GPU_rank == 2){
+	numa_node = 0;
+    } else if(GPU_rank == 3){
+	numa_node = 1;
+    } else if(GPU_rank == 4){
+       numa_node = 6;
+    } else if(GPU_rank == 5){
+       numa_node = 7;
+    } else if(GPU_rank == 6){
+       numa_node = 4;
+    } else if(GPU_rank == 7){
+       numa_node = 5;
+    }
+    */
+
+    int* hwt = NULL;
+    int hwt_count = read_numa_threads(numa_node, &hwt);
+
+    /*pin_hwthreads(hwt_count, hwt);
+    std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+    std::cout << ", hwthreads:";
+    for(int i=0; i<hwt_count; i++){
+        printf(" %d", hwt[i]);
+    }
+    printf("\n");
+    */
+
+    // now they will be directly next to each other ... lets see if this is a problem
+    pin_hwthreads(1, &hwt[omp_get_thread_num()]);
+    std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+    std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
 
 #ifdef PRINT_MSG
     std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
 #endif	
-
-    solver = new RGF<double>(ns_t, nt_t, nb_t);
     
+    solver = new RGF<double>(ns_t, nt_t, nb_t);
+ 
+#ifdef PRINT_MSG    
     if(MPI_rank == 0)
     	std::cout << "new RGFSolver Class version." << std::endl; 
+#endif
+
 }
 
 // currently not needed !!
@@ -64,8 +135,9 @@ void RGFSolver::symbolic_factorization(SpMat& Q, int& init) {
 void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 
 #ifdef PRINT_MSG
-	std::cout << "in RGF FACTORIZE()." << std::endl;
+	std::cout << "MPI rank : " << MPI_rank << ", in RGF FACTORIZE()." << std::endl;
 #endif
+
 
     // check if n and Q.size() match
     if(n != Q.rows()){
@@ -83,6 +155,9 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     nnz = Q_lower.nonZeros();
 
     // allocate memory
+    
+    // pin here!
+
     size_t* ia = new long unsigned int [n+1];
     size_t* ja = new long unsigned int [nnz];
     double* a = new double [nnz];
@@ -110,15 +185,17 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     t_priorLatChol = get_time(0.0);
     double gflops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
     //std::cout << "log_det new      = " << log_det << std::endl;
-	
+
     //double gflops_factorize = solver->factorize();
     //log_det = solver->logDet();
     //std::cout << "log_det original = " << log_det << std::endl;
     t_priorLatChol = get_time(t_priorLatChol);
 
-    /*if(MPI_rank == 0){
+#ifdef GFLOPS
+    if(MPI_rank == 0){
         std::cout << "Gflop/s for the numerical factorization Qu: " << gflops_factorize << std::endl;
-    }*/
+    }
+#endif
 
      //std::cout << "In factorize. hostname : " << processor_name << ", MPI_rank : " << MPI_rank << ", GPU rank : " << GPU_rank << ", time Chol : " << t_priorLatChol << std::endl;
 
@@ -187,11 +264,11 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 
     log_det = solver->logDet(ia, ja, a);
 
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
     printf("logdet: %f\n", log_det);
     if(isnan(log_det))
 	    exit(1);
-//#endif
+#endif
 
 #ifdef PRINT_TIMES
     printf("RGF factorise time: %lg\n",t_factorise);
@@ -218,7 +295,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 
     // map solution back
     memcpy(V.data(), x, nrhs*n*sizeof(double));
-    std::cout << "norm(Qst*V   - t(Dx)) = " << (Q*V - D.transpose()).norm() << ", norm(V) = " << V.norm() << std::endl;
+    //std::cout << "norm(Qst*V   - t(Dx)) = " << (Q*V - D.transpose()).norm() << ", norm(V) = " << V.norm() << std::endl;
 
 
 #ifdef PRINT_TIMES
@@ -240,7 +317,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
     int nrhs = 1;
 
 #ifdef PRINT_MSG
-	std::cout << "in RGF FACTORIZE_SOLVE()." << std::endl;
+    std::cout << "MPI rank : " << MPI_rank << ", in RGF FACTORIZE_SOLVE()." << std::endl;	
 #endif
 
     // check if n and Q.size() match
@@ -257,6 +334,8 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 #ifdef PRINT_MSG
     std::cout << "nnz Q = " << nnz << std::endl;
 #endif
+
+     // pin here
 
     // allocate memory
     size_t* ia = new long unsigned int [n+1];
@@ -301,11 +380,12 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	log_det = solver->logDet(ia, ja, a);
     //log_det = solver->logDet();
 
-    /*
+#ifdef GFLOPS
     if(MPI_rank == 0){
-        std::cout << "Gflop/s for the numerical factorization: " << gflops_factorize << std::endl;
+        std::cout << "Gflop/s for the numerical factorization Qxy: " << gflops_factorize << std::endl;
     }
-    */
+#endif
+    
 
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
@@ -345,6 +425,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
   	for (i = 0; i < n; i++){
 	    sol[i] = x[i];
   	}	
+
 
   	delete[] ia;
   	delete[] ja;

@@ -158,6 +158,7 @@ class PostTheta{
 	double t_condLatSolve;
 
 	double t_bfgs_iter;
+
 	public:
 	 /**
      * @brief constructor for regression model (no random effects). 

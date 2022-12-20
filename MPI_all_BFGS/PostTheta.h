@@ -22,17 +22,17 @@
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
-#include "RGFSolver.h"
-//#include "RGFSolver_dummy.h"
+//#include "RGFSolver.h"
+#include "RGFSolver_dummy.h"
 
 //#define SMART_GRAD
 //#define EST_LOGDET_QST
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
-#define RECORD_TIMES
+//#define RECORD_TIMES
 
-//#define DATA_SYNTHETIC
+#define DATA_SYNTHETIC
 
 #ifdef EST_LOGDET_QST
 #include "generate_1D_fem.h"
@@ -147,7 +147,7 @@ class PostTheta{
 
     bool printed_eps_flag = false;
 
-#ifdef RECORD_TIMES
+//#ifdef RECORD_TIMES
     std::string log_file_name;
     // to record times 
     double t_Ftheta_ext;
@@ -159,7 +159,7 @@ class PostTheta{
 	double t_condLatAMat;
 	double t_thread_nom;
 	double t_thread_denom;
-#endif
+//#endif
 
 	// these have to always be defined otherwise compile error.
 	// always get measured but not written to file

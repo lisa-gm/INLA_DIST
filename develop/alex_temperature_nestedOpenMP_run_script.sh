@@ -22,10 +22,17 @@ num_ranks=9
 #nb=5
 #no=3230796
 
-ns=4155
-nt=300
-nb=3
-no=1931882
+#ns=1105
+ns=3240
+nt=730
+#nt=334
+nb=6
+#nb=8
+#no=577778
+#no=1931882
+#no=13381997
+#no=6540994
+no=4735835
 
 #ns=2307
 #nt=201
@@ -74,9 +81,8 @@ folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb$
 
 source ~/.profile
 
-# CAREFUL : needs to be AT LEAST 11 (main + 10 workers, 10 because of hessian, for BFGS only 9 are required)
 echo "srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_${data_type}_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_newRGFClass_nestedOMP_singleCopyV_test_Constr_newPrior_i1.txt
+srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_${data_type}_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_addDiag_relBFGSdelta_1e-7_pinned_i3.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 

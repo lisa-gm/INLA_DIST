@@ -15,8 +15,11 @@
 
 #include "Solver.h"
 
+#include "helper_functions.h"
 //#define PRINT_PAR
 //#define PRINT_OMP
+
+//#define RECORD_TIMES
 
 // get gflops manually from pardiso output
 //#define MEAS_GFLOPS
