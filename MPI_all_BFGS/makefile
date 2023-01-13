@@ -3,9 +3,9 @@ MKLROOT?=$(shell echo $$MKLROOT)
 
 # PARDISO only
 #############################################################################################################
-#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/x_gaedkelb
 #BASE_PATH=/users/lgaedkem
-BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 #CXX=CC     #mpic++
 CXX=mpicxx
@@ -20,8 +20,8 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
 
 # INCLUDES
-#INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCEIGEN=-I/usr/include/eigen3
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen
 
 INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse

@@ -14,7 +14,15 @@ Uses nested OpenMP parallelism and MPI. Code structured differently. Master - wo
 
 Similar to MPI_BFGS, however, here each rank performs all the "outer" computations, the function evaluations are assigned to individual ranks. This makes it a more flexible framework in terms of number of ranks in (2) we needed exactly the right amount of ranks as there were function evaluations. Now any number of ranks is possible. At the end of the function evaluations, all information is shared using MPI_Allreduce. Hence, all ranks go through the BFGS search, but also all ranks perform function evaluations. 
 
-#### 4.) RGF
+When sufficiently many ranks are available, each function evaluation is assigned two processes, 1 for nominator, 1 for denominator, this way each PARDISO instance can have their own node. 
+
+
+#### 4.) develop 
+
+"default" GPU version. 1 MPI rank for each function evaluation (like MPI_all_BFGS) and then OpenMP parallelism for nominator/denominator (FAU nodes have 8 GPUs attached to 1 node, so here it doesn't make so much sense to introduce more MPI ranks)
+
+
+#### 5.) RGF
 
 RGF folder that contains all the code required for the GPU Solver. (1)-(3) all access the same RGF code. Currently compiled as object files with headers. Maybe later it can be compiled into a shared library to make it more similar to PARDISO.
 
