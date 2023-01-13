@@ -18,6 +18,8 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
+//#define WRITE_RESULTS
+
 //#define WRITE_LOG
 
 #include "mpi.h"
@@ -221,7 +223,8 @@ int main(int argc, char* argv[])
 
     // dimension hyperparamter vector
     int dim_th;
-
+    int dim_spatial_domain;
+    
     // spatial component
     SpMat c0; 
     SpMat g1; 
@@ -238,9 +241,20 @@ int main(int argc, char* argv[])
     SpMat Ax; 
     Vect y;
 
-    int num_constr = 1;
-    bool constr = false;
-    //bool constr = true;
+    bool constr;
+    int num_constr;
+
+#ifdef DATA_SYNTHETIC
+    constr = false;
+#elif defined(DATA_TEMPERATURE)
+    constr = true;
+    //constr = false;
+    num_constr = 1;
+#else
+    printf("Invalid dataset.");
+    exit(1);
+#endif
+    
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -633,20 +647,33 @@ int main(int argc, char* argv[])
             if(constr)
                 std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
         }
-        //theta << 4, 4, 4, 4;    //
+
+	 dim_spatial_domain = 2;
+        
+	 //theta << 4, 4, 4, 4;    //
         //theta_param << -1.500, 7.000, 7.00, 3.000;
-        theta_param << -2.201569, 8.010112, 7.026133, 2.720725;
+        //theta_param << -2.201569, 8.010112, 7.026133, 2.720725;
         //theta_param << -1.308664,  0.498426,  4.776162,  1.451209;
         //theta_param << -1.270, 12.132, 9.773, 4.710;
         //theta_param << -1.25, 13.6, 10.4, 5.4;
-        theta_original_param << -2.461, 6.279, 3.394, 3.257;  // estimated from INLA / same for my code varies a bit according to problem size
+         theta_param << -1.500, 7.000, 7.00, 3.000;
+	
+	//theta_original_param << -2.461, 6.279, 3.394, 3.257;  // estimated from INLA / same for my code varies a bit according to problem size
 
 
         // using PC prior, choose lambda  
-        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+        //theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
         // TODO: update prior ....
         // theta_prior_param << 
-
+        // NEW ORDER sigma.e, range s, range t, sigma.u
+        // -log(p)/u where c(u, p)
+        theta_prior_param[0] = -log(0.01)/5;          //prior.sigma obs : 5, 0.01
+        //theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
+        theta_prior_param[1] = -log(0.5)/500;
+    //theta_prior_param[2] = -log(0.5)/20;            //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
+        theta_prior_param[2] = -log(0.5)/10;
+    //theta_prior_param[3] = -log(0.5)/10;          //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
+    theta_prior_param[3] = -log(0.5)/5; 
         //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << -0.2, -2, -2, 3;
         /*if(MPI_rank == 0){
@@ -864,6 +891,12 @@ int main(int argc, char* argv[])
 
     double fx;
 
+#ifdef WRITE_RESULTS
+   string results_folder = base_path + "/results_param_PARDISO";
+   if(MPI_rank == 0){
+       create_folder(results_folder);
+   }
+#endif
 
 #if 0
 
@@ -1046,6 +1079,15 @@ if(MPI_rank == 0){
         std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
 
+#ifdef WRITE_RESULTS
+   if(MPI_rank == 0){
+	std::string file_name_theta = results_folder + "/mode_theta_interpret_param.txt";
+	theta_param[0] = theta[0];
+	fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_param[1], theta_param[2], theta_param[3]);
+	write_vector(file_name_theta, theta_param, dim_th);
+   }
+#endif
+
     /*std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
     std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;*/
 
@@ -1084,6 +1126,7 @@ if(MPI_rank == 0){
     //theta_max = theta_prior;
     //theta_max = theta_original;
     theta_max   = theta;
+    //theta_max <<  1.38619961, -5.87969971,  1.02746149,  3.68536359;
 
     // in what parametrisation are INLA's results ... ?? 
     double eps = 0.005;
@@ -1127,8 +1170,15 @@ if(MPI_rank == 0){
     if(MPI_rank == 0){
         std::cout << "\ncovariance interpr. param.  : \n" << cov << std::endl;
         //std::cout << "time get covariance         : " << t_get_covariance << " sec" << std::endl;
+
+#ifdef WRITE_RESULTS
+    std::string file_name_cov = results_folder + "/inv_hessian_mode_theta_interpret_param.txt";
+    write_matrix(file_name_cov, cov);
+#endif
+
     }
-    #endif
+
+#endif
 
 
 #if 1
@@ -1160,6 +1210,12 @@ if(MPI_rank == 0){
         if(constr == true)
             std::cout << "Dxy*mu : " << (Dxy*mu).transpose() << ", \nshould be : " << e.transpose() << std::endl;
 #endif
+
+#ifdef WRITE_RESULTS
+    std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
+    write_vector(file_name_fixed_eff, mu, n);
+#endif
+
     }
 
 
@@ -1204,16 +1260,21 @@ if(MPI_rank == 0){
     if(MPI_rank == 0){
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
+        std::cout << "\nUSING ESTIMATED THETA : " << theta_max.transpose() << std::endl;
         
         t_get_marginals = -omp_get_wtime();
-        fun->get_marginals_f(theta, marg);
+        fun->get_marginals_f(theta_max, marg);
         t_get_marginals += omp_get_wtime();
 
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
+
+#ifdef WRITE_RESULTS
+        std::string file_name_marg = results_folder + "/sd_latent_parameters.txt";
+        write_vector(file_name_marg, marg.cwiseSqrt(), n);
+#endif
     }
 /*
 #ifdef DATA_SYNTHETIC

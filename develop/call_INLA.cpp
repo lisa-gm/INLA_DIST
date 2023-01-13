@@ -8,8 +8,8 @@
 #include <stdio.h>
 
 // choose one of the two
-//#define DATA_SYNTHETIC
-#define DATA_TEMPERATURE
+#define DATA_SYNTHETIC
+//#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF_SOLVER
@@ -18,7 +18,7 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
-#define WRITE_RESULTS
+//#define WRITE_RESULTS
 
 //#define WRITE_LOG
 
@@ -907,7 +907,7 @@ int main(int argc, char* argv[])
     //exit(1);
 
 #ifdef WRITE_RESULTS
-   string results_folder = base_path + "/results_param";
+   string results_folder = base_path + "/results_param_fixed_inverse";
    if(MPI_rank == 0){
     	create_folder(results_folder);
    }

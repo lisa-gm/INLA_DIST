@@ -188,7 +188,7 @@ int main(int argc, char* argv[])
 
     size_t i; // iteration variable
 
-#if 0
+#if 1
 
     /*
     int ns=1;
@@ -203,12 +203,12 @@ int main(int argc, char* argv[])
     std::cout << "Q: \n" << Q << std::endl;
     */
 
-    int ns=2;
-    int nt=5;
+    int ns=3;
+    int nt=10;
     int nb=2;
     int n = ns*nt + nb;
 
-    SpMat Q = gen_test_mat_base3(nt);
+    SpMat Q = gen_test_mat_base3(ns, nt, nb);
 
     Vect rhs(n);
     rhs.setOnes(n);
@@ -496,6 +496,30 @@ int main(int argc, char* argv[])
   sol_x_file.close();
   */
 
+
+    // true inv diag from Eigen
+    //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
+    SimplicialLLT<SpMat> solverQ;
+    solverQ.compute(Q);
+
+   if(solverQ.info()!=Success) {
+     cout << "Oh: Very bad" << endl;
+   }
+
+   SpMat L = solverQ.matrixL();
+   if(n < 20){
+        std:cout << "L: \n" << MatrixXd(L) << std::endl;
+    }
+
+   SpMat eye(n,n);
+   eye.setIdentity();
+
+   SpMat inv_Q = solverQ.solve(eye);
+
+   if(n < 20){
+        std::cout << "inv(Q):\n" << MatrixXd(inv_Q) << std::endl;
+    }
+
     t_inv = get_time(0.0);
     double flops_invDiag = solver->RGFdiag(ia, ja, a, invDiag);
     t_inv = get_time(t_inv);
@@ -528,18 +552,6 @@ int main(int argc, char* argv[])
         //printf("%f\n", b[i]);
     }
 
-    // true inv diag from Eigen
-    SimplicialLLT<SpMat> solverQ;
-    solverQ.compute(Q);
-
-   if(solverQ.info()!=Success) {
-     cout << "Oh: Very bad" << endl;
-   }
-
-   SpMat eye(n,n);
-   eye.setIdentity();
-
-   SpMat inv_Q = solverQ.solve(eye);
    //cout << "Q:\n" << Q << endl;
 
     if(n < 20){

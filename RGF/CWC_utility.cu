@@ -514,7 +514,7 @@ void d_csr_mult_f(void *handle,int m,int n,int k,int n_nonzeros,int *Aedge_i,int
     void *dBuffer;
     size_t bufferSize;
     cusparseSpMM_bufferSize((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,CUSPARSE_OPERATION_NON_TRANSPOSE,\
-                 &alpha,descra,descrb,&beta,descrc,CUDA_R_64F,CUSPARSE_MM_ALG_DEFAULT,&bufferSize);
+                 &alpha,descra,descrb,&beta,descrc,CUDA_R_64F,CUSPARSE_SPMM_ALG_DEFAULT,&bufferSize);
     cudaMalloc(&dBuffer,bufferSize);
 
     //cusparseCreateMatDescr(&descra);
@@ -524,7 +524,7 @@ void d_csr_mult_f(void *handle,int m,int n,int k,int n_nonzeros,int *Aedge_i,int
     //cusparseDcsrmm((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,m,n,k,n_nonzeros,\
     //               &alpha,descra,Annz,Aedge_i,Aindex_j,B,k,&beta,C,m);
     cusparseSpMM((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,CUSPARSE_OPERATION_NON_TRANSPOSE,\
-                 &alpha,descra,descrb,&beta,descrc,CUDA_R_64F,CUSPARSE_MM_ALG_DEFAULT,dBuffer);
+                 &alpha,descra,descrb,&beta,descrc,CUDA_R_64F,CUSPARSE_SPMM_ALG_DEFAULT,dBuffer);
 
     cusparseDnMatGetValues(descrc,(void**)&C);
 
@@ -551,7 +551,7 @@ void z_csr_mult_f(void *handle,int m,int n,int k,int n_nonzeros,int *Aedge_i,int
     void *dBuffer;
     size_t bufferSize;
     cusparseSpMM_bufferSize((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,CUSPARSE_OPERATION_NON_TRANSPOSE,\
-                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_MM_ALG_DEFAULT,&bufferSize);
+                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_SPMM_ALG_DEFAULT,&bufferSize);
     cudaMalloc(&dBuffer,bufferSize);
 
     //cusparseCreateMatDescr(&descra);
@@ -562,7 +562,7 @@ void z_csr_mult_f(void *handle,int m,int n,int k,int n_nonzeros,int *Aedge_i,int
     //               (cuDoubleComplex*)&alpha,descra,(cuDoubleComplex*)Annz,Aedge_i,Aindex_j,\
 		//   (cuDoubleComplex*)B,k,(cuDoubleComplex*)&beta,(cuDoubleComplex*)C,m);
     cusparseSpMM((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,CUSPARSE_OPERATION_NON_TRANSPOSE,\
-                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_MM_ALG_DEFAULT,dBuffer);
+                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_SPMM_ALG_DEFAULT,dBuffer);
 
     cusparseDnMatGetValues(descrc,(void**)&C);
 
@@ -589,7 +589,7 @@ void z_csr_mult_fo(void *handle,int m,int n,int k,int n_nonzeros,int *Aedge_i,in
     void *dBuffer;
     size_t bufferSize;
     cusparseSpMM_bufferSize((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,CUSPARSE_OPERATION_NON_TRANSPOSE,\
-                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_MM_ALG_DEFAULT,&bufferSize);
+                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_SPMM_ALG_DEFAULT,&bufferSize);
     cudaMalloc(&dBuffer,bufferSize);
 
     //cusparseCreateMatDescr(&descra);
@@ -600,7 +600,7 @@ void z_csr_mult_fo(void *handle,int m,int n,int k,int n_nonzeros,int *Aedge_i,in
     //               (cuDoubleComplex*)&alpha,descra,(cuDoubleComplex*)Annz,Aedge_i,Aindex_j,\
 		//   (cuDoubleComplex*)B,k,(cuDoubleComplex*)&beta,(cuDoubleComplex*)C,m);
     cusparseSpMM((cusparseHandle_t)handle,CUSPARSE_OPERATION_NON_TRANSPOSE,CUSPARSE_OPERATION_NON_TRANSPOSE,\
-                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_MM_ALG_DEFAULT,dBuffer);
+                 &alpha,descra,descrb,&beta,descrc,CUDA_C_64F,CUSPARSE_SPMM_ALG_DEFAULT,dBuffer);
 
     cusparseDnMatGetValues(descrc,(void**)&C);
 
