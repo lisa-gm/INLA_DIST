@@ -33,11 +33,11 @@ class RGFSolver: public Solver {
         size_t nb_t;
         size_t no_t;
 
-        SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
+        //SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
 
-        int* ia;                /**< CSR format. row indices. */
-        int* ja;                /**< CSR format. col pointers. */
-        double* a;              /**< CSR format. values. */
+        //int* ia;                /**< CSR format. row indices. */
+        //int* ja;                /**< CSR format. col pointers. */
+        //double* a;              /**< CSR format. values. */
 
         double* b;              /**< right-hand side. */
         double* x;              /**< placeholder for solution. */

@@ -12,7 +12,7 @@
 //#define DATA_TEMPERATURE
 
 // enable RGF solver or not
-#define RGF_SOLVER
+//#define RGF_SOLVER
 
 #ifdef RGF_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
@@ -802,10 +802,10 @@ int main(int argc, char* argv[])
     // TODO: stepsize too small? seems like it almost always accepts step first step.    
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    param.delta = 1e-3;
-    //param.delta = 1e-10;
+    //param.delta = 1e-3;
+    param.delta = 1e-7;
     // maximum line search iterations
-    param.max_iterations = 200;
+    param.max_iterations = 200; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -967,6 +967,7 @@ if(MPI_rank == 0){
 
 
 #if 0
+
     double t_f_eval = -omp_get_wtime();
 
     ArrayXi fact_to_rank_list_feval(2);
@@ -979,7 +980,7 @@ if(MPI_rank == 0){
     if(MPI_rank == fact_to_rank_list_feval[0] || MPI_rank == fact_to_rank_list_feval[1]){
 
     	// single function evaluation
-    	for(int i=0; i<3; i++){
+    	for(int i=0; i<5; i++){
 
     		Vect mu_dummy(n);
 		double t_temp = -omp_get_wtime();
@@ -997,7 +998,10 @@ if(MPI_rank == 0){
 	if(MPI_rank == fact_to_rank_list_feval[0])
 		std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
+    //exit(1);
+
 #endif
+
 
 #if 1
     if(MPI_rank == 0)
@@ -1013,6 +1017,9 @@ if(MPI_rank == 0){
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     std::cout << "theta       : " << theta.transpose() << std::endl;
     */
+
+    //int threads_Eigen = 1;
+    //Eigen::setNbThreads(threads_Eigen);
 
     double time_bfgs = -omp_get_wtime();
     int niter = solver.minimize(*fun, theta, fx, MPI_rank);

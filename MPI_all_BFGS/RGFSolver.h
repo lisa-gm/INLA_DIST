@@ -36,6 +36,9 @@ class RGFSolver: public Solver {
         int MPI_size;
         int MPI_rank;
 
+	char processor_name[MPI_MAX_PROCESSOR_NAME];
+    	int name_len;
+
         int threads_level1;
 
         /* matrix size */
@@ -44,6 +47,7 @@ class RGFSolver: public Solver {
         // to avoid redeclaration every time
         size_t i;
 
+	int GPU_rank;
         // pardiso wants integer, RGF wants size_t, recast for now
         size_t ns_t;
         size_t nt_t;

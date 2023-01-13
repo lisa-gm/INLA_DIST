@@ -5,11 +5,12 @@
 
 #include "Solver.h"
 #include "../RGF/RGF.H"
+#include "helper_functions.h"
 //#include "RGF.H"
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
-
+//#define GFLOPS
 
 /*
 #if 0
