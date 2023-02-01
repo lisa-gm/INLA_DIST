@@ -28,9 +28,9 @@ LIBS	    = $(ARMADILLO) $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
 
 $(info ============== Compiling ==============)
 
-all: main #mainEigen
+all: mainEigen #mainEigen
 
-CC_FILES   = Utilities.o main.o #main.o
+CC_FILES   = Utilities.o mainEigen.o #main.o
 CU_FILES   = CWC_utility.o
 
 mainEigen: $(CC_FILES) $(CU_FILES)
