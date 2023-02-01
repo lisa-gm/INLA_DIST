@@ -24,6 +24,6 @@ without any additional inputs. When the else-section is active requires external
 
 `srun ./main ${folder_path} ${ns} ${nt} ${nb} ${no} `
 
-where folder_path describes the path to the data files, ns, nb and nt as above and no describes the number of observations. There are numerous run scripts e.g. in run_script.sh that can be adapted to automate this process. 
+where folder_path describes the path to the data files, ns, nb and nt as above and no describes the number of observations. There are numerous run scripts e.g. in `run_script.sh` that can be adapted to automate this process. 
 
 
