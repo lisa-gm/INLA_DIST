@@ -168,6 +168,35 @@ void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat
 int main(int argc, char* argv[])
 {
 
+#if 1
+
+    /*
+    int ns=1;
+    int nt=6;
+    int nb=1;
+    int no=0;
+
+    int n = ns*nt+nb;
+
+    //SpMat Q = gen_test_mat_base1();
+    SpMat Q = gen_test_mat_base2();
+    std::cout << "Q: \n" << Q << std::endl;
+    */
+
+    int ns=3;
+    int nt=5;
+    int nb=2;
+    int n = ns*nt + nb;
+
+    SpMat Q = gen_test_mat_base3(ns, nt, nb);
+
+    Vect rhs(n);
+    rhs.setOnes(n);
+
+
+
+#else
+
     if(argc != 1 + 6){
         std::cout << "wrong number of input parameters. " << std::endl;
 
@@ -185,37 +214,6 @@ int main(int argc, char* argv[])
 
         exit(1);
     }
-
-    size_t i; // iteration variable
-
-#if 1
-
-    /*
-    int ns=1;
-    int nt=6;
-    int nb=1;
-    int no=0;
-
-    int n = ns*nt+nb;
-
-    //SpMat Q = gen_test_mat_base1();
-    SpMat Q = gen_test_mat_base2();
-    std::cout << "Q: \n" << Q << std::endl;
-    */
-
-    int ns=3;
-    int nt=10;
-    int nb=2;
-    int n = ns*nt + nb;
-
-    SpMat Q = gen_test_mat_base3(ns, nt, nb);
-
-    Vect rhs(n);
-    rhs.setOnes(n);
-
-
-
-#else
 
     std::cout << "reading in example. " << std::endl;
 
@@ -411,6 +409,9 @@ int main(int argc, char* argv[])
 
 
 #if 1
+
+    size_t i; // iteration variable
+
 	// =========================================================================== //
 	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
 
