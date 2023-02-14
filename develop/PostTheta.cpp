@@ -1866,7 +1866,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 #endif
 
 	// assemble overall precision matrix Q.st
-	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 	/*if(MPI_rank == 0)
 		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;*/
 
@@ -1882,6 +1882,18 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 		}
 	}
 	*/
+
+	////////////////////////////////////////////////////////////// 
+	// here to stabilize the model ... theoretically shouldn't be here ...
+	// is in INLA
+	if(constr){
+		SpMat epsId(nu,nu);
+		epsId.setIdentity();
+		epsId = 1e-4*epsId;
+
+		Qst = Qst + epsId;
+	}
+	////////////////////////////////////////////////////////////// 
 
 #ifdef PRINT_MSG
 		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
@@ -1922,18 +1934,6 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			construct_Q_spatial(theta, Qu);
 		}	
 
-
-		////////////////////////////////////////////////////////////// 
-		// here to stabilize the model ... theoretically shouldn't be here ...
-		// is in INLA
-		if(constr){
-			SpMat epsId(nu,nu);
-			epsId.setIdentity();
-			epsId = 1e-4*epsId;
-
-			Qu = Qu + epsId;
-		}
-		////////////////////////////////////////////////////////////// 
 
 		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
 		// construct Qx from Qs values, extend by zeros 

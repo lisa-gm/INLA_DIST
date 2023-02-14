@@ -828,7 +828,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
    cudaMallocHost(&tmp4,b_size*b_size*sizeof(T));
 #endif
 
-   printf("\n*** new version selected inverse... ***\n\n");
+   //printf("\n*** new version selected inverse... ***\n\n");
 
    double flop_count = 0;
    double t_inv = get_time(0.0);

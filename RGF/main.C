@@ -569,7 +569,7 @@ int main(int argc, char* argv[])
   */
 
     // print/write diag 
-  string sel_inv_file_name = base_path +"/sel_inv_RGF_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
+  string sel_inv_file_name = "sel_inv_RGF_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ nb_s + "_no" + no_s +".dat";
   cout << sel_inv_file_name << endl;
   ofstream sel_inv_file(sel_inv_file_name,    ios::out | ::ios::trunc);
   
