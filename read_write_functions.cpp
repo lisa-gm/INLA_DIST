@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <sys/stat.h>
 
+// std::setwd print out
+#include <iomanip>
+
 // require armadillo for read dense matrix for now
 #include <armadillo>
 
@@ -198,7 +201,7 @@ void write_vector(std::string full_file_name, Eigen::VectorXd x, int n){
   ofstream sol_file(full_file_name,    ios::out | ::ios::trunc);
   
   for (int i = 0; i < n; i++){
-    sol_file << x[i] << endl;
+    sol_file << std::setprecision(15) << x[i] << endl;
   }
   sol_file.close();
 
@@ -209,7 +212,7 @@ void write_matrix(std::string full_file_name, Eigen::MatrixXd A){
    
     ofstream sol_file(full_file_name);
     if(sol_file){
-    	sol_file << A;
+    	sol_file << std::setprecision(15) << A;
     	sol_file.close();
         std::cout << "wrote to file : " << full_file_name << std::endl;
     } else {
@@ -217,6 +220,44 @@ void write_matrix(std::string full_file_name, Eigen::MatrixXd A){
         exit(1);
     }
 }
+
+#if 1
+// only takes lower triangular part of matrix & CSC format or
+// upper triangular & CSR format
+void write_sym_CSC_matrix(std::string full_file_name, SpMat A){
+
+    SpMat A_lower = A.triangularView<Lower>();
+
+    int n = A_lower.cols();
+    int nnz = A_lower.nonZeros();
+   
+    ofstream sol_file(full_file_name);
+    if(sol_file){
+        sol_file << n << "\n";
+        sol_file << n << "\n";
+        sol_file << nnz << "\n";
+
+        for (int i = 0; i < nnz; i++){
+            sol_file << A_lower.innerIndexPtr()[i] << "\n";
+        }   
+
+        for (int i = 0; i < n+1; i++){
+             sol_file << A_lower.outerIndexPtr()[i] << "\n";
+        }     
+
+        for (int i = 0; i < nnz; i++){
+            sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
+        }
+
+        sol_file.close();
+        std::cout << "wrote to file : " << full_file_name << std::endl;
+    } else {
+        std::cout << "There was an error writing " << full_file_name << " to file." << std::endl;
+        exit(1);
+    }
+}
+
+#endif
 
 void write_log_file(std::string full_file_name, int ns, int nt, int nb, int no, int nnz, \
                     std::string solver_type, double log_det, \
