@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <unsupported/Eigen/SparseExtra>
 
 #include <armadillo>
 #include "generate_testMat_selInv.cpp"
@@ -168,7 +169,7 @@ void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat
 int main(int argc, char* argv[])
 {
 
-#if 1
+#if 0
 
     /*
     int ns=1;
@@ -183,9 +184,9 @@ int main(int argc, char* argv[])
     std::cout << "Q: \n" << Q << std::endl;
     */
 
-    int ns=3;
-    int nt=5;
-    int nb=2;
+    int ns=2;
+    int nt=3;
+    int nb=1;
     int n = ns*nt + nb;
 
     SpMat Q = gen_test_mat_base3(ns, nt, nb);
@@ -404,6 +405,30 @@ int main(int argc, char* argv[])
     Vect rhs(n);
     double exp_theta = exp(theta[0]);
 	rhs = exp_theta*Ax.transpose()*y;
+
+#endif
+
+
+#if 0
+
+	// only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+    size_t nnz = Q_lower.nonZeros();
+
+    //std::cout << "Q_lower before writing :\n" << Q_lower << std::endl;
+    std::string Q_file = "Q_lower_" + to_string(Q_lower.rows()) + "_" + to_string(Q_lower.cols()) + ".mtx";
+    // saving Q to file in mtx format
+    std::cout << "writing Q_lower to file in mtx format." << std::endl;
+    //Eigen::saveMarket(Q, Q_file);
+    Eigen::saveMarket(Q_lower, Q_file);
+
+    /*
+    // read in mtx matrix file
+    SpMat Q_test(Q_lower.rows(), Q_lower.cols());
+    Eigen::loadMarket(Q_test, Q_file);
+    //std::cout << "Q_lower after reloading :\n" << Q_test << std::endl;
+    std::cout << "norm(Q_test - Q_lower) = " << (Q_test - Q_lower).norm() << std::endl;
+    */
 
 #endif
 
