@@ -3,6 +3,7 @@
 
 # ignoring data files
 *.dat
+*.mtx
 
 # ignoring addtional latex files
 *.aux
