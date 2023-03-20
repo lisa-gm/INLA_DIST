@@ -153,7 +153,21 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
     magma_init();
     magma_device_t device;
     magma_getdevice(&device);
-    magma_queue_create_from_cuda(device, NULL, NULL, NULL, &magma_queue);
+
+    // in order to get the magma GEMMs in a non-null stream, the second argument of magma_queue_create needs to be a CUDA stream
+    // so make a cuda stream to use for this.
+
+    cudaError_t cuerr;
+    cudaStream_t magmaGemmCudaStream;
+    cuerr = cudaStreamCreate ( &magmaGemmCudaStream );
+    if ( cuerr ) {
+        printf ("Error creating magmaGemmCudaStream in RGF.h \n");
+        abort();
+    }
+    
+    //magma_queue_create_from_cuda(device, NULL, NULL, NULL, &magma_queue);
+    magma_queue_create_from_cuda(device, magmaGemmCudaStream, NULL, NULL, &magma_queue);
+
     stream_c = magma_queue_get_cuda_stream(magma_queue);
     cublas_handle = magma_queue_get_cublas_handle(magma_queue);
 
@@ -1271,7 +1285,7 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
    allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
    
    //Copy diag_pos to device
-   memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
+    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
     double gflops = FirstStageFactor_noCopyHost(logDet);
@@ -1362,13 +1376,13 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     allocate_data_on_device((void**)&tmp2_dev,b_size*b_size*sizeof(T));
 
     //Copy diag_pos to device
-    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
+    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
     double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev);
 
     //Copy data to host
-    memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
+    memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T), NULL );
 
     //Data deallocation
     deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
@@ -1452,6 +1466,15 @@ void RGF<T>::create_blocks()
 template <class T>
 inline void RGF<T>::init_supernode(T *M_dev, size_t supernode)
 {
+    static cudaStream_t memsetStream = NULL;
+    if ( memsetStream == NULL ) {
+        cudaStreamCreate( &memsetStream );
+    }
+
+    static cudaStream_t copyStream = NULL;
+    if ( copyStream == NULL ) {
+        cudaStreamCreate( &copyStream );
+    }    
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
    size_t supernode_nnz = matrix_ia[supernode_lc] - matrix_ia[supernode_fc];
@@ -1460,11 +1483,14 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode)
    size_t cols = supernode_lc - supernode_fc;
    size_t supernode_size = rows * cols;
 
-   fill_dev(M_dev, T(0.0), supernode_size);
-   memcpy_to_device(&matrix_ia[supernode_fc],ia_dev,(cols+1)*sizeof(size_t));
-   memcpy_to_device(&matrix_ja[supernode_offset],ja_dev,supernode_nnz*sizeof(size_t));
-   memcpy_to_device(&matrix_a[supernode_offset],a_dev,supernode_nnz*sizeof(T));
-   init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd);
+    cudaMemsetAsync((void*)M_dev, 0, supernode_size*sizeof(T), memsetStream );
+
+    memcpy_to_device( &matrix_ia[supernode_fc],     ia_dev, (cols+1)*sizeof(size_t),       copyStream );
+    memcpy_to_device( &matrix_ja[supernode_offset], ja_dev,  supernode_nnz*sizeof(size_t), copyStream );
+    memcpy_to_device( &matrix_a[supernode_offset],  a_dev,   supernode_nnz*sizeof(T),      copyStream );
+    
+    
+    init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd, memsetStream );
 }
 
 /************************************************************************************************/
@@ -1472,6 +1498,10 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode)
 template <class T>
 inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode)
 {
+    static cudaStream_t copystream = NULL;
+    if ( copystream == NULL ) {
+        cudaStreamCreate( &copystream );
+    }
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
    size_t ind = mf_block_index(supernode, supernode);
@@ -1483,7 +1513,7 @@ inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode)
    printf("size rows&cols = %d, ind = %d\n", rows*cols, ind);
 #endif
 
-   memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T));
+    memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T), copystream );
 }
 
 /************************************************************************************************/
@@ -1497,7 +1527,7 @@ inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode)
    size_t rows = mf_block_lda(supernode, supernode);
    size_t cols = supernode_lc - supernode_fc;
 
-   memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T));
+    memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T), NULL );
 }
 
 /************************************************************************************************/

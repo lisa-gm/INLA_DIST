@@ -81,8 +81,8 @@ void copy_data_to_device(void *host_data,void *device_data,int N,int M,size_t si
 }
 
 extern "C"
-void memcpy_to_device(void *host_data,void *device_data,size_t size_element){
-     cudaMemcpyAsync(device_data,host_data,size_element,cudaMemcpyHostToDevice,NULL);
+void memcpy_to_device(void *host_data, void *device_data, size_t size_element, cudaStream_t stream ) {
+     cudaMemcpyAsync(device_data,host_data,size_element,cudaMemcpyHostToDevice, stream );
 }
 
 extern "C"
@@ -91,8 +91,8 @@ void copy_data_to_host(void *host_data,void *device_data,int N,int M,size_t size
 }
 
 extern "C"
-void memcpy_to_host(void *host_data,void *device_data,size_t size_element){
-     cudaError_t cudaErr = cudaMemcpyAsync(host_data,device_data,size_element,cudaMemcpyDeviceToHost,NULL);
+void memcpy_to_host(void *host_data, void *device_data, size_t size_element, cudaStream_t stream ){
+    cudaError_t cudaErr = cudaMemcpyAsync(host_data,device_data,size_element,cudaMemcpyDeviceToHost, stream );
      if (cudaErr != cudaSuccess) { printf("Copy Supernode to host. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); }
 
 }
@@ -1107,14 +1107,16 @@ __global__ void d_init_supernode(double *M, size_t *ia, size_t *ja, double *a, s
 }
 
 extern "C"
-void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, 
+	 size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
     size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
 
     size_t supernode_fc = supernode * ns;
     size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
 
-    d_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(M, ia, ja, a, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    d_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(M, ia, ja, a, supernode_fc, 
+	supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 }
 
 __global__ void z_init_supernode(cuDoubleComplex *M, size_t *ia, size_t *ja, cuDoubleComplex *a, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
@@ -1140,12 +1142,13 @@ __global__ void z_init_supernode(cuDoubleComplex *M, size_t *ia, size_t *ja, cuD
 }
 
 extern "C"
-void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, 
+	size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
     size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
 
     size_t supernode_fc = supernode * ns;
     size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
 
-    z_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM>>>((cuDoubleComplex*)M, ia, ja, (cuDoubleComplex*)a, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    z_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream >>>((cuDoubleComplex*)M, ia, ja, (cuDoubleComplex*)a, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 }
