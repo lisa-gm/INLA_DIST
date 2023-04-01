@@ -434,8 +434,12 @@ inline void tgemm_dev(char transa, char transb, int m, int n, int k, double alph
     magma_trans_t magma_transa = magma_trans_const(transa);
     magma_trans_t magma_transb = magma_trans_const(transb);
 
+    cudaDeviceSynchronize();
+
     //dgemm_on_dev(handle,transa,transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc);
     magma_dgemm(magma_transa,magma_transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc,queue);
+
+    cudaDeviceSynchronize();
 }
 
 template <>
@@ -652,9 +656,62 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
-    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info);
+    // 
+
+    // potentially check if *a is always the same
+    static int test = 0;
+    static double* save_buffer_dev;
+    double* save_buffer_dev2;
+    static double* res;
+
+    magma_int_t nlda_mag = n*lda;
+    magma_int_t inc = 1;
+    magma_queue_t magma_queue;
+
+
+    if(test == 0){
+        cudaMallocHost(&save_buffer_dev,n*lda*sizeof(double));
+        cudaMallocHost(&save_buffer_dev2,n*lda*sizeof(double));
+
+        cudaMemcpy(save_buffer_dev, a, n*lda*sizeof(double), cudaMemcpyDeviceToDevice);
+        test = 1;
+    } else {
+
+        cudaMemcpy(save_buffer_dev2, save_buffer_dev, n*lda*sizeof(double), cudaMemcpyDeviceToDevice);
+        printf("after cuda mem copy\n");
+        cudaDeviceSynchronize();
+        magma_daxpy(nlda_mag, -1.0, (magmaDouble_const_ptr)a, inc, (magmaDouble_ptr)save_buffer_dev2, inc, magma_queue);
+        printf("after daxpy\n");
+        cudaDeviceSynchronize();
+        cudaMallocHost(&res, sizeof(double));
+        res[0] = magma_ddot(nlda_mag, save_buffer_dev2,1, save_buffer_dev2,1, NULL);  
+        cudaDeviceSynchronize();
+
+        printf("result = %e", res[0]);
+
+        /*
+        magma_daxpy(   magma_int_t     n,
+        double  alpha,
+        magmaDouble_const_ptr   dx,
+        magma_int_t     incx,
+        magmaDouble_ptr     dy,
+        magma_int_t     incy,
+        magma_queue_t   queue 
+        )  
+        */ 
+    }   
+
+    cudaDeviceSynchronize();
+
+    //magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
+    magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version  
+
+    cudaDeviceSynchronize();
+
+
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
+	    exit(1);
     }
 }
 
@@ -679,7 +736,11 @@ inline void ttrsm_dev(char side, char uplo, char trans, char diag, int m, int n,
     magma_trans_t magma_trans = magma_trans_const(trans);
     magma_diag_t magma_diag = magma_diag_const(diag);
 
+    cudaDeviceSynchronize();
+
     magma_dtrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
+
+    cudaDeviceSynchronize();
 }
 
 template <>
@@ -703,7 +764,11 @@ inline void tlacpy_dev(char uplo, int m, int n, double *a, int lda, double *b, i
 {
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
+    cudaDeviceSynchronize();
+
     magmablas_dlacpy(magma_uplo, m, n, a, lda, b, ldb, queue);
+
+    cudaDeviceSynchronize();
 }
 
 template <>

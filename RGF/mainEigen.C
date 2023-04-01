@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/KroneckerProduct>
+#include <unsupported/Eigen/SparseExtra>   // includes saveMarket
 
 #include <armadillo>
 #include "generate_testMat_selInv.cpp"
@@ -22,7 +23,7 @@ using Eigen::MatrixXd;
 
 typedef Eigen::VectorXd Vect;
 
-#define PRINT_MSG
+//#define PRINT_MSG
 
 #if 0
 typedef CPX T;
@@ -89,7 +90,7 @@ void construct_Q_spat_temp(SpMat& Qst, Vect& theta, SpMat& c0, SpMat& g1, SpMat&
 		#endif
 
 		// assemble overall precision matrix Q.st
-		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 
 		//std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
 }
@@ -162,13 +163,307 @@ void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat
 
 }
 
+// construct sparse Matrix from invBlks 
+// invBlks have particular order ... non-contiguous ... 
+// but we want to fill sparse matrix by column 
+void construct_spInvQBlks(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, T* invBlks, SpMat& QinvBlks){
+
+    //std::cout << "nnz_invBlks = " << nnz_invBlks << ", ns = " << ns << ", nt = " << nt << ", nb = " << nb << std::endl;
+    size_t n = ns*nt + nb;
+    SpMat QinvBlks_lower(n,n);
+    QinvBlks_lower.reserve(nnz_invBlks);
+
+    // deal with final block later
+    for(int col=0; col<ns*nt; col++){
+        int ts = col / ns; // determine which time step we are in
+        int col_ts = col % ns; // col relative to the current timestep
+        //printf("ts = %d, col ts = %d\n", ts, col_ts);
+        // row 
+        for(int i=0; i<ns; i++){
+            int row = ns * ts + i;
+            // get correct entry from invBlks array
+            // invBlks sorted as D1, F1, D2, F2, ... Fn, Dn+1n+1, column-major
+            int ind_invBlks = ts * (ns + nb) * ns + col_ts * ns + i;
+            QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
+
+        }
+
+        for(int i=0; i<nb; i++){   
+            // always last rows
+            int row = ns*nt+i;
+            int ind_invBlks = ts * (ns + nb) * ns + ns * ns + col_ts * nb + i;
+            QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
+
+        }
+    }
+
+    // ... and finally for last nb columns
+    int ind_offset = (ns + nb) * ns * nt;
+    for(int col=ns*nt; col<ns*nt+nb; col++){
+        int col_ts = col % ns;
+        //printf("col ts = %d\n", col_ts);
+        for(int i=0; i<nb; i++){
+            int row = ns*nt+i;
+            int ind_invBlks = ind_offset + col_ts*nb + i;
+            QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
+        }
+    }
+
+    QinvBlks = QinvBlks_lower.selfadjointView<Lower>();
+
+}
+
+
+// construct sparse Matrix from invBlks 
+// invBlks have particular order ... non-contiguous ... 
+// but we want to fill sparse matrix by column 
+void construct_lower_CSC_invBlks(size_t ns, size_t nt, size_t nb, size_t nnz_lower_invBlks, T* invBlks, SpMat& QinvBlks){
+
+    //std::cout << "nnz_invBlks lower = " << nnz_lower_invBlks << ", ns = " << ns << ", nt = " << nt << ", nb = " << nb << std::endl;
+    int n = ns*nt + nb;
+    SpMat QinvBlks_lower(n,n);
+    QinvBlks_lower.reserve(nnz_lower_invBlks);
+
+    int* row_ind_a; // row index of each nnz value
+    int* col_ptr_a; // list of val indices where each column starts
+    T* a;
+
+    row_ind_a = new int [nnz_lower_invBlks];
+    col_ptr_a = new int [n+1];
+    a         = new T[nnz_lower_invBlks];
+
+    size_t counter = 0;
+
+    double t_loop = - omp_get_wtime();
+
+    // deal with final block later
+    // only read-out values from lower triangular part
+    for(int col=0; col<ns*nt; col++){
+        int ts = col / ns; // determine which time step we are in
+        int col_ts = col % ns; // col relative to the current timestep
+        //printf("ts = %d, col ts = %d, counter = %ld\n", ts, col_ts, counter);
+        
+        col_ptr_a[col] = counter;
+
+        for(int i=col_ts; i<ns; i++){
+            int row = ns * ts + i;
+            // get correct entry from invBlks array
+            // invBlks sorted as D1, F1, D2, F2, ... Fn, Dn+1n+1, column-major
+            int ind_invBlks = ts * (ns + nb) * ns + col_ts * ns + i;
+            //QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
+            a[counter]         = invBlks[ind_invBlks];
+            row_ind_a[counter] = row;
+            counter++;
+
+        }
+
+        for(int i=0; i<nb; i++){   
+            // always last rows
+            int row = ns*nt+i;
+            int ind_invBlks = ts * (ns + nb) * ns + ns * ns + col_ts * nb + i;
+
+            a[counter] = invBlks[ind_invBlks];
+            row_ind_a[counter] = row;
+            counter++;
+
+        }
+    }
+
+    // ... and finally for last nb columns
+    int ind_offset = (ns + nb) * ns * nt;
+    for(int col=ns*nt; col<ns*nt+nb; col++){
+        int col_ts = col % ns;
+        //printf("col ts = %d\n", col_ts);
+
+        col_ptr_a[col] = counter;
+
+        for(int i=col_ts; i<nb; i++){
+            int row = ns*nt+i;
+            int ind_invBlks = ind_offset + col_ts*nb + i;
+
+            a[counter] = invBlks[ind_invBlks];
+            row_ind_a[counter] = row;
+            counter++;
+        }
+    }
+
+    // final column ptr entry
+    col_ptr_a[n] = counter;
+
+    t_loop += omp_get_wtime();
+    printf("lowerCSC: time in loop : %f\n", t_loop);
+
+#if 0
+    printf("row_ind_a: ");
+    for(int i=0; i<nnz_lower_invBlks; i++){
+        printf("%d ", row_ind_a[i]);
+    }
+    printf("\n");
+
+
+    printf("col_ptr_a: ");
+    for(int i=0; i<n+1; i++){
+        printf("%d ", col_ptr_a[i]);
+    }
+    printf("\n");
+
+    printf("a: ");
+    for(int i=0; i<nnz_lower_invBlks; i++){
+        printf("%f ", a[i]);
+    }
+    printf("\n");
+#endif
+
+    t_loop = - omp_get_wtime();
+    QinvBlks_lower =  Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz_lower_invBlks,col_ptr_a, row_ind_a,a);
+    t_loop += omp_get_wtime();
+    printf("lowerCSC: time Eigen Map : %f\n", t_loop);
+
+    t_loop = - omp_get_wtime();
+    QinvBlks = QinvBlks_lower.selfadjointView<Lower>();
+    t_loop += omp_get_wtime();
+    printf("lowerCSC: time Eigen copy symmetrize : %f\n", t_loop);
+    //std::cout << "QinvBlks : \n" << MatrixXd(QinvBlks) << std::endl;
+
+}
+
+
+// construct sparse Matrix from invBlks -> generate full CSC structure -> no symmetric multiplication routine
+// invBlks have particular order ... non-contiguous ... 
+// but we want to fill sparse matrix by column
+void construct_full_CSC_invBlks(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, T* invBlks, SpMat& QinvBlks){
+
+    //std::cout << "nnz_invBlks lower = " << nnz_lower_invBlks << ", ns = " << ns << ", nt = " << nt << ", nb = " << nb << std::endl;
+    int n = ns*nt + nb;
+    //SpMat QinvBlks_lower(n,n);
+    QinvBlks.reserve(nnz_invBlks);
+
+    int* row_ind_a; // row index of each nnz value
+    int* col_ptr_a; // list of val indices where each column starts
+    T* a;
+
+    row_ind_a = new int [nnz_invBlks];
+    col_ptr_a = new int [n+1];
+    a         = new T[nnz_invBlks];
+
+    size_t counter = 0;
+
+    double t_loop = - omp_get_wtime();
+
+    // deal with final block later
+    // only read-out values from lower triangular part
+    for(int col=0; col<ns*nt; col++){
+        int ts = col / ns; // determine which time step we are in
+        int col_ts = col % ns; // col relative to the current timestep
+        //printf("ts = %d, col ts = %d, counter = %ld\n", ts, col_ts, counter);
+        
+        col_ptr_a[col] = counter;
+
+        for(int i=0; i<ns; i++){
+            int row = ns * ts + i;
+            // get correct entry from invBlks array
+            // invBlks sorted as D1, F1, D2, F2, ... Fn, Dn+1n+1, column-major
+            int ind_invBlks = ts * (ns + nb) * ns + col_ts * ns + i;
+            //QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
+            a[counter]         = invBlks[ind_invBlks];
+            row_ind_a[counter] = row;
+            counter++;
+
+        }
+
+        for(int i=0; i<nb; i++){   
+            // always last rows
+            int row = ns*nt+i;
+            int ind_invBlks = ts * (ns + nb) * ns + ns * ns + col_ts * nb + i;
+
+            a[counter] = invBlks[ind_invBlks];
+            row_ind_a[counter] = row;
+            counter++;
+
+        }
+    }
+
+    int ind_offset = (ns + nb) * ns * nt;
+    for(int col=ns*nt; col<ns*nt+nb; col++){
+        int col_ts = col % ns;
+        //printf("col ts = %d\n", col_ts);
+
+        col_ptr_a[col] = counter;
+
+        for(int ts=0;ts<nt; ts++){
+            for(int ss=0; ss<ns; ss++){
+                int row = ts*ns + ss;
+                int ind_invBlks = (ns+nb)*ns*ts + ns*ns + col_ts + ss*nb;
+                a[counter] = invBlks[ind_invBlks];
+                row_ind_a[counter] = row;
+                counter++;
+            }
+
+        }
+
+        for(int i=0; i<nb; i++){
+            int row = ns*nt+i;
+            int ind_invBlks = ind_offset + col_ts*nb + i;
+
+            a[counter] = invBlks[ind_invBlks];
+            row_ind_a[counter] = row;
+            counter++;
+        }
+    }
+
+    // final column ptr entry
+    col_ptr_a[n] = counter;
+
+    t_loop += omp_get_wtime();
+    printf("fullCSC: time in loop : %f\n", t_loop);
+
+#if 0
+    printf("row_ind_a: ");
+    for(int i=0; i<nnz_invBlks; i++){
+        printf("%d ", row_ind_a[i]);
+    }
+    printf("\n");
+
+
+    printf("col_ptr_a: ");
+    for(int i=0; i<n+1; i++){
+        printf("%d ", col_ptr_a[i]);
+    }
+    printf("\n");
+
+    printf("a: ");
+    for(int i=0; i<nnz_invBlks; i++){
+        printf("%f ", a[i]);
+    }
+    printf("\n");
+#endif
+
+    t_loop = - omp_get_wtime();
+    QinvBlks =  Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz_invBlks,col_ptr_a, row_ind_a,a);
+    t_loop += omp_get_wtime();
+    printf("fullCSC: time Eigen Map : %f\n", t_loop);
+
+    //std::cout << "QinvBlks full: \n" << MatrixXd(QinvBlks) << std::endl;
+
+}
+
+
+// compute variances for timestep ts
+// Ax column-major
+void compute_marginals_ts(size_t ns, size_t nt, size_t nb, size_t ts, T* invBlks, SpMat& Ax, Vect& variance_vec){
+    
+    //int nnz_subQ = ns*ns + 
+    //SpMat Q()
+}
 
 /* ===================================================================== */
 
 int main(int argc, char* argv[])
 {
 
-#if 1
+size_t i; // iteration variable
+
+#if 0
 
     /*
     int ns=1;
@@ -184,7 +479,7 @@ int main(int argc, char* argv[])
     */
 
     int ns=3;
-    int nt=5;
+    int nt=50;
     int nb=2;
     int n = ns*nt + nb;
 
@@ -389,100 +684,191 @@ int main(int argc, char* argv[])
 	    theta << -1.5,-5,-2;
 	    //theta.print();
   	} else {
-	    theta << 5, -10, 2.5, 1;
+	    //theta << 5, -10, 2.5, 1;
+        theta << 4.000000, -3.344954,  1.039721,  1.386294; // equals 4,0,0,0 in param scale        
+        std::cout << "theta : " << theta.transpose() << std::endl;
 	    //theta = {3, -5, 1, 2};
 	    //theta.print();
   	}
 
-  	std::cout << "Constructing precision matrix Q. " << std::endl;
-
-    size_t n = ns*nt + nb;
-  	SpMat Q(n,n);
-  	construct_Q(Q, ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);
-    //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-
-    Vect rhs(n);
-    double exp_theta = exp(theta[0]);
-	rhs = exp_theta*Ax.transpose()*y;
-
-#endif
 
 
 #if 1
 
-    size_t i; // iteration variable
+    int nx = ns*nt;
+    SpMat Qx(nx, nx);
 
-	// =========================================================================== //
-	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
+    double t_Qx_factorise;
+    RGF<T> *solver_Qx;
+    solver_Qx = new RGF<T>(ns, nt, 0);
 
-	// only take lower triangular part of A
-    SpMat Q_lower = Q.triangularView<Lower>(); 
-    size_t nnz = Q_lower.nonZeros();
+    double log_det_Qx;
 
-    size_t* ia; 
-    size_t* ja;
-    T* a; 
-    T *b;
-  	T *x;
-    T *invDiag;
+    for(int c=0; c<10; c++){
+        //theta = theta + Vect::Random(theta.size());
+        std::cout << "\niter = " << c << ". Constructing precision matrix Qx. theta : " << theta.transpose() << std::endl;
 
-  	b        = new T[n];
-  	x        = new T[n];
-    invDiag = new T[n];
+        construct_Q_spat_temp(Qx, theta, c0, g1, g2, g3, M0, M1, M2);
 
-    // allocate memory
-    ia = new long unsigned int [n+1];
-    ja = new long unsigned int [nnz];
-    a = new double [nnz];
+        //SpMat epsId(nx,nx);
+        //epsId.setIdentity();
+        //epsId = 1e-4*epsId;
+        //Qx = Qx + epsId;
 
-    Q_lower.makeCompressed();
 
-    for (i = 0; i < n+1; ++i){
-        ia[i] = Q_lower.outerIndexPtr()[i]; 
-    }  
+        // only take lower triangular part of A
+        SpMat Qx_lower = Qx.triangularView<Lower>(); 
+        size_t nnz_Qx  = Qx_lower.nonZeros();
 
-    for (i = 0; i < nnz; ++i){
-        ja[i] = Q_lower.innerIndexPtr()[i];
-    }  
+        //std::string Qx_lower_file = "Qst_lower_ns" + ns_s + "_nt" + nt_s + "_nb0_" + to_string(nx) + "_" + to_string(nx) + ".mtx";
+        //Eigen::saveMarket(Qx_lower, Qx_lower_file);
+        //exit(1);
 
-    for (i = 0; i < nnz; ++i){
-        a[i] = Q_lower.valuePtr()[i];
+        Qx_lower.makeCompressed();
+
+        size_t* ia_Qx; 
+        size_t* ja_Qx;
+        T* a_Qx; 
+
+        // allocate memory
+        ia_Qx = new long unsigned int [nx+1];
+        ja_Qx = new long unsigned int [nnz_Qx];
+        a_Qx  = new double [nnz_Qx];
+
+        for (i = 0; i < nx+1; ++i){
+            ia_Qx[i] = Qx_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (i = 0; i < nnz_Qx; ++i){
+            ja_Qx[i] = Qx_lower.innerIndexPtr()[i];
+        }  
+
+        for (i = 0; i < nnz_Qx; ++i){
+            a_Qx[i] = Qx_lower.valuePtr()[i];
+        }
+
+        t_Qx_factorise = get_time(0.0);
+        //solver->solve_equation(GR);
+        double flops_Qx_factorize = solver_Qx->factorize_noCopyHost(ia_Qx, ja_Qx, a_Qx, log_det_Qx);
+        
+        //double flops_Qx_factorize = solver_Qx->factorize(ia_Qx, ja_Qx, a_Qx);
+        //log_det_Qx = solver_Qx->logDet(ia_Qx, ja_Qx, a_Qx);
+
+        t_Qx_factorise = get_time(t_Qx_factorise);
+
+        printf("logdet       : %f\n", log_det_Qx);
+        printf("time chol(Qx): %lg\n",t_Qx_factorise);
+
+        delete[] ia_Qx;
+        delete[] ja_Qx;
+        delete[] a_Qx;
+
     }
 
-    double t_factorise;
-	double t_solve;
-    double t_inv;
-	RGF<T> *solver;
+    delete solver_Qx;
 
-	time_t rawtime;
-	struct tm *timeinfo;
-	time(&rawtime);
-	timeinfo = localtime(&rawtime);
-	printf ("The current date/time is: %s\n",asctime(timeinfo));
+#endif
 
-	solver = new RGF<T>(ns, nt, nb);
 
-	t_factorise = get_time(0.0);
-	//solver->solve_equation(GR);
-	double flops_factorize = solver->factorize(ia, ja, a);
-	t_factorise = get_time(t_factorise);
+#endif
 
-	double log_det = solver->logDet(ia, ja, a);
-	printf("logdet: %f\n", log_det);
 
-  	// assign b to correct format
-  	for (int i = 0; i < n; i++){
-	    b[i] = rhs[i];
-	    //printf("%f\n", b[i]);
-  	}
+#if 0
 
-  	t_solve = get_time(0.0); 
-    double flops_solve = solver->solve(ia, ja, a, x, b, 1);
-  	t_solve = get_time(t_solve);
-  	printf("flops solve:     %f\n", flops_solve);
 
-	printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
-	printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+    size_t n = ns*nt + nb;
+
+    SpMat Q(n,n);
+    Vect rhs(n);
+    double exp_theta = exp(theta[0]);
+    rhs = exp_theta*Ax.transpose()*y;
+
+
+    std::cout << "\nConstructing precision matrix Qxy. " << std::endl;
+    //std::cout << "Setting Ax to zero." << std::endl;
+    //Ax.makeCompressed();
+    //Ax.setZero();
+
+    RGF<T> *solver;
+    solver = new RGF<T>(ns, nt, nb);
+
+    //for(int c=0; c<1; c++){
+        //theta = theta + Vect::Random(theta.size());
+        //std::cout << "\niter = " << c << ". Constructing precision matrix Qxy. theta : " << theta.transpose() << std::endl;   
+
+        construct_Q(Q, ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);
+        //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+
+
+        //SpMat epsId(n,n);
+        //epsId.setIdentity();
+        //epsId = 1e-4*epsId;
+
+        //Q = Q + epsId;
+
+    	// =========================================================================== //
+    	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
+
+    	// only take lower triangular part of A
+        SpMat Q_lower = Q.triangularView<Lower>(); 
+        size_t nnz    = Q_lower.nonZeros();
+
+        size_t nnz_invBlks = (ns+nb)*ns*nt + nb*nb; 
+
+        size_t* ia; 
+        size_t* ja;
+        T* a; 
+        T *b;
+      	T *x;
+
+      	b        = new T[n];
+      	x        = new T[n];
+
+        // allocate memory
+        ia = new long unsigned int [n+1];
+        ja = new long unsigned int [nnz];
+        a  = new double [nnz];
+
+        Q_lower.makeCompressed();
+
+        for (i = 0; i < n+1; ++i){
+            ia[i] = Q_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (i = 0; i < nnz; ++i){
+            ja[i] = Q_lower.innerIndexPtr()[i];
+        }  
+
+        for (i = 0; i < nnz; ++i){
+            a[i] = Q_lower.valuePtr()[i];
+        }
+
+        double t_factorise;
+    	double t_solve;
+
+    	t_factorise = get_time(0.0);
+    	//solver->solve_equation(GR);
+    	double flops_factorize = solver->factorize(ia, ja, a);
+    	t_factorise = get_time(t_factorise);
+
+    	double log_det = solver->logDet(ia, ja, a);
+    	printf("logdet: %f\n", log_det);
+
+      	// assign b to correct format
+      	for (int i = 0; i < n; i++){
+    	    b[i] = rhs[i];
+    	    //printf("%f\n", b[i]);
+      	}
+
+      	t_solve = get_time(0.0); 
+        double flops_solve = solver->solve(ia, ja, a, x, b, 1);
+      	t_solve = get_time(t_solve);
+      	printf("flops solve:     %f\n", flops_solve);
+
+    	printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
+    	printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+
+    //}
 
   	// create file with solution vector
   	/*
@@ -498,6 +884,7 @@ int main(int argc, char* argv[])
   */
 
 
+#if 0
     // true inv diag from Eigen
     //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
     SimplicialLLT<SpMat> solverQ;
@@ -508,29 +895,103 @@ int main(int argc, char* argv[])
    }
 
    SpMat L = solverQ.matrixL();
-   if(n < 20){
+   /*if(n < 20){
         std:cout << "L: \n" << MatrixXd(L) << std::endl;
-    }
+    }*/
 
    SpMat eye(n,n);
    eye.setIdentity();
 
+   // compute log sum by hand
+   double logDetEigen = 0.0;
+   for(int i = 0; i<n; i++){
+        logDetEigen += log(L.coeff(i,i));
+   }
+   logDetEigen *=2.0;
+   std::cout << "log Det Eigen : " << std::setprecision(10) << logDetEigen << std::endl;
+   std::cout << "diff Log Dets : " << logDetEigen - log_det << std::endl;
+
    SpMat inv_Q = solverQ.solve(eye);
+#endif
 
-   if(n < 20){
-        std::cout << "inv(Q):\n" << MatrixXd(inv_Q) << std::endl;
-    }
 
-    t_inv = get_time(0.0);
+#if 0
+
+    T *invDiag;
+    T *invBlks;
+
+    invDiag  = new T[n];
+    invBlks  = new T[nnz_invBlks];
+
+    double t_invDiag;
+    double t_invBlks;
+
+    t_invDiag = get_time(0.0);
     double flops_invDiag = solver->RGFdiag(ia, ja, a, invDiag);
-    t_inv = get_time(t_inv);
-    printf("flops inv:      %f\n", flops_invDiag);
+    t_invDiag = get_time(t_invDiag);
+    double log_detRGFdiag = solver->logDet(ia, ja, a);
+
+    //printf("flops inv:      %f\n", flops_invDiag);
+
+    
+    t_invBlks = get_time(0.0);
+    double flops_invBlks = solver->RGFinvBlks(ia, ja, a, invBlks);
+    t_invBlks= get_time(t_invBlks);
+    double log_detRGFinvBlks = solver->logDet(ia, ja, a);
+    std::cout << "diff Log Dets : " << log_detRGFdiag - log_detRGFinvBlks << std::endl;
 
 
 
     printf("RGF factorise time: %lg\n",t_factorise);
     printf("RGF solve     time: %lg\n",t_solve);
-    printf("RGF inv Diag  time: %lg\n",t_inv);
+    printf("RGF inv Diag  time: %lg\n",t_invDiag);
+    printf("RGF inv Blks  time: %lg\n",t_invBlks);
+
+
+#ifdef PRINT_MSG
+    printf("mainEigen: array containing all neccessary inv blk entries: \n");
+    for(int i=0; i<nnz_invBlks; i++){
+            printf("%f ", invBlks[i]);
+      }
+      printf("\n");
+#endif
+
+    // now assemble invBlks to correct sparse matrix -> column major -> iterate through columns
+    // careful with block structure, need to be alternating betwen diagonal & off diagonal dense blocks
+#if 0
+    SpMat QinvBlks_comp(n,n);
+    QinvBlks_comp.reserve(ns*ns*nt+2*ns*nb*nt+nb*ns);
+
+    double t_constrQinvBlks_comp = -omp_get_wtime();
+    construct_spInvQBlks(ns, nt, nb, nnz_invBlks, invBlks, QinvBlks_comp);
+    t_constrQinvBlks_comp += omp_get_wtime();
+    printf("Assemble QinvBlks comp time: %lg\n",t_constrQinvBlks_comp);
+#endif
+
+    /*
+    size_t nnz_lower_invBlks = nt*ns*(ns+1)/2 + ns*nb*nt + (nb+1)*nb/2;
+    SpMat QinvBlks_comp(n,n);
+    QinvBlks_comp.reserve(nnz_lower_invBlks);
+
+    double t_constrQinvBlks = -omp_get_wtime();
+    construct_lower_CSC_invBlks(ns, nt, nb, nnz_lower_invBlks, invBlks, QinvBlks_comp);
+    t_constrQinvBlks += omp_get_wtime();
+    printf("Assemble QinvBlks lower time: %lg\n \n",t_constrQinvBlks);
+    */
+    
+    SpMat QinvBlks(n,n);
+    size_t nnz_full_invBlks = ns*ns*nt + 2*ns*nb*nt + nb*nb;
+    double t_constrQinvBlks = -omp_get_wtime();
+    construct_full_CSC_invBlks(ns, nt, nb, nnz_full_invBlks, invBlks, QinvBlks);
+    t_constrQinvBlks += omp_get_wtime();
+    printf("Assemble QinvBlks full time : %lg\n \n",t_constrQinvBlks);
+
+//#ifdef PRINT_MSG
+    //std::cout << "diff(Q_inv_comp - QinvBlks) :\n" << MatrixXd(QinvBlks_comp - QinvBlks_full) << std::endl;
+
+    //std::cout << "inv(Q):\n" << MatrixXd(inv_Q) << std::endl;
+    //std::cout << "norm(QinvBlks_comp - QinvBlks) : " << (QinvBlks_comp - QinvBlks).norm() << std::endl;
+//#endif
 
     // print/write diag 
     /*
@@ -553,24 +1014,47 @@ int main(int argc, char* argv[])
         //printf("%f\n", b[i]);
     }
 
+    Vect invDiagfBlks(n);
+    invDiagfBlks = QinvBlks.diagonal();
+
    //cout << "Q:\n" << Q << endl;
 
+    printf("norm(invDiag - invDiagfBlks)   : %f\n", (invDiag_vec - invDiagfBlks).norm());
+    cout << "norm(invDiag - inv(Q))         : " << (invDiag_vec - inv_Q.diagonal()).norm() << std::endl;
+    cout << "norm(diag(invQ)) : " << inv_Q.diagonal().norm() << std::endl;
+    cout << "norm(invDiagfBlks) : " << invDiagfBlks.norm() << std::endl;
+    cout << "norm(invDiag) : " << invDiag_vec.norm() << std::endl;
+
+
     if(n < 20){
-        cout << "\ninvDiag BTA       : " << invDiag_vec.transpose() << std::endl;
-        cout << "Eigen diag(inv_Q) : " << inv_Q.diagonal().transpose() << endl;
+        cout << "\ninvDiag BTA            : " << invDiag_vec.transpose() << std::endl;
+        cout << "invDiag from blks BTA  : "   << invDiagfBlks.transpose() << std::endl;
+        //cout << "Eigen diag(inv_Q)      : "   << inv_Q.diagonal().transpose() << endl;
     } else {
+#ifdef PRINT_MSG
         cout << "\ninvDiag BTA[1:20]       : " << invDiag_vec.head(20).transpose() << std::endl;
+        cout << "invDiag from blks BTA   : "   << invDiagfBlks.transpose() << std::endl;
         cout << "Eigen diag(inv_Q)[1:20] : " << inv_Q.diagonal().head(20).transpose() << endl;
+        cout << "norm(invDiag - inv(Q))  : " << (invDiag - inv_Q.diagonal()).norm() << std::endl;
+#endif   
     }
+
+
+  delete[] invDiag;
+  delete[] invBlks;
+
+#endif
 
   
   // free memory
   delete solver;
+
   delete[] ia;
   delete[] ja;
   delete[] a;
-  delete[] b;
+
   delete[] x;
+  delete[] b;
 
   #endif
 
