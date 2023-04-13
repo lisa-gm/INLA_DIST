@@ -652,9 +652,12 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
-    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info);
+    //magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info);
+    magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version  
+    
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
+    	    exit(1);
     }
 }
 
