@@ -652,8 +652,14 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
-    //magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info);
-    magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version  
+    // using the magma_dpotrf_expert_gpu interface to
+    // 1. put the entire Dpotrf function on the GPU and
+    // 2. explicitly specify the block size to use.
+    // Of powers of 2 64 appears to be the best for our test case - 128 would be second-best.
+    // Did not evaluate intervening values.
+    //magma_int_t potrfErr = magma_dpotrf_expert_gpu(magma_uplo,n,a,lda,info, 64, MagmaNative ); // native: gpu only
+    
+    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
     
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
@@ -1172,18 +1178,18 @@ inline void init_block_matrix_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t
 /************************************************************************************************/
 
 template <typename T>
-inline void init_supernode_dev(T *M, size_t *ia, size_t *ja, T *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
+inline void init_supernode_dev(T *M, size_t *ia, size_t *ja, T *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream );
 
 template <>
-inline void init_supernode_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+inline void init_supernode_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
-    d_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+    d_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd, stream);
 }
 
 template <>
-inline void init_supernode_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+inline void init_supernode_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
-    z_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+    z_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd, stream );
 }
 
 /************************************************************************************************/
