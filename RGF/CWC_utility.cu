@@ -1084,6 +1084,7 @@ void z_init_block_matrix_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t n
     z_init_block_matrix<<<i_size/BLOCK_DIM, BLOCK_DIM>>>((cuDoubleComplex*)M, ia, ja, (cuDoubleComplex*)a, nnz, ns, nt, nd);
 }
 
+
 __global__ void d_init_supernode(double *M, size_t *ia, size_t *ja, double *a, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
 {
    size_t idx = blockIdx.x * BLOCK_DIM + threadIdx.x;
@@ -1099,6 +1100,7 @@ __global__ void d_init_supernode(double *M, size_t *ia, size_t *ja, double *a, s
       size_t r = ja[idx];
 
       size_t i = getPos(r, c, ns, nt, nd) - offset;
+      //printf("initSN: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
 
       M[i] = a[idx];
    }
@@ -1116,6 +1118,7 @@ void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_
 
     d_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(M, ia, ja, a, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 }
+
 
 __global__ void z_init_supernode(cuDoubleComplex *M, size_t *ia, size_t *ja, cuDoubleComplex *a, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
 {
@@ -1149,3 +1152,62 @@ void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supe
 
     z_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM>>>((cuDoubleComplex*)M, ia, ja, (cuDoubleComplex*)a, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 }
+
+
+
+// ============================================================================================================ //
+// add routine to extract entries of supernode that correspond to nnz(Q) entries 
+// i.e. "opposite" of function above -> given *M, *ia, *ja fill *a
+
+__global__ void d_extract_nnzA(double *a, size_t *ia, size_t *ja, double *M, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+   size_t idx = blockIdx.x * BLOCK_DIM + threadIdx.x;
+
+   size_t offset = getPos(supernode_fc, supernode_fc, ns, nt, nd);
+
+   if (idx < supernode_nnz)
+   {
+      size_t c = 0;
+
+      while (ia[c+1] < idx+supernode_offset+1){
+         c++;
+      }
+
+      c += supernode_fc;
+      size_t r = ja[idx];
+      size_t i = getPos(r, c, ns, nt, nd) - offset;
+
+      //printf("exNNZ: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
+
+      a[idx] = M[i];
+   }
+
+   __syncthreads();
+}
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+
+inline void gpuAssert(cudaError_t code, const char *file, int line)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        exit(code);
+        abort();
+    }
+}
+
+extern "C"
+void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+    //printf("in d_extract_nnzA_on_dev()\n");
+    size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
+
+    size_t supernode_fc = supernode * ns;
+    size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
+
+    d_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+
+    gpuErrchk(cudaDeviceSynchronize());
+}
+

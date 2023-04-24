@@ -6,6 +6,14 @@
 #include "CWC_utility.H"
 #include "magma_v2.h"
 
+
+#define CUDA_POTRF
+
+#ifdef CUDA_POTRF
+#include "cusolverDn.h"
+#endif
+
+
 extern "C" {
 //Blas
     void fortran_name(dcopy,DCOPY)(int *n,double *dx,int *incx,double *dy,int *incy);
@@ -648,71 +656,147 @@ inline void zgetrs_nopiv_dev(char transa,int n,int nrhs,CPX *a,int lda,CPX *b,in
 
 /************************************************************************************************/
 
+#ifdef CUDA_POTRF
+
+template <typename T>
+inline void tpotrf_dev_cuda(char uplo,int n,T *a,int lda,int *info, int* cuda_buffer_flag, 
+                       cusolverDnHandle_t* handle, cusolverDnParams_t *params,
+                       size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host);
+
+template <>
+inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cuda_buffer_flag, 
+                       cusolverDnHandle_t *handle, cusolverDnParams_t *params,
+                       size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host)
+{
+
+    // initialize cuda buffer
+    //printf("in Potrf. cuda buffer flag: %d\n", cuda_buffer_flag[0]);
+
+#if 0
+    // CAREFUL with STATIC variables. GLOBAL!
+    static double* save_buffer_dev;
+    static double* save_buffer_dev2;
+    static double* save_buffer_host1;
+    static double* save_buffer_host2;
+    static double res;
+#endif
+
+    cublasFillMode_t uplo_cuda;
+
+    if(uplo == 'L'){
+        uplo_cuda = CUBLAS_FILL_MODE_LOWER;
+    } else if(uplo =='U') {
+        uplo_cuda = CUBLAS_FILL_MODE_UPPER;
+    } else {
+        printf("invalid potrf argmument uplo: %c\n", uplo);
+        exit(1);
+    }
+
+    if(cuda_buffer_flag[0] == 0){
+
+        printf("in buffer flag = 0. before cusolverDnCreate\n");
+
+        cusolverStatus_t cuSolverError = cusolverDnCreate(handle);
+        if(cuSolverError != 0){
+            printf("cuSolverError not Zero in create handle! Error: %d\n", cuSolverError);
+            exit(1);
+        }
+
+        cuSolverError = cusolverDnCreateParams(params);
+        if(cuSolverError != 0){
+            printf("cuSolverError not Zero in create params!\n");
+            exit(1);
+        }
+
+        cuSolverError = cusolverDnXpotrf_bufferSize(
+                *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, dev_size, host_size);
+       if(cuSolverError != 0){
+            printf("cuSolverError buffer size allocation!\n");
+            exit(1);
+        }
+
+        cuda_buffer_flag[0] = 1;
+
+#if 0        
+        printf("dev size = %ld, host size = %ld\n", dev_size, host_size);
+        cudaMalloc(&save_buffer_dev ,n*lda*sizeof(double));
+        cudaMalloc(&save_buffer_dev2,n*lda*sizeof(double));
+        cudaMallocHost(&save_buffer_host1,n*lda*sizeof(double));
+        cudaMallocHost(&save_buffer_host2,n*lda*sizeof(double));
+        cudaMemcpy(save_buffer_host1, a, n*lda*sizeof(double), cudaMemcpyDeviceToHost);
+#endif
+
+    } else {
+
+#if 0
+        cudaMemcpy(save_buffer_host2, a, n*lda*sizeof(double), cudaMemcpyDeviceToHost);
+        //printf("after cuda mem copy\n");
+        cudaDeviceSynchronize();
+        double temp = 0;
+        for(int i=0; i<n*lda; i++){
+            temp += (save_buffer_host1[i]-save_buffer_host2[i])*(save_buffer_host1[i]-save_buffer_host2[i]);
+        }
+        printf("temp = %f\n", sqrt(temp/(n*lda)));
+        cudaDeviceSynchronize();
+#endif
+
+    }   
+
+    cudaMalloc((void**)&mem_cuda_dev,      (*dev_size) * sizeof(double));
+    cudaMallocHost((void**)&mem_cuda_host, (*host_size) * sizeof(double));
+
+    printf("n = %d, lda = %d, uplo = %c, dev_size = %ld, host_size = %ld\n", n, lda, uplo, dev_size[0], host_size[0]);
+
+    cudaDeviceSynchronize();
+    cusolverStatus_t cuSolverError = cusolverDnXpotrf(
+            *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, 
+            mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info);
+    cudaDeviceSynchronize();
+
+    if(cuSolverError != 0){
+        printf("cuSolverError potrf! cuSolverError : %d, lda = %d\n", cuSolverError, lda);
+        exit(1);
+    }
+
+    int info_host;
+    cudaMemcpy(&info_host, info, sizeof(int), cudaMemcpyDeviceToHost);
+
+    if(info_host != 0){
+        printf("cuSolverError potrf info not zero! info = %d, lda = %d\n", info_host, lda);
+        exit(1);
+    }
+
+}
+
+template <>
+inline void tpotrf_dev_cuda(char uplo,int n,CPX *a,int lda,int *info, int *cuda_buffer_flag, 
+                       cusolverDnHandle_t *handle, cusolverDnParams_t *params,
+                       size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host)
+{
+    printf("just a placeholder. not working!\n");
+    exit(1);
+}
+
+#else
+
+
 template <typename T>
 inline void tpotrf_dev(char uplo,int n,T *a,int lda,int *info);
 
+// OLD POTRF WITH MAMGA which gives problems for _native (when run in non-blocking mode)
 template <>
 inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
-    // 
-
-    // potentially check if *a is always the same
-    static int test = 0;
-    static double* save_buffer_dev;
-    double* save_buffer_dev2;
-    static double* res;
-
-    magma_int_t nlda_mag = n*lda;
-    magma_int_t inc = 1;
-    magma_queue_t magma_queue;
-
-
-    if(test == 0){
-        cudaMallocHost(&save_buffer_dev,n*lda*sizeof(double));
-        cudaMallocHost(&save_buffer_dev2,n*lda*sizeof(double));
-
-        cudaMemcpy(save_buffer_dev, a, n*lda*sizeof(double), cudaMemcpyDeviceToDevice);
-        test = 1;
-    } else {
-
-        cudaMemcpy(save_buffer_dev2, save_buffer_dev, n*lda*sizeof(double), cudaMemcpyDeviceToDevice);
-        printf("after cuda mem copy\n");
-        cudaDeviceSynchronize();
-        magma_daxpy(nlda_mag, -1.0, (magmaDouble_const_ptr)a, inc, (magmaDouble_ptr)save_buffer_dev2, inc, magma_queue);
-        printf("after daxpy\n");
-        cudaDeviceSynchronize();
-        cudaMallocHost(&res, sizeof(double));
-        res[0] = magma_ddot(nlda_mag, save_buffer_dev2,1, save_buffer_dev2,1, NULL);  
-        cudaDeviceSynchronize();
-
-        printf("result = %e", res[0]);
-
-        /*
-        magma_daxpy(   magma_int_t     n,
-        double  alpha,
-        magmaDouble_const_ptr   dx,
-        magma_int_t     incx,
-        magmaDouble_ptr     dy,
-        magma_int_t     incy,
-        magma_queue_t   queue 
-        )  
-        */ 
-    }   
-
-    cudaDeviceSynchronize();
-
     //magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
     magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version  
 
-    cudaDeviceSynchronize();
-
-
     if(potrfErr != 0){
-	    std::cout << "magma potrf error = " << potrfErr << std::endl;
-	    exit(1);
+        std::cout << "magma potrf error = " << potrfErr << std::endl;
+        exit(1);
     }
+
 }
 
 template <>
@@ -722,6 +806,9 @@ inline void tpotrf_dev(char uplo,int n,CPX *a,int lda,int *info)
 
     magma_zpotrf_gpu(magma_uplo,n,(magmaDoubleComplex_ptr)a,lda,info);
 }
+
+#endif // end #ifelse defined CUDA_POTRF
+
 
 /************************************************************************************************/
 
@@ -1157,11 +1244,14 @@ inline void indexed_log_sum(T *x, size_t *index, size_t N, T *sum)
     // initialize to zero ... 
    *sum = 0.0;
 
+   //printf("diag(L) : ");
    #pragma omp parallel for reduction(+:sum[:1])
    for (int i = 0; i < N; i++)
    {
       *sum += log(x[index[i]]);
+      //printf(" %f ", x[index[i]]);
    }
+   //printf("\n");
 }
 
 
@@ -1246,6 +1336,26 @@ template <>
 inline void init_supernode_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
 {
     z_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+}
+
+/************************************************************************************************/
+// NEW
+
+template <typename T>
+inline void extract_nnzA_dev(T *a, size_t *ia, size_t *ja, T *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
+
+template <>
+inline void extract_nnzA_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+    d_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+}
+
+template <>
+inline void extract_nnzA_dev(CPX *a, size_t *ia, size_t *ja, CPX *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+    printf("just dummy version of COMPLEX extract_nnzA_dev. not implemented.\n");
+    exit(1);   
+
 }
 
 /************************************************************************************************/

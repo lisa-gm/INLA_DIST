@@ -479,11 +479,12 @@ size_t i; // iteration variable
     */
 
     int ns=3;
-    int nt=50;
+    int nt=4;
     int nb=2;
     int n = ns*nt + nb;
 
     SpMat Q = gen_test_mat_base3(ns, nt, nb);
+
 
     Vect rhs(n);
     rhs.setOnes(n);
@@ -692,8 +693,15 @@ size_t i; // iteration variable
   	}
 
 
+printf("# threads: %d\n", omp_get_max_threads());
 
-#if 1
+//#pragma omp parallel
+//{
+
+//if(omp_get_thread_num() == 0) // instead of #pragma omp task -> want always the same thread to do same task
+//{
+
+#if 0
 
     int nx = ns*nt;
     SpMat Qx(nx, nx);
@@ -704,7 +712,7 @@ size_t i; // iteration variable
 
     double log_det_Qx;
 
-    for(int c=0; c<10; c++){
+    for(int c=0; c<1; c++){
         //theta = theta + Vect::Random(theta.size());
         std::cout << "\niter = " << c << ". Constructing precision matrix Qx. theta : " << theta.transpose() << std::endl;
 
@@ -720,9 +728,18 @@ size_t i; // iteration variable
         SpMat Qx_lower = Qx.triangularView<Lower>(); 
         size_t nnz_Qx  = Qx_lower.nonZeros();
 
+#if 0
         //std::string Qx_lower_file = "Qst_lower_ns" + ns_s + "_nt" + nt_s + "_nb0_" + to_string(nx) + "_" + to_string(nx) + ".mtx";
-        //Eigen::saveMarket(Qx_lower, Qx_lower_file);
-        //exit(1);
+        //std::string Qx_firstBlock_file = "Qst_firstBlock_" + to_string(ns) + "_" + to_string(ns) + ".txt";
+        //MatrixXd Qx_first = MatrixXd(Qx.block(0,0,ns,ns));
+        //write_matrix(Qx_firstBlock_file, Qx_first);
+        SpMat Qx_first = Qx.block(0,0,ns,ns);
+        std::cout << "nnz(Q) = " << Qx_first.nonZeros() << std::endl;
+        //write_sym_CSC_matrix(Qx_firstBlock_file, Qx_first);
+        std::string Qx_firstBlock_file = "Qst_firstBlock_" + to_string(ns) + "_" + to_string(ns) + ".mtx";
+        Eigen::saveMarket(Qx_first, Qx_firstBlock_file);
+        exit(1);
+#endif
 
         Qx_lower.makeCompressed();
 
@@ -772,9 +789,13 @@ size_t i; // iteration variable
 
 #endif
 
+//} // end omp if(thread 0)
 
-#if 0
 
+//if(omp_get_thread_num() == 1 || omp_get_num_threads() < 2)
+//{
+
+#if 1
 
     size_t n = ns*nt + nb;
 
@@ -789,9 +810,6 @@ size_t i; // iteration variable
     //Ax.makeCompressed();
     //Ax.setZero();
 
-    RGF<T> *solver;
-    solver = new RGF<T>(ns, nt, nb);
-
     //for(int c=0; c<1; c++){
         //theta = theta + Vect::Random(theta.size());
         //std::cout << "\niter = " << c << ". Constructing precision matrix Qxy. theta : " << theta.transpose() << std::endl;   
@@ -805,6 +823,7 @@ size_t i; // iteration variable
         //epsId = 1e-4*epsId;
 
         //Q = Q + epsId;
+    
 
     	// =========================================================================== //
     	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
@@ -812,6 +831,13 @@ size_t i; // iteration variable
     	// only take lower triangular part of A
         SpMat Q_lower = Q.triangularView<Lower>(); 
         size_t nnz    = Q_lower.nonZeros();
+
+        printf("nnz(Q_lower) = %ld\n", nnz);
+
+        /*SpMat Q_lower_fstB = Q_lower.block(0,0,ns,ns);
+        std::string filename =  "Qst_firstBlock_lower_" + to_string(ns) + "_" + to_string(ns) + ".mtx";
+        Eigen::saveMarket(Q_lower_fstB, filename);
+        exit(1);*/
 
         size_t nnz_invBlks = (ns+nb)*ns*nt + nb*nb; 
 
@@ -846,27 +872,38 @@ size_t i; // iteration variable
         double t_factorise;
     	double t_solve;
 
+        RGF<T> *solver;
+        solver = new RGF<T>(ns, nt, nb);
+
     	t_factorise = get_time(0.0);
     	//solver->solve_equation(GR);
     	double flops_factorize = solver->factorize(ia, ja, a);
-    	t_factorise = get_time(t_factorise);
+        double log_det;
+        log_det = solver->logDet(ia, ja, a);
+        printf("logdet: %f\n", log_det);
 
-    	double log_det = solver->logDet(ia, ja, a);
+    	flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
+        t_factorise = get_time(t_factorise);
+
     	printf("logdet: %f\n", log_det);
 
       	// assign b to correct format
-      	for (int i = 0; i < n; i++){
+      	/*for (int i = 0; i < n; i++){
     	    b[i] = rhs[i];
     	    //printf("%f\n", b[i]);
-      	}
+      	}*/
 
       	t_solve = get_time(0.0); 
-        double flops_solve = solver->solve(ia, ja, a, x, b, 1);
+        //double flops_solve = solver->solve(ia, ja, a, x, b, 1);
       	t_solve = get_time(t_solve);
-      	printf("flops solve:     %f\n", flops_solve);
+      	//printf("flops solve:     %f\n", flops_solve);
 
-    	printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
-    	printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+    	//printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
+    	//printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+
+        printf("time chol(Q): %lg\n",t_factorise);
+        printf("time solve  : %lg\n",t_solve);
+
 
     //}
 
@@ -883,8 +920,7 @@ size_t i; // iteration variable
   sol_x_file.close();
   */
 
-
-#if 0
+#if 1
     // true inv diag from Eigen
     //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
     SimplicialLLT<SpMat> solverQ;
@@ -908,14 +944,18 @@ size_t i; // iteration variable
         logDetEigen += log(L.coeff(i,i));
    }
    logDetEigen *=2.0;
-   std::cout << "log Det Eigen : " << std::setprecision(10) << logDetEigen << std::endl;
+
+   //std::cout << "diag(L Eigen) : " << L.diagonal().transpose() << std::endl;
+   std::cout << "log Det Eigen : " << logDetEigen << std::endl;
    std::cout << "diff Log Dets : " << logDetEigen - log_det << std::endl;
 
    SpMat inv_Q = solverQ.solve(eye);
+   MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
+   //std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
 #endif
 
 
-#if 0
+#if 1
 
     T *invDiag;
     T *invBlks;
@@ -931,16 +971,44 @@ size_t i; // iteration variable
     t_invDiag = get_time(t_invDiag);
     double log_detRGFdiag = solver->logDet(ia, ja, a);
 
+    if(n < 25){
+        printf("\nRGFinvDiag: ");
+        for(i=0; i<n; i++){
+            printf(" %f", invDiag[i]);
+        }
+        printf("\n");
+    }
+
     //printf("flops inv:      %f\n", flops_invDiag);
 
-    
+    //solver->init_supernode()
+    T* invQa;
+    invQa = new T[nnz];
+    double flops_invQa = solver->RGFselInv(ia, ja, a, invQa);
+    double log_detRGFselInv = solver->logDet(ia, ja, a);
+
+    if(n < 25){
+        printf("invQa : ");
+        for(int i=0; i<nnz; i++){
+            printf(" %f", invQa[i]);
+        }
+        printf("\n");
+    }
+
+    SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
+                               Q_lower.innerIndexPtr(),invQa);
+
+  // TODO: more efficient way to do this?
+    SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
+
+    if(n < 25){
+        std::cout << "invQ_new : \n" << MatrixXd(invQ_new) << std::endl;
+    }
+
     t_invBlks = get_time(0.0);
     double flops_invBlks = solver->RGFinvBlks(ia, ja, a, invBlks);
     t_invBlks= get_time(t_invBlks);
-    double log_detRGFinvBlks = solver->logDet(ia, ja, a);
-    std::cout << "diff Log Dets : " << log_detRGFdiag - log_detRGFinvBlks << std::endl;
-
-
+    std::cout << "diff Log Dets : " << log_detRGFdiag - log_detRGFselInv << std::endl;
 
     printf("RGF factorise time: %lg\n",t_factorise);
     printf("RGF solve     time: %lg\n",t_solve);
@@ -1019,17 +1087,27 @@ size_t i; // iteration variable
 
    //cout << "Q:\n" << Q << endl;
 
+    //std::cout << "inv_Q - invQ_new :\n" << inv_Q - invQ_new << std::endl;
+
     printf("norm(invDiag - invDiagfBlks)   : %f\n", (invDiag_vec - invDiagfBlks).norm());
-    cout << "norm(invDiag - inv(Q))         : " << (invDiag_vec - inv_Q.diagonal()).norm() << std::endl;
-    cout << "norm(diag(invQ)) : " << inv_Q.diagonal().norm() << std::endl;
-    cout << "norm(invDiagfBlks) : " << invDiagfBlks.norm() << std::endl;
-    cout << "norm(invDiag) : " << invDiag_vec.norm() << std::endl;
+    cout << "norm(invQ_new - inv(Q))         : " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
+    cout << "norm(diag(invQ))   : " << inv_Q.diagonal().norm() << std::endl;
+    printf("norm(invDiagfBlks) : %f\n", invDiagfBlks.norm());
+    printf("norm(invDiag)      : %f\n", invDiag_vec.norm());
+
+    MatrixXd Qinv_proj_fullInv = Ax * inv_Q * Ax.transpose();
+    MatrixXd Qinv_proj         = Ax * invQ_new * Ax.transpose();
+
+    std::cout << "diag(Qinv_proj_fullInv) : " << Qinv_proj_fullInv.diagonal().head(10).transpose() << std::endl;
+    std::cout << "diag(Qinv)              : " << Qinv_proj.diagonal().head(10).transpose() << std::endl;
+    MatrixXd temp = Qinv_proj_fullInv - Qinv_proj;
+    std::cout << "norm(Qinv_proj - Qinv_proj_fullInv) : " << temp.diagonal().norm() << std::endl;
 
 
     if(n < 20){
         cout << "\ninvDiag BTA            : " << invDiag_vec.transpose() << std::endl;
         cout << "invDiag from blks BTA  : "   << invDiagfBlks.transpose() << std::endl;
-        //cout << "Eigen diag(inv_Q)      : "   << inv_Q.diagonal().transpose() << endl;
+        cout << "Eigen diag(inv_Q)      : "   << inv_Q.diagonal().transpose() << endl;
     } else {
 #ifdef PRINT_MSG
         cout << "\ninvDiag BTA[1:20]       : " << invDiag_vec.head(20).transpose() << std::endl;
@@ -1056,7 +1134,12 @@ size_t i; // iteration variable
   delete[] x;
   delete[] b;
 
+  //} // end if
+
   #endif
+
+  //} // end omp parallel
+
 
     
   return 0;
