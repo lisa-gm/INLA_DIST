@@ -463,7 +463,7 @@ int main(int argc, char* argv[])
 
 size_t i; // iteration variable
 
-#if 0
+#if 1
 
     /*
     int ns=1;
@@ -723,7 +723,6 @@ printf("# threads: %d\n", omp_get_max_threads());
         //epsId = 1e-4*epsId;
         //Qx = Qx + epsId;
 
-
         // only take lower triangular part of A
         SpMat Qx_lower = Qx.triangularView<Lower>(); 
         size_t nnz_Qx  = Qx_lower.nonZeros();
@@ -796,7 +795,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 //{
 
 #if 1
-
+    /*
     size_t n = ns*nt + nb;
 
     SpMat Q(n,n);
@@ -823,8 +822,7 @@ printf("# threads: %d\n", omp_get_max_threads());
         //epsId = 1e-4*epsId;
 
         //Q = Q + epsId;
-    
-
+        */
     	// =========================================================================== //
     	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
 
@@ -952,6 +950,7 @@ printf("# threads: %d\n", omp_get_max_threads());
    SpMat inv_Q = solverQ.solve(eye);
    MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
    //std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
+
 #endif
 
 
@@ -979,12 +978,16 @@ printf("# threads: %d\n", omp_get_max_threads());
         printf("\n");
     }
 
+    printf("computed RGFdiag\n");
+
     //printf("flops inv:      %f\n", flops_invDiag);
 
     //solver->init_supernode()
     T* invQa;
     invQa = new T[nnz];
+    printf("before rgfselinv\n");
     double flops_invQa = solver->RGFselInv(ia, ja, a, invQa);
+    printf("before logDetselInv\n");
     double log_detRGFselInv = solver->logDet(ia, ja, a);
 
     if(n < 25){
@@ -994,6 +997,8 @@ printf("# threads: %d\n", omp_get_max_threads());
         }
         printf("\n");
     }
+
+    printf("computed RGFselInv\n");
 
     SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
                                Q_lower.innerIndexPtr(),invQa);
@@ -1095,6 +1100,7 @@ printf("# threads: %d\n", omp_get_max_threads());
     printf("norm(invDiagfBlks) : %f\n", invDiagfBlks.norm());
     printf("norm(invDiag)      : %f\n", invDiag_vec.norm());
 
+    /*
     MatrixXd Qinv_proj_fullInv = Ax * inv_Q * Ax.transpose();
     MatrixXd Qinv_proj         = Ax * invQ_new * Ax.transpose();
 
@@ -1102,7 +1108,7 @@ printf("# threads: %d\n", omp_get_max_threads());
     std::cout << "diag(Qinv)              : " << Qinv_proj.diagonal().head(10).transpose() << std::endl;
     MatrixXd temp = Qinv_proj_fullInv - Qinv_proj;
     std::cout << "norm(Qinv_proj - Qinv_proj_fullInv) : " << temp.diagonal().norm() << std::endl;
-
+    */
 
     if(n < 20){
         cout << "\ninvDiag BTA            : " << invDiag_vec.transpose() << std::endl;

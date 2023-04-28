@@ -694,21 +694,7 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
 
     if(cuda_buffer_flag[0] == 0){
 
-        printf("in buffer flag = 0. before cusolverDnCreate\n");
-
-        cusolverStatus_t cuSolverError = cusolverDnCreate(handle);
-        if(cuSolverError != 0){
-            printf("cuSolverError not Zero in create handle! Error: %d\n", cuSolverError);
-            exit(1);
-        }
-
-        cuSolverError = cusolverDnCreateParams(params);
-        if(cuSolverError != 0){
-            printf("cuSolverError not Zero in create params!\n");
-            exit(1);
-        }
-
-        cuSolverError = cusolverDnXpotrf_bufferSize(
+        cusolverStatus_t cuSolverError = cusolverDnXpotrf_bufferSize(
                 *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, dev_size, host_size);
        if(cuSolverError != 0){
             printf("cuSolverError buffer size allocation!\n");
@@ -745,7 +731,7 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
     cudaMalloc((void**)&mem_cuda_dev,      (*dev_size) * sizeof(double));
     cudaMallocHost((void**)&mem_cuda_host, (*host_size) * sizeof(double));
 
-    printf("n = %d, lda = %d, uplo = %c, dev_size = %ld, host_size = %ld\n", n, lda, uplo, dev_size[0], host_size[0]);
+    //printf("n = %d, lda = %d, uplo = %c, dev_size = %ld, host_size = %ld\n", n, lda, uplo, dev_size[0], host_size[0]);
 
     cudaDeviceSynchronize();
     cusolverStatus_t cuSolverError = cusolverDnXpotrf(

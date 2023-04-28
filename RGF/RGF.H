@@ -95,7 +95,6 @@ private:
     size_t *host_size;
     double *mem_cuda_dev;
     double *mem_cuda_host;
-
 #endif
 
     T *MF;
@@ -232,6 +231,18 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 
     cudaMallocHost((void**)&dev_size,sizeof(size_t));
     cudaMallocHost((void**)&host_size,sizeof(size_t));
+
+    cusolverStatus_t cuSolverError = cusolverDnCreate(handle);
+    if(cuSolverError != 0){
+      printf("cuSolverError not Zero in create handle! Error: %d\n", cuSolverError);
+      exit(1);
+    }
+
+    cuSolverError = cusolverDnCreateParams(params);
+    if(cuSolverError != 0){
+      printf("cuSolverError not Zero in create params!\n");
+      exit(1);
+    }
 
 #endif 
 
@@ -523,7 +534,7 @@ double RGF<T>::FirstStageFactor()
 
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
@@ -588,7 +599,7 @@ double RGF<T>::FirstStageFactor()
         nvtxRangeId_t id_dpotrf = nvtxRangeStartA("LastPotrf");       
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
@@ -635,7 +646,7 @@ double RGF<T>::FirstStageFactor()
        //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
@@ -684,8 +695,6 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
     IB = 0;
     NR = Bmax[0]-Bmin[0];
 
-    cudaDeviceSynchronize();     
-
     nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNodeDev");  
     init_supernode(blockR_dev, IB);
     nvtxRangeEnd(id_initSN);    
@@ -699,17 +708,13 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 #ifdef PRINT_MSG
        std::cout << "Copy to blockM_dev, i = " << i << ",  mf_block_lda(IB, IB) = " << mf_block_lda(IB, IB) << std::endl;
 #endif
-       cudaDeviceSynchronize();
        nvtxRangeId_t id_cpyDevDev = nvtxRangeStartA("CopySNtoblockMdev");  
        tlacpy_dev('N', 2*NR, NR, blockR_dev, mf_block_lda(IB, IB), blockM_dev,  mf_block_lda(IB, IB), magma_queue);
        nvtxRangeEnd(id_cpyDevDev);    
-       cudaDeviceSynchronize();
 
 #ifdef PRINT_MSG
        std::cout << "IB = " << IB << std::endl;
 #endif
-
-       cudaDeviceSynchronize();
 
        double t_fact = get_time(0.0);
 
@@ -722,24 +727,17 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 #else
        tpotrf_dev('L', NR, blockM_dev, mf_block_lda(IB, IB), &info);
 #endif
-       cudaDeviceSynchronize();
        nvtxRangeEnd(id_dpotrf);    
 
        //copy_supernode_to_host_write(blockR_dev, IB);
-
-       cudaDeviceSynchronize();
 
        id_cpyDevDev = nvtxRangeStartA("CopyDiagDevDev");  
        copy_supernode_diag(blockM_dev, IB);
        nvtxRangeEnd(id_cpyDevDev);  
 
-       cudaDeviceSynchronize();  
-
       id_cpyDevDev = nvtxRangeStartA("CopyDiagtoHost");  
       cudaMemcpy(diag, diag_dev, NR*sizeof(T), cudaMemcpyDeviceToHost );
       nvtxRangeEnd(id_cpyDevDev);    
-
-      cudaDeviceSynchronize();
 
       id_cpyDevDev = nvtxRangeStartA("ComLogDetHost");       
       // compute log sum
@@ -748,8 +746,6 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 
       printf("log Det : %f\n", logDet);
       nvtxRangeEnd(id_cpyDevDev);  
-
-      cudaDeviceSynchronize();
     }
 
     delete[] diag;
@@ -794,8 +790,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
     std::cout << "calling first Cholesky factorization now" << std::endl;
     std::cout << "IB = " << IB << std::endl;
 #endif
-
-    cudaDeviceSynchronize();
 
     double t_fact = get_time(0.0);
 
@@ -872,7 +866,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
@@ -923,7 +917,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);    
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
@@ -1559,6 +1553,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
    if(cpy_indicator == 1){
       tlacpy_dev('F', ND, NR, G_dense_i_dev, ND, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
+      cudaDeviceSynchronize();
       extract_nnzA(blockR_dev, 0);
    }
 
@@ -1874,7 +1869,8 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
 
 template <class T>
 double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
-{
+{  
+   printf("in RGFselInv\n");
 
    if (!factorization_completed)
        factorize(ia, ja, a);
@@ -1885,9 +1881,7 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
       exit(1);
    }
 
-   //printf("ia[matrix_size] = %ld\n", ia[matrix_size]);
-
-   factorization_completed = false;
+   printf("ia[matrix_size] = %ld\n", ia[matrix_size]);
 
    cpy_indicator = 1; // => copy back all entries of nnzQ
 
@@ -1897,7 +1891,8 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
 
     size_t nnz = matrix_ia[matrix_size];
 
-    inv_a = new T[nnz];
+    //inv_a = new T[nnz];
+    gpuErrchk(cudaMallocHost((void**)&inv_a, nnz*sizeof(T)));
 
     //std::cout << "nnz = " << nnz << std::endl;
     size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
@@ -1913,8 +1908,14 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     allocate_data_on_device((void**)&inv_ja_dev,max_rows*max_cols*sizeof(size_t));
     allocate_data_on_device((void**)&inv_a_dev,max_rows*max_cols*sizeof(T));
 
+    printf("called third stage factor\n");
+
     //Computation
     double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
+
+   printf("after third stage factor\n");
+
+   factorization_completed = false; // we have overwritten the Cholesky factor
 
     //CAREFUL: invBlks are on CPU but not as contiguous array, block-wise !!
     //memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
@@ -1940,7 +1941,7 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     deallocate_data_on_dev(inv_ja_dev,max_rows*max_cols*sizeof(size_t));
     deallocate_data_on_dev(inv_a_dev,max_rows*max_cols*sizeof(T));
 
-    delete[] inv_a;
+    cudaFreeHost(inv_a);
 
     return gflops;
 }
@@ -2081,21 +2082,13 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode)
    size_t cols = supernode_lc - supernode_fc;
    size_t supernode_size = rows * cols;
 
-   cudaDeviceSynchronize();
-
    fill_dev(M_dev, T(0.0), supernode_size);
-
-   cudaDeviceSynchronize();
 
    memcpy_to_device(&matrix_ia[supernode_fc],ia_dev,(cols+1)*sizeof(size_t));
    memcpy_to_device(&matrix_ja[supernode_offset],ja_dev,supernode_nnz*sizeof(size_t));
    memcpy_to_device(&matrix_a[supernode_offset],a_dev,supernode_nnz*sizeof(T));
 
-   cudaDeviceSynchronize();
-
    init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd);
-
-   cudaDeviceSynchronize();
 }
 
 
@@ -2183,11 +2176,7 @@ inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode)
    printf("size rows&cols = %ld, ind = %ld\n", rows*cols, ind);
 #endif
 
-   cudaDeviceSynchronize();
-
    memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T));
-
-   cudaDeviceSynchronize();
 
 }
 
@@ -2208,11 +2197,7 @@ inline void RGF<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
    printf("size rows&cols = %ld, ind = %ld\n", rows*cols, ind);
 #endif
 
-   cudaDeviceSynchronize();
-
    memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T));
-
-   cudaDeviceSynchronize();
 
   time_t rawtime;
   struct tm * timeinfo;
@@ -2248,11 +2233,7 @@ inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode)
    size_t rows = mf_block_lda(supernode, supernode);
    size_t cols = supernode_lc - supernode_fc;
 
-   cudaDeviceSynchronize();
-
    memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T));
-
-   cudaDeviceSynchronize();
 
 }
 
@@ -2267,11 +2248,7 @@ inline void RGF<T>::copy_supernode_diag(T *src, size_t supernode)
    size_t rows = mf_block_lda(supernode, supernode);
    size_t cols = supernode_lc - supernode_fc;
 
-   cudaDeviceSynchronize();
-
    indexed_copy_offset_dev(src, &diag_dev[supernode_fc], &diag_pos_dev[supernode_fc], cols, offset);
-
-   cudaDeviceSynchronize();
 
 }
 
@@ -2281,14 +2258,11 @@ template <class T>
 inline void RGF<T>::swap_pointers(T **ptr1, T **ptr2)
 {
 
-   cudaDeviceSynchronize();
-
    T *tmp = *ptr1;
    *ptr1 = *ptr2;
    *ptr2 = tmp;
-
-   cudaDeviceSynchronize();
-}
+   
+   }
 
 /************************************************************************************************/
 
