@@ -1225,6 +1225,9 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       // G = L^-T * L^-1 => G*L = L^-T
       ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
       flop_count += 0.5 * NR * NR * NR;
+
+      cudaDeviceSynchronize();
+
       // initialize identity matrix temp1_dev of size NR = ns (now)
       init_eye_on_dev(tmp1_dev,NR,0);
       // temp2_dev = L_Fn^T*Gn+1
@@ -1278,6 +1281,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       }
       printf("\n"); 
 #endif
+
+      cudaDeviceSynchronize();
 
       if(cpy_indicator == 0){
          // when we only want the diagonal
@@ -1378,6 +1383,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 0.5 * NR * NR * NR;
       // initialize eye(NR, NR)
       init_eye_on_dev(tmp1_dev,NR,0);
+
+      cudaDeviceSynchronize();
 
       // tmp2_dev = blockR_dev^T*blockP_dev => L_Ei^T*Gi+1
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockP_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue);
@@ -1870,7 +1877,6 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
 template <class T>
 double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
 {  
-   printf("in RGFselInv\n");
 
    if (!factorization_completed)
        factorize(ia, ja, a);
@@ -1880,8 +1886,6 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
       std::cout << "Matrices don't match!!" << std::endl;
       exit(1);
    }
-
-   printf("ia[matrix_size] = %ld\n", ia[matrix_size]);
 
    cpy_indicator = 1; // => copy back all entries of nnzQ
 
@@ -1908,12 +1912,8 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     allocate_data_on_device((void**)&inv_ja_dev,max_rows*max_cols*sizeof(size_t));
     allocate_data_on_device((void**)&inv_a_dev,max_rows*max_cols*sizeof(T));
 
-    printf("called third stage factor\n");
-
     //Computation
     double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
-
-   printf("after third stage factor\n");
 
    factorization_completed = false; // we have overwritten the Cholesky factor
 

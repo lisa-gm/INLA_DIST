@@ -463,7 +463,7 @@ int main(int argc, char* argv[])
 
 size_t i; // iteration variable
 
-#if 1
+#if 0
 
     /*
     int ns=1;
@@ -795,7 +795,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 //{
 
 #if 1
-    /*
+
     size_t n = ns*nt + nb;
 
     SpMat Q(n,n);
@@ -822,7 +822,7 @@ printf("# threads: %d\n", omp_get_max_threads());
         //epsId = 1e-4*epsId;
 
         //Q = Q + epsId;
-        */
+    
     	// =========================================================================== //
     	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
 
@@ -978,16 +978,16 @@ printf("# threads: %d\n", omp_get_max_threads());
         printf("\n");
     }
 
-    printf("computed RGFdiag\n");
+    //printf("computed RGFdiag\n");
 
     //printf("flops inv:      %f\n", flops_invDiag);
 
     //solver->init_supernode()
     T* invQa;
     invQa = new T[nnz];
-    printf("before rgfselinv\n");
+    //printf("before rgfselinv\n");
     double flops_invQa = solver->RGFselInv(ia, ja, a, invQa);
-    printf("before logDetselInv\n");
+    //printf("before logDetselInv\n");
     double log_detRGFselInv = solver->logDet(ia, ja, a);
 
     if(n < 25){
@@ -998,7 +998,7 @@ printf("# threads: %d\n", omp_get_max_threads());
         printf("\n");
     }
 
-    printf("computed RGFselInv\n");
+    //printf("computed RGFselInv\n");
 
     SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
                                Q_lower.innerIndexPtr(),invQa);
@@ -1099,6 +1099,21 @@ printf("# threads: %d\n", omp_get_max_threads());
     cout << "norm(diag(invQ))   : " << inv_Q.diagonal().norm() << std::endl;
     printf("norm(invDiagfBlks) : %f\n", invDiagfBlks.norm());
     printf("norm(invDiag)      : %f\n", invDiag_vec.norm());
+
+    // to file
+    std::string invQ_Eigen_fileName = "invQ_diag_Eigen.txt";
+    ofstream invQ_Eigen_file(invQ_Eigen_fileName,    ios::out | ::ios::trunc);
+
+    std::string invQ_selInv_fileName = "invQ_diag_selInv.txt";
+     ofstream invQ_selInv_file(invQ_selInv_fileName,    ios::out | ::ios::trunc);
+
+    for(int i=0; i<n; i++){
+        invQ_Eigen_file << std::setprecision(15) << inv_Q.diagonal()[i] << endl;
+        invQ_selInv_file << std::setprecision(15) << invQ_new.diagonal()[i] << std::endl;
+    }
+
+    invQ_Eigen_file.close();
+    invQ_selInv_file.close();
 
     /*
     MatrixXd Qinv_proj_fullInv = Ax * inv_Q * Ax.transpose();
