@@ -6,6 +6,18 @@
 #include "CWC_utility.H"
 #include "magma_v2.h"
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+
+inline void gpuAssert(cudaError_t code, const char *file, int line)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        exit(code);
+        abort();
+    }
+}
+
 extern "C" {
 //Blas
     void fortran_name(dcopy,DCOPY)(int *n,double *dx,int *incx,double *dy,int *incy);
@@ -650,6 +662,10 @@ inline void tpotrf_dev(char uplo,int n,T *a,int lda,int *info);
 template <>
 inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
+    //double a_host;
+    //gpuErrchk(cudaMemcpy(&a_host, &a[0], sizeof(double), cudaMemcpyDeviceToHost)); 
+    //printf("in potrf. n = %d, lda = %d, a[0] = %f\n", n, lda, a_host);
+
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
     // using the magma_dpotrf_expert_gpu interface to
@@ -662,7 +678,11 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
     
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
-    	    exit(1);
+        int ind_error = (potrfErr-1)*(lda+1);
+        double a_problem_host;
+        gpuErrchk(cudaMemcpy(&a_problem_host, &a[ind_error], sizeof(double), cudaMemcpyDeviceToHost));
+        printf("ind error = %d, a[ind_error] = %f\n", ind_error, a_problem_host);
+    	exit(1);
     }
 }
 
