@@ -14,9 +14,9 @@ extern "C" {
   void deallocate_data_on_device(void*);
   size_t deallocate_data_on_dev(void*,size_t);
   void copy_data_to_device(void*,void*,int,int,size_t);
-  void memcpy_to_device(void*,void*,size_t);
+  void memcpy_to_device( void*, void*, size_t, cudaStream_t ); 
   void copy_data_to_host(void*,void*,int,int,size_t);
-  void memcpy_to_host(void*,void*,size_t);
+    void memcpy_to_host( void*, void*, size_t, cudaStream_t );
   void dgemm_on_dev(void*,char,char,int,int,int,double,double*,\
 		    int,double*,int,double,double*,int);
   void zgemm_on_dev(void*,char,char,int,int,int,CPX,CPX*,\
@@ -67,6 +67,6 @@ extern "C" {
   void z_fill_on_dev(CPX *x, const CPX value, size_t N);
   void d_init_block_matrix_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t nnz, size_t ns, size_t nt, size_t nd);
   void z_init_block_matrix_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t nnz, size_t ns, size_t nt, size_t nd);
-  void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
-  void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
+    void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream);
+    void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream );
 }

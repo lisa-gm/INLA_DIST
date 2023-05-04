@@ -51,8 +51,13 @@ private:
     bool MF_dev_allocated = false;
     bool factorization_completed = false;
 
+    // add copy stream, add compute stream
     magma_queue_t magma_queue;
     cudaStream_t stream_c;
+    cudaStream_t copyStream = NULL;
+    cudaStream_t copyStreamDtH = NULL;
+    cudaStream_t magmaGemmCudaStream = NULL;
+    cudaEvent_t  initBlock_dev;
     void *cublas_handle;
 
     T *MF;
@@ -80,8 +85,8 @@ private:
     void create_blocks();
     void initialize_MF_host();
     
-    inline void init_supernode(T *M_dev, size_t supernode);
-    inline void copy_supernode_to_host(T *M_dev, size_t supernode);
+    inline void init_supernode(T *M_dev, size_t supernode, cudaStream_t stream);
+    inline void copy_supernode_to_host(T *M_dev, size_t supernode, cudaStream_t stream);
     inline void copy_supernode_to_device(T *M_dev, size_t supernode);
     inline void copy_supernode_diag(T *src, size_t supernode);
     inline void swap_pointers(T **ptr1, T **ptr2);
@@ -150,10 +155,31 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
        }
     }
 
+
+    gpuErrchk(cudaEventCreate(&initBlock_dev));
+
+    // initialize cuda copyStream
+    gpuErrchk(cudaStreamCreate( &copyStream ));
+    gpuErrchk(cudaStreamCreate( &copyStreamDtH ));
+   
+
     magma_init();
     magma_device_t device;
     magma_getdevice(&device);
-    magma_queue_create_from_cuda(device, NULL, NULL, NULL, &magma_queue);
+
+    // in order to get the magma GEMMs in a non-null stream, the second argument of magma_queue_create needs to be a CUDA stream
+    // so make a cuda stream to use for this.
+
+    cudaError_t cuerr;
+    cuerr = cudaStreamCreate ( &magmaGemmCudaStream );
+    if ( cuerr ) {
+        printf ("Error creating magmaGemmCudaStream in RGF.h \n");
+        abort();
+    }
+    
+    //magma_queue_create_from_cuda(device, NULL, NULL, NULL, &magma_queue);
+    magma_queue_create_from_cuda(device, magmaGemmCudaStream, NULL, NULL, &magma_queue);
+
     stream_c = magma_queue_get_cuda_stream(magma_queue);
     cublas_handle = magma_queue_get_cublas_handle(magma_queue);
 
@@ -191,6 +217,10 @@ RGF<T>::~RGF()
 
    magma_queue_destroy(magma_queue);
    magma_finalize();
+
+   cudaStreamDestroy(copyStream);
+   cudaStreamDestroy(copyStreamDtH);
+   cudaStreamDestroy(magmaGemmCudaStream);
 
    delete[] Bmin;
    delete[] Bmax;
@@ -288,11 +318,16 @@ double RGF<T>::FirstStageFactor()
     IB = 0;
     NR = Bmax[0]-Bmin[0];
 
-    init_supernode(blockR_dev, IB);
+    init_supernode(blockR_dev, IB, magmaGemmCudaStream);
     if (matrix_nd > 0)
     {
-       init_supernode(blockDense_dev, matrix_nt);
+       init_supernode(blockDense_dev, matrix_nt, magmaGemmCudaStream);
     }
+
+    cudaDeviceSynchronize(); // TO BE REPLACED
+    // put it in cudaEvent
+    //gpuErrchk(cudaEventRecord(copy_gpu, magmaGemmCudaStream)); // want compute_stream to wait
+    //gpuErrchk(cudaStreamWaitEvent(compute_stream, copy_gpu, 0));
 
 #ifdef PRINT_MSG
     std::cout << "calling first Cholesky factorization now" << std::endl;
@@ -313,6 +348,9 @@ double RGF<T>::FirstStageFactor()
     //printf("IB = %d, t_potrf = %f\n", IB, t_temp);
     flop_count += 1.0/3.0 * NR * NR * NR;
 
+   // the trsm shouldn't be launched until potrf has finished
+    cudaDeviceSynchronize();
+
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
     {
@@ -325,7 +363,8 @@ double RGF<T>::FirstStageFactor()
     }
 
     t_temp = get_time(0.0);
-    copy_supernode_to_host(blockR_dev, IB);
+    cudaDeviceSynchronize();
+    copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
     t_temp = get_time(t_temp);
     t_copy_DtH =+ t_temp;
 
@@ -344,12 +383,14 @@ double RGF<T>::FirstStageFactor()
        NR  = Bmax[IB]-Bmin[IB];
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
+       // 
        swap_pointers(&blockR_dev, &blockM_dev);
-       init_supernode(blockR_dev, IB);
+       init_supernode(blockR_dev, IB, magmaGemmCudaStream);
 
        // UPDATE NEXT DIAGONAL BLOCK 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
+       // magma_queue should be on top of magmaGemmCudaStream
        t_temp = get_time(0.0);
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
        t_temp = get_time(t_temp);
@@ -360,10 +401,10 @@ double RGF<T>::FirstStageFactor()
        if (matrix_nd > 0)
        {
           // Update dense rows of super node IB
-	  t_temp = get_time(0.0);
-	  tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
+	       t_temp = get_time(0.0);
+	       tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
           t_dgemm += get_time(t_temp);
-	  // NM = NR
+	       // NM = NR
           flop_count += 2.0*matrix_nd * NR * NM + 2*matrix_nd*NR; // nb*ns*(ns+2) + nb*ns*ns
           
           // update last diagonal block
@@ -371,6 +412,8 @@ double RGF<T>::FirstStageFactor()
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM;
        }
 
+      // how can I get the default stream to wait but make an exception for copyStreamDtH ?
+      cudaDeviceSynchronize(); // TO BE REPLACED
 
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
@@ -381,7 +424,6 @@ double RGF<T>::FirstStageFactor()
        //printf("IB = %d, t_potrf = %f\n", IB, t_temp);
        flop_count += 1.0/3.0 * NR * NR * NR;
        
-
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
@@ -389,9 +431,9 @@ double RGF<T>::FirstStageFactor()
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
        t_temp = get_time(0.0);
-       copy_supernode_to_host(blockR_dev, IB);
+       cudaDeviceSynchronize();
+       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
        t_copy_DtH += get_time(t_temp);
-
    
     }
 
@@ -402,7 +444,7 @@ double RGF<T>::FirstStageFactor()
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
        swap_pointers(&blockR_dev, &blockM_dev);
-       init_supernode(blockR_dev, IB);
+       init_supernode(blockR_dev, IB, magmaGemmCudaStream);
 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
@@ -417,6 +459,9 @@ double RGF<T>::FirstStageFactor()
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM; 
        }
+
+       cudaDeviceSynchronize(); // TO BE REPLACED
+
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
@@ -431,10 +476,13 @@ double RGF<T>::FirstStageFactor()
        
        }
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
-	t_temp = get_time(0.0);
-       copy_supernode_to_host(blockR_dev, IB);
+	    t_temp = get_time(0.0);
+
+       cudaDeviceSynchronize();
+       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
 
        t_copy_DtH += get_time(t_temp);
+
     }
 
     if (matrix_nd > 0)
@@ -458,11 +506,15 @@ double RGF<T>::FirstStageFactor()
        std::cout << "after complete Cholesky factorization" << std::endl;
 #endif
        t_temp = get_time(0.0);
-       copy_supernode_to_host(blockDense_dev, IB);
+
+       cudaDeviceSynchronize();
+       copy_supernode_to_host(blockDense_dev, IB, copyStreamDtH);
        
        t_copy_DtH += get_time(t_temp);
     
     }
+
+   cudaDeviceSynchronize(); // TO BE REPLACED
 
    t_fact = get_time(t_fact);
    //std::cout << "gflop count    : " << flop_count / 1e9 << std::endl;
@@ -495,11 +547,13 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
     IB = 0;
     NR = Bmax[0]-Bmin[0];
 
-    init_supernode(blockR_dev, IB);
+    init_supernode(blockR_dev, IB, magmaGemmCudaStream);
     if (matrix_nd > 0)
     {
-       init_supernode(blockDense_dev, matrix_nt);
+       init_supernode(blockDense_dev, matrix_nt, magmaGemmCudaStream);
     }
+
+    cudaDeviceSynchronize();
 
 #ifdef PRINT_MSG
     std::cout << "calling first Cholesky factorization now" << std::endl;
@@ -511,6 +565,8 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     flop_count += 1.0/3.0 * NR * NR * NR;
+
+    cudaDeviceSynchronize();
 
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
@@ -540,7 +596,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
        swap_pointers(&blockR_dev, &blockM_dev);
-       init_supernode(blockR_dev, IB);
+       init_supernode(blockR_dev, IB, magmaGemmCudaStream);
+
+       cudaDeviceSynchronize();
 
        // UPDATE NEXT DIAGONAL BLOCK 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
@@ -548,6 +606,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
        flop_count += 2.0 * NR * NR * NR + 2.0 * NR * NR;
 
+       // these dgemms independent from previous one. Put in separate stream, just require supernode to be loaded.
        if (matrix_nd > 0)
        {
           // Update dense rows of super node IB
@@ -559,18 +618,28 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
           flop_count += 2.0 * matrix_nd * matrix_nd * NM + 2.0 * matrix_nd * matrix_nd;
        }
+
+       cudaDeviceSynchronize();
+
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
        flop_count += 1.0/3.0 * NR * NR * NR;
+
+       cudaDeviceSynchronize();
+
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
        flop_count += (NR + matrix_nd) * NR * NR;
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
+      cudaDeviceSynchronize();
+
        //copy_supernode_to_host(blockR_dev, IB);
        copy_supernode_diag(blockR_dev, IB);
+
+      cudaDeviceSynchronize();
 
     }
 
@@ -581,7 +650,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
        swap_pointers(&blockR_dev, &blockM_dev);
-       init_supernode(blockR_dev, IB);
+       init_supernode(blockR_dev, IB, magmaGemmCudaStream);
+
+       cudaDeviceSynchronize();
 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
@@ -596,10 +667,15 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
           flop_count += 2.0* matrix_nd * matrix_nd * NM + 2.0 * matrix_nd*matrix_nd;
        }
+
+        cudaDeviceSynchronize();
+
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
        flop_count += 1.0/3.0 * NR * NR * NR;
+
+       cudaDeviceSynchronize();
     
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
@@ -610,6 +686,8 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        
        }
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
+
+       cudaDeviceSynchronize();
 
        //copy_supernode_to_host(blockR_dev, IB);
        copy_supernode_diag(blockR_dev, IB);
@@ -1271,7 +1349,7 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
    allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
    
    //Copy diag_pos to device
-   memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
+    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
     double gflops = FirstStageFactor_noCopyHost(logDet);
@@ -1308,14 +1386,36 @@ template <class T>
 double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
 {
 
-   if (!factorization_completed)
+   if (!factorization_completed){
        factorize(ia, ja, a);
+   }
    
    // check if solve is performed on the right matrix 
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
       std::cout << "Matrices don't match!!" << std::endl;
       exit(1);
    }
+
+   // check MF diff put in static array first time
+   /*
+   static int solve_flag = 0;
+   static double *MF_initial;
+   
+   if(solve_flag == 0){
+      printf("in solve, solve flag = 0\n");
+      MF_initial = new double[matrix_n_nonzeros];
+      for(int i=0; i<matrix_n_nonzeros; i++){
+         MF_initial[i] = MF[i];
+      }
+      solve_flag = 1;
+   } else {
+      double temp = 0;
+      for(int i=0; i<matrix_n_nonzeros; i++){
+            temp += (MF_initial[i]-MF[i])*(MF_initial[i]-MF[i]);
+        }
+        printf("norm(MF-MF_initial) = %f\n", temp);
+   }
+   */
 
     //Data allocation
     rhs = new T[matrix_size*nrhs];
@@ -1362,13 +1462,13 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     allocate_data_on_device((void**)&tmp2_dev,b_size*b_size*sizeof(T));
 
     //Copy diag_pos to device
-    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
+    memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
     double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev);
 
     //Copy data to host
-    memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
+    memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T), NULL );
 
     //Data deallocation
     deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
@@ -1450,27 +1550,37 @@ void RGF<T>::create_blocks()
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::init_supernode(T *M_dev, size_t supernode)
+inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stream)
 {
-   size_t supernode_fc = supernode * matrix_ns;
-   size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
-   size_t supernode_nnz = matrix_ia[supernode_lc] - matrix_ia[supernode_fc];
-   size_t supernode_offset = matrix_ia[supernode_fc];
-   size_t rows = mf_block_lda(supernode, supernode);
-   size_t cols = supernode_lc - supernode_fc;
-   size_t supernode_size = rows * cols;
 
-   fill_dev(M_dev, T(0.0), supernode_size);
-   memcpy_to_device(&matrix_ia[supernode_fc],ia_dev,(cols+1)*sizeof(size_t));
-   memcpy_to_device(&matrix_ja[supernode_offset],ja_dev,supernode_nnz*sizeof(size_t));
-   memcpy_to_device(&matrix_a[supernode_offset],a_dev,supernode_nnz*sizeof(T));
-   init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd);
+    size_t supernode_fc = supernode * matrix_ns;
+    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
+    size_t supernode_nnz = matrix_ia[supernode_lc] - matrix_ia[supernode_fc];
+    size_t supernode_offset = matrix_ia[supernode_fc];
+    size_t rows = mf_block_lda(supernode, supernode);
+    size_t cols = supernode_lc - supernode_fc;
+    size_t supernode_size = rows * cols;
+
+    cudaMemsetAsync((void*)M_dev, 0, supernode_size*sizeof(T), stream );
+
+    //printf("in init supernode. a[0] = %f\n", matrix_a[supernode_offset]);
+
+    memcpy_to_device( &matrix_ia[supernode_fc],     ia_dev, (cols+1)*sizeof(size_t),       stream );
+    memcpy_to_device( &matrix_ja[supernode_offset], ja_dev,  supernode_nnz*sizeof(size_t), stream );
+    memcpy_to_device( &matrix_a[supernode_offset],  a_dev,   supernode_nnz*sizeof(T),      stream );
+        
+    init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd, stream );
+
+    //double a_host;
+    //gpuErrchk(cudaMemcpy(&a_host, &M_dev[0], sizeof(double), cudaMemcpyDeviceToHost)); 
+    //printf("in init supernode. IB = %d, a[0] = %f\n", supernode, a_host);
+
 }
 
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode)
+inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode, cudaStream_t stream)
 {
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
@@ -1480,10 +1590,11 @@ inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode)
 
 #ifdef PRINT_MSG
    printf("In copy supernode to host.\n");
-   printf("size rows&cols = %d, ind = %d\n", rows*cols, ind);
+   printf("size rows = %d, size cols = %d, size rows*cols = %d, ind = %d\n", rows, cols, rows*cols, ind);
 #endif
 
-   memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T));
+    memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T), stream );
+
 }
 
 /************************************************************************************************/
@@ -1497,7 +1608,8 @@ inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode)
    size_t rows = mf_block_lda(supernode, supernode);
    size_t cols = supernode_lc - supernode_fc;
 
-   memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T));
+    memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T), NULL );
+
 }
 
 /************************************************************************************************/
