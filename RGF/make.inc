@@ -7,7 +7,9 @@ BASE_PATH=/home/x_gaedkelb
 RGF_MPICXX        = mpicxx #-Wl,-rpath -Wl,$(INTEL64)/compiler/lib/intel64
 
 RGF_FLAGS         = -DAdd_ -DSOLVE_CRAY -D__MINMAX -Wno-write-strings
-RGF_CXXFLAGS      = -O3 -ffast-math -funroll-loops -DMPICH_IGNORE_CXX_SEEK #-O3
+#RGF_CXXFLAGS      = -O3 -ffast-math -funroll-loops -DMPICH_IGNORE_CXX_SEEK #-O3
+RGF_CXXFLAGS      = -g -DMPICH_IGNORE_CXX_SEEK 
+
 
 LAPACK            = -L$(LAPHOME) -lmkl_gf_lp64 -lmkl_sequential -lmkl_core -Wl,-rpath -Wl,$(MKLHOME) 
 OPENMP            = -fopenmp
@@ -24,6 +26,7 @@ RGF_COMMONFLAGS   = -DCUDA_SDK=$(CUDA_SDK)
 #MAGMA             = -L/home/x_gaedkelb/applications/magma-2.5.4/lib -lmagma
 INCMAG            = -I$(BASE_PATH)/applications/custom_magma/magma/include
 MAGMA             = -L$(BASE_PATH)/applications/custom_magma/magma/lib -lmagma
+
 
 CUDAHOME          = /usr/local/cuda
 #CUDAHOME          = $(CUDA_HOME)

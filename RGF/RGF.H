@@ -8,8 +8,18 @@
 #include "Types.H"
 #include "Utilities.H"
 #include "CWC_utility.H"
+#include "Blas.H"  // to inherit #define CUDA_POTRF
+
+
+// debug ...
+#include <iostream>
+#include <fstream>
+#include <ctime>
 
 //#include "helper_functions.h"
+
+#include "nvToolsExt.h"
+
 
 //#define PRINT_MSG
 
@@ -26,6 +36,8 @@ public:
     double solve(size_t*, size_t*, T*, T*,size_t);
     double solve(size_t*, size_t*, T*, T*,T*,size_t);
     double RGFdiag(size_t*, size_t*, T*, T*);
+    double RGFinvBlks(size_t*, size_t*, T*, T*);
+    double RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ);
     T logDet(size_t*, size_t*, T*);
     double residualNorm(T*,T*);
     double residualNormNormalized(T*,T*);
@@ -46,10 +58,14 @@ private:
     size_t NBlock;
     size_t *diag_pos;
 
+    size_t ind_invBlks_fi;
+
     size_t b_size;
     bool MF_allocated = false;
+    bool invBlks_allocated = false;
     bool MF_dev_allocated = false;
     bool factorization_completed = false;
+    int cpy_indicator; // 0: copy back diagonal, 1: copy back nnzQ, 2: copy back invBlks
 
     // add copy stream, add compute stream
     magma_queue_t magma_queue;
@@ -60,16 +76,37 @@ private:
     cudaEvent_t  initBlock_dev;
     void *cublas_handle;
 
+#ifdef CUDA_POTRF
+    int* info_cuda = NULL;
+    int *cuda_buffer_flag;
+
+    cusolverDnHandle_t *handle;
+    cusolverDnParams_t *params;
+
+    size_t *dev_size;
+    size_t *host_size;
+    double *mem_cuda_dev;
+    double *mem_cuda_host;
+#endif
+
     T *MF;
+    T *invBlks;
+    T *inv_a;
     T *blockR_dev;
     T *blockM_dev;
     T *blockP_dev;
     T *blockDense_dev;
     T *rhs;
+
     size_t *ia_dev;
     size_t *ja_dev;
     T      *a_dev;
-    T *diag_dev;
+
+    size_t *inv_ia_dev;
+    size_t *inv_ja_dev;
+    T      *inv_a_dev;
+
+    T      *diag_dev;
     size_t *diag_pos_dev;
 
     inline size_t mf_block_index(size_t, size_t);
@@ -78,15 +115,27 @@ private:
     inline size_t mf_dense_block_offset(size_t);
     inline size_t mf_dense_block_lda(size_t);
 
+    inline size_t invblks_diag_block_index(size_t);
+    inline size_t invblks_dense_block_index(size_t);
+
     double FirstStageFactor();
     double FirstStageFactor_noCopyHost(double &logDet);
+    double FirstStageFactor_noCopyHost_testV(double &logDet);
     double SecondStageSolve(size_t);
-    double ThirdStageRGF(T*,T*);
+    double ThirdStageRGF(T*,T*, int);
     void create_blocks();
     void initialize_MF_host();
+    void initialize_invBlks_host();
     
     inline void init_supernode(T *M_dev, size_t supernode, cudaStream_t stream);
+    //inline void init_supernode(T *M_dev, size_t supernode);
+
     inline void copy_supernode_to_host(T *M_dev, size_t supernode, cudaStream_t stream);
+    //inline void copy_supernode_to_host(T *M_dev, size_t supernode);
+
+    inline void extract_nnzA(T *M_dev, size_t supernode); // new to extract nnzQ(Qinv)
+    inline void copy_supernode_to_host_write(T *M_dev, size_t supernode); // debugging ...
+
     inline void copy_supernode_to_device(T *M_dev, size_t supernode);
     inline void copy_supernode_diag(T *src, size_t supernode);
     inline void swap_pointers(T **ptr1, T **ptr2);
@@ -101,6 +150,12 @@ template <class T>
 RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 {
    // only set up indices etc. no values yet.
+
+#ifdef CUDA_POTRF
+   printf("using CUDA POTRF.\n");
+#else
+   printf("using MAGMA POTRF.\n");
+#endif
    
     //matrix_ia = ia;
     //matrix_ja = ja;
@@ -183,6 +238,32 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
     stream_c = magma_queue_get_cuda_stream(magma_queue);
     cublas_handle = magma_queue_get_cublas_handle(magma_queue);
 
+#ifdef CUDA_POTRF
+    cudaMalloc((void**)&info_cuda, sizeof(int));
+
+    cudaMallocHost((void**)&cuda_buffer_flag, sizeof(int));
+    cuda_buffer_flag[0] = 0;
+
+    cudaMallocHost((void**)&handle,sizeof(cusolverDnHandle_t));
+    cudaMallocHost((void**)&params,sizeof(cusolverDnParams_t));
+
+    cudaMallocHost((void**)&dev_size,sizeof(size_t));
+    cudaMallocHost((void**)&host_size,sizeof(size_t));
+
+    cusolverStatus_t cuSolverError = cusolverDnCreate(handle);
+    if(cuSolverError != 0){
+      printf("cuSolverError not Zero in create handle! Error: %d\n", cuSolverError);
+      exit(1);
+    }
+
+    cuSolverError = cusolverDnCreateParams(params);
+    if(cuSolverError != 0){
+      printf("cuSolverError not Zero in create params!\n");
+      exit(1);
+    }
+
+#endif 
+
 }
 
 /************************************************************************************************/
@@ -205,6 +286,14 @@ RGF<T>::~RGF()
       cudaFreeHost(MF);
    }
 
+   // if we require entire diagonal blocks
+   if(invBlks_allocated){
+#ifdef PRINT_MSG
+      std::cout << "cudaFreeHost(invBlks) gets called." << std::endl;
+#endif
+      cudaFreeHost(invBlks);
+   }
+
    if (MF_dev_allocated)
    {
       size_t max_supernode_nnz = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
@@ -225,6 +314,18 @@ RGF<T>::~RGF()
    delete[] Bmin;
    delete[] Bmax;
    delete[] diag_pos;
+
+
+#ifdef CUDA_POTRF
+    cudaFreeHost(info_cuda);
+    cudaFreeHost(cuda_buffer_flag);
+
+    cudaFreeHost(host_size);
+    cudaFreeHost(dev_size);
+    cudaFreeHost(mem_cuda_host);
+    cudaFree(mem_cuda_dev);
+#endif 
+
 }
 
 /************************************************************************************************/
@@ -287,13 +388,43 @@ inline size_t RGF<T>::mf_dense_block_lda(size_t i)
 }
 
 /************************************************************************************************/
+// assuming that invBlks stores :
+// Sigma_11, Sigma_n+11, Sigma22, Sigma_n+12, ... , Sigma_nn, Sigma_n+1n, Sigma_n+1n+1
+// total size (ns+nd)*ns*nt + nb^2
+
+template <class T>
+inline size_t RGF<T>::invblks_diag_block_index(size_t i)
+{
+   // out-of-bounds check for i which represents time step
+   if(i > matrix_nt){
+      printf("in invblks_diag_block_index(). block index i = %ld out of bounds!\n", i);
+   }
+   // (ns+nd)*ns*i
+   return (matrix_ns+matrix_nd)*matrix_ns*i;
+
+}
+
+
+template <class T>
+inline size_t RGF<T>::invblks_dense_block_index(size_t i)
+{
+   // out-of-bounds check for i which represents time step
+   if(i > matrix_nt){
+      printf("in invblks_diag_block_index(). block index i = %ld out of bounds!\n", i);
+   }
+   // ns^2*(i+1) + ns*nb*i
+   return matrix_ns*matrix_ns*(i+1) + matrix_ns*matrix_nd*i;
+}
+
+/************************************************************************************************/
+
 
 template <class T>
 double RGF<T>::FirstStageFactor()
 {
 
 #ifdef PRINT_MSG
-    std::cout << "In first stage Factor" << std::endl;
+    std::cout << "In FirstStageFactor(), omp get thread num = " << omp_get_thread_num() << std::endl;
 #endif
    
     double t_potrf    = 0;
@@ -341,7 +472,14 @@ double RGF<T>::FirstStageFactor()
 	
     t_temp = get_time(0.0);
     // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     cuda_buffer_flag[0] = 0;
+     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     t_temp = get_time(t_temp);
     t_potrf += t_temp;
@@ -385,15 +523,22 @@ double RGF<T>::FirstStageFactor()
 
        // 
        swap_pointers(&blockR_dev, &blockM_dev);
+
+       nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
        init_supernode(blockR_dev, IB, magmaGemmCudaStream);
+       //init_supernode(blockR_dev, IB);
+       nvtxRangeEnd(id_initSN);
 
        // UPDATE NEXT DIAGONAL BLOCK 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
        // magma_queue should be on top of magmaGemmCudaStream
+
+       nvtxRangeId_t id_dgemm = nvtxRangeStartA("BigGemm_inLoop");
        t_temp = get_time(0.0);
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
        t_temp = get_time(t_temp);
+       nvtxRangeEnd(id_dgemm);
        t_dgemm += t_temp;
        
        flop_count += 2.0 * NR * NR * NR + 2.0 * NR * NR;
@@ -401,14 +546,19 @@ double RGF<T>::FirstStageFactor()
        if (matrix_nd > 0)
        {
           // Update dense rows of super node IB
+
+          id_dgemm = nvtxRangeStartA("DenseLowerGemm_inLoop");
 	       t_temp = get_time(0.0);
 	       tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
           t_dgemm += get_time(t_temp);
+          nvtxRangeEnd(id_dgemm);
 	       // NM = NR
           flop_count += 2.0*matrix_nd * NR * NM + 2*matrix_nd*NR; // nb*ns*(ns+2) + nb*ns*ns
           
           // update last diagonal block
+          id_dgemm = nvtxRangeStartA("LastBlockLowerGemm_inLoop");
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue);
+          nvtxRangeEnd(id_dgemm);
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM;
        }
 
@@ -418,7 +568,20 @@ double RGF<T>::FirstStageFactor()
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        t_temp = get_time(0.0);
+       nvtxRangeId_t id_dpotrf = nvtxRangeStartA("Potrf_inLoop");       
+
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
+
+       nvtxRangeEnd(id_dpotrf);
        t_temp  = get_time(t_temp);
        t_potrf += t_temp;
        //printf("IB = %d, t_potrf = %f\n", IB, t_temp);
@@ -426,13 +589,19 @@ double RGF<T>::FirstStageFactor()
        
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
+       nvtxRangeId_t id_ttrsm = nvtxRangeStartA("ttrsm_inLoop");       
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
+       nvtxRangeEnd(id_ttrsm);
        flop_count += (NR + matrix_nd) * NR * NR;
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
        t_temp = get_time(0.0);
+
+       nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_SN_toHost_inLoop");     
        cudaDeviceSynchronize();
-       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
+       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);  
+       //copy_supernode_to_host(blockR_dev, IB);
+       nvtxRangeEnd(id_Cpy_SN_host);             
        t_copy_DtH += get_time(t_temp);
    
     }
@@ -444,11 +613,16 @@ double RGF<T>::FirstStageFactor()
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
        swap_pointers(&blockR_dev, &blockM_dev);
+       nvtxRangeId_t id_initSN = nvtxRangeStartA("initLastSuperNode");
        init_supernode(blockR_dev, IB, magmaGemmCudaStream);
+       //init_supernode(blockR_dev, IB);
+       nvtxRangeEnd(id_initSN);
 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
+       nvtxRangeId_t id_dgemm = nvtxRangeStartA("LastLargeGemm");
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
+       nvtxRangeEnd(id_dgemm);             
        flop_count += 2.0* NR * NR * NR + 2.0 * NR * NR;
 
        if (matrix_nd > 0)
@@ -464,22 +638,39 @@ double RGF<T>::FirstStageFactor()
 
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
+        nvtxRangeId_t id_dpotrf = nvtxRangeStartA("LastPotrf");       
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
+       nvtxRangeEnd(id_dpotrf);
        flop_count += 1.0/3.0 * NR * NR * NR;
     
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        if (matrix_nd > 0)
        {
+          nvtxRangeId_t id_ttrsm = nvtxRangeStartA("LastTtrsm");       
           ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
+          nvtxRangeEnd(id_ttrsm);
           flop_count += matrix_nd * NR * NR;
        
        }
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 	    t_temp = get_time(0.0);
 
-       cudaDeviceSynchronize();
-       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
+      cudaDeviceSynchronize();
+       nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_LastLarge_SN_toHost");  
+       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);     
+       //copy_supernode_to_host_write(blockR_dev, IB);
+       //copy_supernode_to_host(blockR_dev, IB);
+       nvtxRangeEnd(id_Cpy_SN_host);
 
        t_copy_DtH += get_time(t_temp);
 
@@ -498,7 +689,18 @@ double RGF<T>::FirstStageFactor()
    
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
+       //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+#endif
+
        flop_count += 1.0/3.0 * NR * NR * NR;
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
 
@@ -509,6 +711,8 @@ double RGF<T>::FirstStageFactor()
 
        cudaDeviceSynchronize();
        copy_supernode_to_host(blockDense_dev, IB, copyStreamDtH);
+      //copy_supernode_to_host(blockDense_dev, IB);
+      //copy_supernode_to_host_write(blockDense_dev, IB);
        
        t_copy_DtH += get_time(t_temp);
     
@@ -526,12 +730,92 @@ double RGF<T>::FirstStageFactor()
    return gflops;
 }
 
+/************************************************************************************************/
+// dummy function to check calls
+
+template <class T>
+double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
+
+    printf("In Factorize noCopyHost test version.\n");
+
+    int info;
+    size_t IB;
+    size_t NR,NM;
+    T ONE      = f_one();
+
+    IB = 0;
+    NR = Bmax[0]-Bmin[0];
+
+    nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNodeDev");  
+    init_supernode(blockR_dev, IB);
+    nvtxRangeEnd(id_initSN);    
+
+    T* diag;
+    diag = new T[NR];
+
+    // loop where I copy from blockR_dev to blockM_dev & keep factorizing
+
+    for(int i=0; i<100; i++){
+#ifdef PRINT_MSG
+       std::cout << "Copy to blockM_dev, i = " << i << ",  mf_block_lda(IB, IB) = " << mf_block_lda(IB, IB) << std::endl;
+#endif
+       nvtxRangeId_t id_cpyDevDev = nvtxRangeStartA("CopySNtoblockMdev");  
+       tlacpy_dev('N', 2*NR, NR, blockR_dev, mf_block_lda(IB, IB), blockM_dev,  mf_block_lda(IB, IB), magma_queue);
+       nvtxRangeEnd(id_cpyDevDev);    
+
+#ifdef PRINT_MSG
+       std::cout << "IB = " << IB << std::endl;
+#endif
+
+       double t_fact = get_time(0.0);
+
+       // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
+        nvtxRangeId_t id_dpotrf = nvtxRangeStartA("firstPotrf");  
+       cudaDeviceSynchronize();     
+#ifdef CUDA_POTRF
+       tpotrf_dev_cuda('L', NR, blockM_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+       tpotrf_dev('L', NR, blockM_dev, mf_block_lda(IB, IB), &info);
+#endif
+       nvtxRangeEnd(id_dpotrf);    
+
+       //copy_supernode_to_host_write(blockR_dev, IB);
+
+       id_cpyDevDev = nvtxRangeStartA("CopyDiagDevDev");  
+       copy_supernode_diag(blockM_dev, IB);
+       nvtxRangeEnd(id_cpyDevDev);  
+
+      id_cpyDevDev = nvtxRangeStartA("CopyDiagtoHost");  
+      cudaMemcpy(diag, diag_dev, NR*sizeof(T), cudaMemcpyDeviceToHost );
+      nvtxRangeEnd(id_cpyDevDev);    
+
+      id_cpyDevDev = nvtxRangeStartA("ComLogDetHost");       
+      // compute log sum
+      log_sum(diag, NR, &logDet);
+      logDet = 2*logDet;
+
+      printf("log Det : %f\n", logDet);
+      nvtxRangeEnd(id_cpyDevDev);  
+    }
+
+    delete[] diag;
+
+    return 1.0;
+
+}
+
+
+
 
 /************************************************************************************************/
 
 template <class T>
 double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 {
+
+   //std::cout << "In FirstStageFactor_noCopyHost(), omp get thread num = " << omp_get_thread_num() << std::endl;
+
     int info;
     size_t IB;
     size_t NR,NM;
@@ -557,12 +841,25 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 
 #ifdef PRINT_MSG
     std::cout << "calling first Cholesky factorization now" << std::endl;
+    std::cout << "IB = " << IB << std::endl;
 #endif
 
     double t_fact = get_time(0.0);
 
     // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
+     nvtxRangeId_t id_dpotrf = nvtxRangeStartA("firstPotrf");       
+    //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     cuda_buffer_flag[0] = 0;
+     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
+
+    nvtxRangeEnd(id_dpotrf);    
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     flop_count += 1.0/3.0 * NR * NR * NR;
 
@@ -603,7 +900,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        // UPDATE NEXT DIAGONAL BLOCK 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
+       nvtxRangeId_t id_dgemm = nvtxRangeStartA("BigGemm_inLoop");
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue);
+       nvtxRangeEnd(id_dgemm);
        flop_count += 2.0 * NR * NR * NR + 2.0 * NR * NR;
 
        // these dgemms independent from previous one. Put in separate stream, just require supernode to be loaded.
@@ -623,14 +922,30 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
+       cudaDeviceSynchronize();
+       nvtxRangeId_t id_dpotrf = nvtxRangeStartA("Potrf_inLoop");       
+       //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
+       nvtxRangeEnd(id_dpotrf);
        flop_count += 1.0/3.0 * NR * NR * NR;
 
        cudaDeviceSynchronize();
 
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
+
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
+       nvtxRangeId_t id_ttrsm = nvtxRangeStartA("ttrsm_inLoop");       
        ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue);
+       nvtxRangeEnd(id_ttrsm);       
        flop_count += (NR + matrix_nd) * NR * NR;
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
@@ -672,7 +987,17 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
+       //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);    
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
        flop_count += 1.0/3.0 * NR * NR * NR;
 
        cudaDeviceSynchronize();
@@ -707,7 +1032,17 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
    
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
+       //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+#endif
        flop_count += 1.0/3.0 * matrix_nd * matrix_nd * matrix_nd;
 
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
@@ -872,7 +1207,7 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
+double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 {
    int info;
    size_t IB;
@@ -933,10 +1268,31 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       tgemm_dev('T', 'N', NR, NR, NR, ONE, tmp1_dev, NR, tmp1_dev, NR, ZERO, blockDense_dev, mf_block_lda(IB, IB), magma_queue);
       flop_count += 2.0 * NR * NR * NR;
 
+      if(cpy_indicator == 2){
+         // instead of full block, just copy elements that are nnz in Q
+
+         // compute indices: total ns^2*nt+nb^2 -> want to write into last nb^s indices
+         ind_invBlks_fi = invblks_diag_block_index(IB);
+         //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         cudaMemcpy(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T), cudaMemcpyDeviceToHost);
+
+#ifdef PRINT_MSG
+         printf("first index final small diagonal block: %ld\n", ind_invBlks_fi);
+         printf("final small block : \n");
+         for(int i=0; i<ND*ND; i++){
+            printf("%f ", invBlks[ind_invBlks_fi+i]);
+         }
+         printf("\n");
+#endif
+
+      }
+
       //last non-dense block
       IB = NBlock-2;
       NR = Bmax[IB]-Bmin[IB];
       NP = Bmax[IB+1]-Bmin[IB+1];
+
 
       //printf("IB = %d, NR = %d, NP = %d\n", IB, NR, NP);
 
@@ -946,6 +1302,9 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       // G = L^-T * L^-1 => G*L = L^-T
       ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
       flop_count += 0.5 * NR * NR * NR;
+
+      cudaDeviceSynchronize();
+
       // initialize identity matrix temp1_dev of size NR = ns (now)
       init_eye_on_dev(tmp1_dev,NR,0);
       // temp2_dev = L_Fn^T*Gn+1
@@ -961,14 +1320,21 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       tgemm_dev('N', 'N', NR, NR, NR, ONE, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), ZERO, tmp1_dev, NR, magma_queue);
       flop_count += 2.0 * NR * NR * NR;
 
-#ifdef PRINT_MSG
-      cudaMemcpy(tmp3, blockDense_dev, NP*NP*sizeof(T), cudaMemcpyDeviceToHost);
-      printf("blockDense : \n");
-      for(int i=0; i<ND*ND; i++){
-         printf("%f ", tmp3[i]);
-      }
-      printf("\n");
+      if(cpy_indicator == 2){
+         // compute indices: total ns^2*nt+nb^2 -> now at last ns x ns block
+         ind_invBlks_fi = invblks_diag_block_index(IB);
+         //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         cudaMemcpy(&invBlks[ind_invBlks_fi], tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+#ifdef PRINT_MSG         
+         printf("first index last ns x ns diagonal block: %ld\n", ind_invBlks_fi);
+         printf("last ns x ns block : \n");
+         for(int i=0; i<NR*NR; i++){
+            printf("%f ", invBlks[ind_invBlks_fi+i]);
+         }
+         printf("\n");
 #endif
+      }
 
       // *************** Gn+1n ************ //
       // Sn+1n    = -Sn+1n+1*L_Fn*L_Dn+1^-1
@@ -977,14 +1343,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       //printf("NP = %d, NR = %d, mf_dense_block_lda(IB) = %d\n", NP, NR, mf_dense_block_lda(IB));
       // dgemm(nothing/transpose A, nothing/transpose B, #rows A, #cols B, #cols A, ...)
       tgemm_dev('N', 'N', NP, NR, NP, ONE, blockDense_dev, mf_block_lda(IB+1, IB+1), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ZERO, tmp3_dev, NP, magma_queue);
-#ifdef PRINT_MSG
-      cudaMemcpy(tmp3, tmp3_dev, b_size*ND*sizeof(T), cudaMemcpyDeviceToHost);
-      printf("tmp3 : \n");
-      for(int i=0; i<b_size*ND; i++){
-         printf("%f ", tmp3[i]);
-      }
-      printf("\n");
-#endif
+
 
       // step 2: -tmp3_dev*L_Dn^-1 => -tmp3_dev*blockR_dev, dim(tmp3_dev) = (nb, ns), dim(blockR_dev) = (ns, ns)
       // nb, ns, ns
@@ -1000,11 +1359,34 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       printf("\n"); 
 #endif
 
+      cudaDeviceSynchronize();
+
+      if(cpy_indicator == 0){
+         // when we only want the diagonal
+         copy_supernode_diag(blockDense_dev, NBlock-1);
+      } else if(cpy_indicator == 1){
+         // want nnzQ entries in CSC format
+         extract_nnzA(blockDense_dev, NBlock-1);
+      } else if(cpy_indicator == 2){
+         // copy over Gn+1n
+         ind_invBlks_fi = invblks_dense_block_index(IB);
+         //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         cudaMemcpy(&invBlks[ind_invBlks_fi], G_dense_i_dev, matrix_nd*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+#ifdef PRINT_MSG
+         printf("first index last ns x nd diagonal block: %ld\n", ind_invBlks_fi);
+         printf("last ns x ns small block : \n");
+         for(int i=0; i<matrix_nd*matrix_ns; i++){
+            printf("%f ", invBlks[ind_invBlks_fi+i]);
+         }
+         printf("\n");
+#endif
+      }
+
       // *************** Gnn ************ //
       // copy tmp1_dev to blockR_dev
       tlacpy_dev('F', NR, NR, tmp1_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue);
       // copy back blockDense_dev, which contains Gn+1 ??
-      copy_supernode_diag(blockDense_dev, NBlock-1);
 
 #ifdef PRINT_MSG
       cudaMemcpy(tmp4, tmp1_dev, b_size*b_size*sizeof(T), cudaMemcpyDeviceToHost);
@@ -1031,6 +1413,24 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       flop_count += 0.5 * NR * NR * NR;
       // blockR_dev = L^-T*L^-1
       tgemm_dev('T', 'N', NR, NR, NR, ONE, tmp1_dev, NR, tmp1_dev, NR, ZERO, blockR_dev, mf_block_lda(IB, IB), magma_queue);
+
+      if(cpy_indicator == 2){
+         // compute indices: total ns^2*nt+nb^2 -> now at last ns x ns block
+         ind_invBlks_fi = invblks_diag_block_index(IB);
+         //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         cudaMemcpy(&invBlks[ind_invBlks_fi], tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+#ifdef PRINT_MSG       
+         printf("first index last ns x ns diagonal block case with no fixed effects : %ld\n", ind_invBlks_fi);
+         printf("last ns x ns block : \n");
+         for(int i=0; i<NR*NR; i++){
+            printf("%f ", invBlks[ind_invBlks_fi+i]);
+         }
+         printf("\n");
+
+#endif
+      }
+
    }
 
    //second-last non-dense block .. 0-block
@@ -1041,8 +1441,17 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       NP = Bmax[IB+1]-Bmin[IB+1];
 
       swap_pointers(&blockR_dev, &blockP_dev);
-      copy_supernode_diag(blockP_dev, IB+1);
       copy_supernode_to_device(blockR_dev, IB);
+      // copy diagonal from previous iteration into buffer on device
+      if(cpy_indicator == 0){
+         copy_supernode_diag(blockP_dev, IB+1);
+      } else if(cpy_indicator == 1){
+         //copy_supernode_diag(blockP_dev, IB+1);
+         // write G_dense_i_dev into "correct spot in blockP_dev"
+         tlacpy_dev('F', ND, NR, G_dense_i_dev, ND, &blockP_dev[mf_dense_block_offset(IB+1)], mf_dense_block_lda(IB+1), magma_queue);
+         extract_nnzA(blockP_dev, IB+1);
+         //exit(1);
+      }
 
       // tril(blockR_dev)
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR);
@@ -1051,6 +1460,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       flop_count += 0.5 * NR * NR * NR;
       // initialize eye(NR, NR)
       init_eye_on_dev(tmp1_dev,NR,0);
+
+      cudaDeviceSynchronize();
 
       // tmp2_dev = blockR_dev^T*blockP_dev => L_Ei^T*Gi+1
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockP_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue);
@@ -1074,6 +1485,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
          // tmp4_dev = L_Fi^T*Gn+1i+1*L_Ei
          // step 1: tmp4_dev = L_Fi^T*Gn+1i+1, dim(tmp2_dev) = (ns,ns)
          tgemm_dev('T', 'N', NP, NR, ND, ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), G_dense_i_dev, ND, ZERO, tmp4_dev, NR, magma_queue);
+
 #ifdef PRINT_MSG
          cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
          printf("L_Fi^T*Gn+1i+1: \n");
@@ -1085,6 +1497,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
 
          // tmp4_dev = tmp4_dev*L_Ei
          tgemm_dev('N', 'N', NR, NP, NR, ONE, tmp4_dev, NR, &blockR_dev[NR], mf_block_lda(IB+1, IB), ZERO, tmp4_dev, NR, magma_queue);
+
 #ifdef PRINT_MSG
          cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
          printf("L_Fi^T*Gn+1i+1*L_Ei:\n");
@@ -1148,7 +1561,25 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
          }
          printf("\n");
 #endif
-      }
+
+
+         if(cpy_indicator == 2){
+            // copy over Gn+1i
+            ind_invBlks_fi = invblks_dense_block_index(IB);
+            //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+            //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+            cudaMemcpy(&invBlks[ind_invBlks_fi], G_dense_i_dev, matrix_nd*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+#ifdef PRINT_MSG         
+            printf("first index of i-th ns x nd diagonal block: %ld\n", ind_invBlks_fi);
+            printf(" i-th ns x nd dense block : \n");
+            for(int i=0; i<matrix_nd*matrix_ns; i++){
+               printf("%f ", invBlks[ind_invBlks_fi+i]);
+            }
+            printf("\n");
+ #endif
+         } // end cpy invBlks
+
+      } // end if matrix_nd > 0
 
       // tmp2_dev = blockR_dev^T*tmp1_dev => tmp2_dev = L^-T*tmp1_dev
       tgemm_dev('T', 'N', NR, NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, ZERO, tmp2_dev, NR, magma_queue);
@@ -1156,6 +1587,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       // tmp1_dev = tmp2_dev*L^-1
       tgemm_dev('N', 'N', NR, NR, NR, ONE, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), ZERO, tmp1_dev, NR, magma_queue);
       flop_count += 2.0 * NR * NR * NR; 
+
 #ifdef PRINT_MSG
       cudaMemcpy(tmp4, tmp1_dev, NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
       printf("Gii: \n");
@@ -1165,14 +1597,49 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
       printf("\n");
 #endif
 
+      if(cpy_indicator == 2){
+         // compute indices: total ns^2*nt+nb^2 -> now at last ns x ns block
+         ind_invBlks_fi = invblks_diag_block_index(IB);
+         //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
+         cudaMemcpy(&invBlks[ind_invBlks_fi], tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+#ifdef PRINT_MSG         
+         printf("first index last ns x ns diagonal block case with no fixed effects : %ld\n", ind_invBlks_fi);
+         printf("i-th ns x ns block : \n");
+         for(int i=0; i<NR*NR; i++){
+            printf("%f ", invBlks[ind_invBlks_fi+i]);
+         }
+         printf("\n");
+#endif
+      }
+
       // copy tmp1_dev to blockR_dev
       tlacpy_dev('F', NR, NR, tmp1_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue);
    }
 
+#ifdef PRINT_MSG
+   if(cpy_indicator == 2){
+      printf("array containing all neccessary inv blk entries: \n");
+      for(int i=0; i<(matrix_ns+matrix_nd)*matrix_ns*matrix_nt+matrix_nd*matrix_nd; i++){
+            printf("%f ", invBlks[i]);
+      }
+      printf("\n");
+   }
+#endif
+
    t_inv = get_time(t_inv);
    double gflops = flop_count / (1e9*t_inv);
 
-   copy_supernode_diag(blockR_dev, 0);
+   // copy diagonal of first block into buffer
+   if(cpy_indicator == 0){
+      copy_supernode_diag(blockR_dev, 0);
+   }
+
+   if(cpy_indicator == 1){
+      tlacpy_dev('F', ND, NR, G_dense_i_dev, ND, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue);
+      cudaDeviceSynchronize();
+      extract_nnzA(blockR_dev, 0);
+   }
 
    // free memory of extra buffers
    deallocate_data_on_dev(eye_dev      ,b_size*b_size*sizeof(T));
@@ -1187,7 +1654,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev)
 #endif
 
    return gflops;
-}
+} // end thirdstageFactor
 
 template <class T>
 void RGF<T>::initialize_MF_host(){
@@ -1212,6 +1679,31 @@ void RGF<T>::initialize_MF_host(){
 
 }
 
+
+template <class T>
+void RGF<T>::initialize_invBlks_host(){
+
+#ifdef PRINT_MSG
+   std::cout << "in initialize invBlks host" << std::endl;
+#endif   
+   
+   // cudaMallocHost takes a long time -> only worth it if we reuse it!
+   if(!invBlks_allocated)
+   {
+      double t_invBlk_alloc = get_time(0.0);
+      // allocate space for Diagonal blocks and dense rows below
+      size_t nnz_invBlks = (matrix_ns+matrix_nd)*matrix_ns*matrix_nt + matrix_nd*matrix_nd;
+      cudaMallocHost(&invBlks, nnz_invBlks * sizeof(T));
+      t_invBlk_alloc = get_time(t_invBlk_alloc);
+
+      invBlks_allocated = true;
+
+//#ifdef PRINT_MSG
+      std::cout << "in initialize invBlks host. nnz(invBlks) : " << nnz_invBlks << ", Allocation time : " << t_invBlk_alloc << std::endl;
+//#endif  
+   }
+
+}
 
 /************************************************************************************************/
 
@@ -1353,6 +1845,7 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
 
     //Computation
     double gflops = FirstStageFactor_noCopyHost(logDet);
+    //double gflops = FirstStageFactor_noCopyHost_testV(logDet);
 
     //////// NEW /////////////
     //Data deallocation
@@ -1451,6 +1944,7 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
    }
 
     factorization_completed = false;
+    cpy_indicator = 0; // => only copy back diagonal
 
     //Data allocation
     T *tmp1_dev;
@@ -1465,7 +1959,7 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
-    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev);
+    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
 
     //Copy data to host
     memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T), NULL );
@@ -1473,6 +1967,133 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     //Data deallocation
     deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
     deallocate_data_on_dev(diag_pos_dev,matrix_size*sizeof(size_t));
+    deallocate_data_on_dev(tmp1_dev,b_size*b_size*sizeof(T));
+    deallocate_data_on_dev(tmp2_dev,b_size*b_size*sizeof(T));
+
+    return gflops;
+}
+
+template <class T>
+double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
+{  
+
+   if (!factorization_completed)
+       factorize(ia, ja, a);
+
+   // check if number of nnz are the same to check if matrix is the same
+   if(!(ia[matrix_size] == matrix_ia[matrix_size])){
+      std::cout << "Matrices don't match!!" << std::endl;
+      exit(1);
+   }
+
+   cpy_indicator = 1; // => copy back all entries of nnzQ
+
+    //Data allocation
+    T *tmp1_dev;
+    T *tmp2_dev;
+
+    size_t nnz = matrix_ia[matrix_size];
+
+    //inv_a = new T[nnz];
+    gpuErrchk(cudaMallocHost((void**)&inv_a, nnz*sizeof(T)));
+
+    //std::cout << "nnz = " << nnz << std::endl;
+    size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
+    size_t max_cols = max(matrix_ns, matrix_nd);
+
+    //allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
+    //allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
+    allocate_data_on_device((void**)&tmp1_dev,b_size*b_size*sizeof(T));
+    allocate_data_on_device((void**)&tmp2_dev,b_size*b_size*sizeof(T));
+
+    //Temp data allocation
+    allocate_data_on_device((void**)&inv_ia_dev,(max_cols+1)*sizeof(size_t));
+    allocate_data_on_device((void**)&inv_ja_dev,max_rows*max_cols*sizeof(size_t));
+    allocate_data_on_device((void**)&inv_a_dev,max_rows*max_cols*sizeof(T));
+
+    //Computation
+    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
+
+   factorization_completed = false; // we have overwritten the Cholesky factor
+
+    //CAREFUL: invBlks are on CPU but not as contiguous array, block-wise !!
+    //memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
+
+    // restructure array to only contain value array of CSC format
+    //size_t nnz_invBlks = (matrix_ns+matrix_nd)*matrix_ns*matrix_nt+matrix_nd*matrix_nd;
+    //for(size_t i=0; i<nnz_invBlks; i++){
+      //invBlks_ext[i] = invBlks[i];
+    //}
+
+    for(size_t i=0; i<nnz; i++){
+      invQ[i] = inv_a[i];
+    }
+
+    //Data deallocation
+    //deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
+    //deallocate_data_on_dev(diag_pos_dev,matrix_size*sizeof(size_t));
+    deallocate_data_on_dev(tmp1_dev,b_size*b_size*sizeof(T));
+    deallocate_data_on_dev(tmp2_dev,b_size*b_size*sizeof(T));
+
+    //Temp data deallocation
+    deallocate_data_on_dev(inv_ia_dev,(max_cols+1)*sizeof(size_t));
+    deallocate_data_on_dev(inv_ja_dev,max_rows*max_cols*sizeof(size_t));
+    deallocate_data_on_dev(inv_a_dev,max_rows*max_cols*sizeof(T));
+
+    cudaFreeHost(inv_a);
+
+    return gflops;
+}
+
+template <class T>
+double RGF<T>::RGFinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
+{
+
+   if (!factorization_completed)
+       factorize(ia, ja, a);
+
+   // check if number of nnz are the same to check if matrix is the same
+   if(!(ia[matrix_size] == matrix_ia[matrix_size])){
+      std::cout << "Matrices don't match!!" << std::endl;
+      exit(1);
+   }
+
+   factorization_completed = false;
+   cpy_indicator = 2; // => copy back inv diag blocks in block format
+
+    //std::cout << "nnz = " << nnz << std::endl;
+    size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
+    size_t max_cols = max(matrix_ns, matrix_nd);
+
+   initialize_invBlks_host();
+
+    //Data allocation
+    T *tmp1_dev;
+    T *tmp2_dev;
+
+    //allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
+    //allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
+    allocate_data_on_device((void**)&tmp1_dev,b_size*b_size*sizeof(T));
+    allocate_data_on_device((void**)&tmp2_dev,b_size*b_size*sizeof(T));
+
+    //Copy diag_pos to device
+    //memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
+
+    //Computation
+    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
+
+    //CAREFUL: invBlks are on CPU but not as contiguous array, block-wise !!
+    //memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
+
+    // restructure array to only contain value array of CSC format
+    size_t nnz_invBlks = (matrix_ns+matrix_nd)*matrix_ns*matrix_nt+matrix_nd*matrix_nd;
+    for(size_t i=0; i<nnz_invBlks; i++){
+      invBlks_ext[i] = invBlks[i];
+    }
+
+    //Data deallocation
+    //deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
+    //deallocate_data_on_dev(diag_pos_dev,matrix_size*sizeof(size_t));
     deallocate_data_on_dev(tmp1_dev,b_size*b_size*sizeof(T));
     deallocate_data_on_dev(tmp2_dev,b_size*b_size*sizeof(T));
 
@@ -1577,6 +2198,75 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
 
 }
 
+
+/************************************************************************************************/
+
+// M_dev is local, all entries of 1 supernode
+// a_dev is local -> all nnz entries of a in that supernode
+template <class T>
+inline void RGF<T>::extract_nnzA(T *M_dev, size_t supernode)
+{
+   size_t supernode_fc = supernode * matrix_ns;
+   size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
+   size_t supernode_nnz = matrix_ia[supernode_lc] - matrix_ia[supernode_fc];
+   size_t supernode_offset = matrix_ia[supernode_fc];
+   size_t rows = mf_block_lda(supernode, supernode);
+   size_t cols = supernode_lc - supernode_fc;
+   size_t supernode_size = rows * cols;
+
+   gpuErrchk(cudaMemcpy(inv_ia_dev, &matrix_ia[supernode_fc], (cols+1)*sizeof(size_t), cudaMemcpyHostToDevice ));
+   gpuErrchk(cudaMemcpy(inv_ja_dev, &matrix_ja[supernode_offset], supernode_nnz*sizeof(size_t), cudaMemcpyHostToDevice ));
+
+   //memcpy_to_device(&matrix_ia[supernode_fc],inv_ia_dev,(cols+1)*sizeof(size_t));
+   //memcpy_to_device(&matrix_ja[supernode_offset],inv_ja_dev,supernode_nnz*sizeof(size_t));
+   //memcpy_to_device(&matrix_a[supernode_offset],a_dev,supernode_nnz*sizeof(T));
+
+   /*
+   T* M_host;
+   M_host = new T[supernode_size];
+
+   cudaMemcpy(M_host, M_dev, supernode_size*sizeof(T), cudaMemcpyDeviceToHost );
+  
+   printf("IB = %ld, supernode nnz = %ld, supernode size = %ld, M host : ", supernode, supernode_nnz, supernode_size);
+   for(int i=0; i<supernode_size; i++){
+      printf(" %f", M_host[i]);
+   }
+   printf("\n");
+
+   delete[] M_host;
+
+   size_t* inv_ia_host;
+   inv_ia_host = new size_t[supernode_nnz];
+
+   //memcpy_to_host(a_dev, a_host, supernode_nnz*sizeof(T));
+   cudaMemcpy(inv_ia_host, inv_ia_dev, (cols+1)*sizeof(size_t), cudaMemcpyDeviceToHost );
+   //memcpy_to_host(a_dev, &invQ[supernode_offset], supernode_nnz*sizeof(T));
+
+   printf("ia host : ");
+   for(int i=0; i<cols+1; i++){
+      printf(" %ld", inv_ia_host[i]);
+   }
+   printf("\n");
+   */
+
+   extract_nnzA_dev(inv_a_dev, inv_ia_dev, inv_ja_dev, M_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd);
+
+   //exit(1);
+   //printf("supernode offset : %ld, supernode nnz : %ld\n", supernode_offset, supernode_nnz);
+
+   gpuErrchk(cudaMemcpy(&inv_a[supernode_offset], inv_a_dev, supernode_nnz*sizeof(T), cudaMemcpyDeviceToHost));
+
+   /*
+   printf("inv_a : ");
+   for(int i=0; i<supernode_nnz; i++){
+      //inv_a[supernode_offset+i] = inv_a_host[i];
+      printf(" %f", inv_a[supernode_offset+i]);
+   }
+   printf("\n");
+   cudaDeviceSynchronize();   
+   */
+}
+
 /************************************************************************************************/
 
 template <class T>
@@ -1596,6 +2286,48 @@ inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode, cudaStrea
     memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T), stream );
 
 }
+
+
+/************************************************************************************************/
+
+template <class T>
+inline void RGF<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
+{
+   size_t supernode_fc = supernode * matrix_ns;
+   size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
+   size_t ind = mf_block_index(supernode, supernode);
+   size_t rows = mf_block_lda(supernode, supernode);
+   size_t cols = supernode_lc - supernode_fc;
+
+#ifdef PRINT_MSG
+   printf("In copy supernode to host.\n");
+   printf("size rows&cols = %ld, ind = %ld\n", rows*cols, ind);
+#endif
+
+   memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T));
+
+  time_t rawtime;
+  struct tm * timeinfo;
+  char buffer[80];
+
+  time (&rawtime);
+  timeinfo = localtime(&rawtime);
+
+  strftime(buffer,sizeof(buffer),"chunk_of_L_%d-%m-%Y %H:%M:%S.txt",timeinfo);
+  std::string file_name(buffer);
+
+   //std::string file_name = "chunk_of_L.txt";
+   ofstream file(file_name,    ios::out | ::ios::trunc); 
+   for(int i=0; i<rows*cols; i++){
+      //file << std::setprecision(15) << MF[ind+i] << endl;
+      file << MF[ind+i] << endl;
+
+   }
+   file.close();
+   std::cout << "wrote to file : " << file_name << std::endl;
+
+}
+
 
 /************************************************************************************************/
 
@@ -1624,6 +2356,7 @@ inline void RGF<T>::copy_supernode_diag(T *src, size_t supernode)
    size_t cols = supernode_lc - supernode_fc;
 
    indexed_copy_offset_dev(src, &diag_dev[supernode_fc], &diag_pos_dev[supernode_fc], cols, offset);
+
 }
 
 /************************************************************************************************/
@@ -1631,10 +2364,12 @@ inline void RGF<T>::copy_supernode_diag(T *src, size_t supernode)
 template <class T>
 inline void RGF<T>::swap_pointers(T **ptr1, T **ptr2)
 {
+
    T *tmp = *ptr1;
    *ptr1 = *ptr2;
    *ptr2 = tmp;
-}
+   
+   }
 
 /************************************************************************************************/
 

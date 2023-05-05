@@ -7,7 +7,8 @@ LAPHOME       = $(MKLHOME)
 
 include ./make.inc
 
-DEBUG       = #-O1 -g #-fsanitize=address,signed-integer-overflow #-Wall
+## for nvtx ranges: lnvToolsExt
+DEBUG       =  -lnvToolsExt #-O1 -g #-fsanitize=address,signed-integer-overflow #-Wall
 
 # for mainEigen
 INCEIGEN=-I/usr/include/eigen3
@@ -34,10 +35,10 @@ CC_FILES   = Utilities.o mainEigen.o #main.o
 CU_FILES   = CWC_utility.o
 
 mainEigen: $(CC_FILES) $(CU_FILES)
-	$(RGF_MPICXX) $(RGF_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(LIBS) -lm -o $@ $(DEBUG) # $(RGF_LOADFLAGS)
+	$(RGF_MPICXX) $(RGF_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(LIBS) $(DEBUG) -lm -o $@ # $(RGF_LOADFLAGS)
 
 main: $(CC_FILES) $(CU_FILES)
-	$(RGF_MPICXX) $(RGF_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(OPENMP) $(LIBS) -lm -o $@ $(DEBUG) # $(RGF_LOADFLAGS)
+	$(RGF_MPICXX) $(DEBUG) $(RGF_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(OPENMP) $(LIBS) -lm -o $@ # $(RGF_LOADFLAGS)
 
 #librgf.a: $(CC_FILES) $(CU_FILES)
 #	ar rvs $@ $^
@@ -46,7 +47,7 @@ main: $(CC_FILES) $(CU_FILES)
 #	$(LOADER) --shared $(CC_FILES) $(CU_FILES) $(LOADFLAGS) $(LIBS) -lm -o $@ $(DEBUG) -fPIC
 
 .C.o:
-	$(CXX) -c $< $(RGF_CXXFLAGS) $(DEBUG) $(RGF_FLAGS) $(INCLUDEDIR) $(OPENMP) -fPIC
+	$(CXX) -c $< $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCLUDEDIR) $(DEBUG) $(OPENMP) -fPIC
 
 CWC_utility.o: CWC_utility.cu
 	$(NVCC) -c CWC_utility.cu $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' 
