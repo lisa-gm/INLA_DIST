@@ -659,6 +659,7 @@ inline void zgetrs_nopiv_dev(char transa,int n,int nrhs,CPX *a,int lda,CPX *b,in
 template <typename T>
 inline void tpotrf_dev(char uplo,int n,T *a,int lda,int *info);
 
+// OLD POTRF WITH MAMGA which gives problems for _native (when run in non-blocking mode)
 template <>
 inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
@@ -684,7 +685,7 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
         printf("ind error = %d, a[ind_error] = %f\n", ind_error, a_problem_host);
     	exit(1);
     }
-}
+        }
 
 template <>
 inline void tpotrf_dev(char uplo,int n,CPX *a,int lda,int *info)

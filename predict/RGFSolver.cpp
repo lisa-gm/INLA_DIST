@@ -2,7 +2,7 @@
 #include "RGFSolver.h"
 
 
-RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
+RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb) : ns_t(ns), nt_t(nt), nb_t(nb){
    	
 
     MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
@@ -16,8 +16,6 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     //std::cout << "threads level 1 : " << threads_level1 << std::endl;
 
     MPI_Get_processor_name(processor_name, &name_len);
-    printf("Processor name : %s\n",processor_name);
-
 
     // CAREFUL USING N in both functions ..
     n  = ns_t*nt_t + nb_t;
@@ -29,16 +27,6 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
 #ifdef PRINT_MSG
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
-
-    GPU_rank = 0;
-    printf("Careful! GPU rank hard coded to machine: kw60890!\n");
-
-    /*
-    if(noGPUs < 8){
-        printf("not on Alex! change GPU assignment!");
-        exit(1);
-    }
-    */
 
     /*
     // assume max 3 ranks per node
@@ -59,10 +47,8 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     } 
     */
     
-    /*
-     int max_rank_per_node = 8;
-    int GPU_rank = MPI_rank % max_rank_per_node;
-    */
+    int max_rank_per_node = 2;
+    int GPU_rank = 0;   // MPI_rank % max_rank_per_node;
 
     // allocate devices as numThreads mod noGPUs
     //int counter = threads_level1*MPI_rank + omp_get_thread_num();
@@ -122,9 +108,9 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     */
 
     // now they will be directly next to each other ... lets see if this is a problem
-    pin_hwthreads(1, &hwt[omp_get_thread_num()]);
-    std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
-    std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
+    //pin_hwthreads(1, &hwt[omp_get_thread_num()]);
+    //std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+    //std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
 
 #ifdef PRINT_MSG
     std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
@@ -734,6 +720,149 @@ void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& i
     delete[] invDiag;
 
 }  // end selected inversion with constraints
+
+
+void RGFSolver::selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv) {
+    std::cout << "Placeholder selected_inversion_fullTakInv() doesnt exist for BTA solver." << std::endl;
+    exit(1);
+}
+
+
+void RGFSolver::selected_inversion_fullTakInv_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V){
+    std::cout << "Placeholder selected_inversion_fullTakInv_w_constr() doesnt exist for BTA solver yet." << std::endl;
+    exit(1);
+}
+
+
+void RGFSolver::compute_full_inverse(SpMat& Q, MatrixXd& Qinv) {
+
+#ifdef PRINT_MSG
+    std::cout << "MPI rank : " << MPI_rank << ", in RGF FACTORIZE_SOLVE()." << std::endl;   
+#endif
+
+    // check if n and Q.size() match
+    if(n != Q.rows()){
+        printf("\nInitialised matrix size and current matrix size don't match!\n");
+        printf("n = %ld.\nnrows(Q) = %ld.\n", n, Q.rows());
+        exit(1);
+    }
+
+    // only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+    nnz = Q_lower.nonZeros();
+
+#ifdef PRINT_MSG
+    std::cout << "nnz Q = " << nnz << std::endl;
+#endif
+
+     // pin here
+
+    // allocate memory
+    size_t* ia = new long unsigned int [n+1];
+    size_t* ja = new long unsigned int [nnz];
+    double* a = new double [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        a[i] = Q_lower.valuePtr()[i];
+    }
+
+#ifdef PRINT_MSG
+    std::cout << "calling solver = new RGF now" << std::endl;
+#endif
+
+    //solver = new RGF<double>(ia, ja, a, ns_t, nt_t, nb_t);
+    //solver = new RGF<double>(ns_t, nt_t, nb_t);
+
+
+#ifdef PRINT_MSG
+    printf("Calling RGF solver in RGF factorize_solver now.\n");
+#endif
+
+       // std::cout << "RGF factorize solve, nb = " << nb_t << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
+
+    double t_condLatChol = get_time(0.0);
+
+    double gflops_factorize = solver->factorize(ia, ja, a);
+    //double gflops_factorize = solver->factorize();
+
+    t_condLatChol = get_time(t_condLatChol);
+    
+    log_det = solver->logDet(ia, ja, a);
+    //log_det = solver->logDet();
+
+#ifdef GFLOPS
+    if(MPI_rank == 0){
+        std::cout << "Gflop/s for the numerical factorization Qxy: " << gflops_factorize << std::endl;
+    }
+#endif
+    
+
+#ifdef PRINT_MSG
+    printf("logdet: %f\n", log_det);
+#endif
+
+    // set rhs to identity
+    int nrhs = n;
+    int n2 = n*n;
+
+    MatrixXd IdMat(n,n);
+    IdMat.setIdentity();
+
+
+    double* b      = new double[n2];
+    double* x      = new double[n2];
+
+    // assign b to correct format
+    for (i = 0; i < n2; i++){
+        b[i] = IdMat.data()[i];
+        //printf("%f\n", b[i]);
+    }
+
+    double t_condLatSolve = get_time(0.0);
+
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    //double gflops_solve = solver->solve(x, b, nrhs);
+
+    t_condLatSolve = get_time(t_condLatSolve);
+
+#ifdef PRINT_MSG
+    //printf("flops solve:     %f\n", flops_solve);
+    printf("Residual norm: %e\n", solver->residualNorm(x, b));
+    printf("Residual norm normalized: %e\n", solver->residualNormNormalized(x, b));
+#endif
+
+#ifdef PRINT_TIMES
+    printf("RGF factorise time: %lg\n",t_condLatChol);
+    printf("RGF solve     time: %lg\n",t_condLatSolve);
+#endif
+
+    //std::cout << "In factorize_solve. hostname : " << processor_name << ", MPI_rank : " << MPI_rank << ", GPU rank : " << GPU_rank << ", time Chol : " << t_condLatChol << ", time Solve : " << t_condLatSolve << std::endl;
+
+    // assign b to correct format
+    for (i = 0; i < n2; i++){
+        Qinv.data()[i] = x[i];
+    }   
+
+
+    delete[] ia;
+    delete[] ja;
+    delete[] a;
+
+    delete[] x;
+    delete[] b;
+
+
+}
 
 
 RGFSolver::~RGFSolver(){

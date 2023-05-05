@@ -395,8 +395,102 @@ int main(int argc, char* argv[])
 	    //theta.print();
   	}
 
-  	std::cout << "Constructing precision matrix Q. " << std::endl;
+printf("# threads: %d\n", omp_get_max_threads());
 
+#pragma omp parallel
+{
+
+if(omp_get_thread_num() == 0) // instead of #pragma omp task -> want always the same thread to do same task
+{
+
+#if 1
+
+    size_t i; // iteration variable
+
+    int nx = ns*nt;
+    SpMat Qx(nx, nx);
+
+    double t_Qx_factorise;
+    RGF<T> *solver_Qx;
+    solver_Qx = new RGF<T>(ns, nt, 0);
+
+    double log_det_Qx;
+
+    for(int c=0; c<1; c++){
+        //theta = theta + Vect::Random(theta.size());
+        std::cout << "\niter = " << c << ". Constructing precision matrix Qx. theta : " << theta.transpose() << std::endl;
+
+        construct_Q_spat_temp(Qx, theta, c0, g1, g2, g3, M0, M1, M2);
+
+        //SpMat epsId(nx,nx);
+        //epsId.setIdentity();
+        //epsId = 1e-4*epsId;
+        //Qx = Qx + epsId;
+
+
+        // only take lower triangular part of A
+        SpMat Qx_lower = Qx.triangularView<Lower>(); 
+        size_t nnz_Qx  = Qx_lower.nonZeros();
+
+        //std::string Qx_lower_file = "Qst_lower_ns" + ns_s + "_nt" + nt_s + "_nb0_" + to_string(nx) + "_" + to_string(nx) + ".mtx";
+        //Eigen::saveMarket(Qx_lower, Qx_lower_file);
+        //exit(1);
+
+        Qx_lower.makeCompressed();
+
+        size_t* ia_Qx; 
+        size_t* ja_Qx;
+        T* a_Qx; 
+
+        // allocate memory
+        ia_Qx = new long unsigned int [nx+1];
+        ja_Qx = new long unsigned int [nnz_Qx];
+        a_Qx  = new double [nnz_Qx];
+
+        for (i = 0; i < nx+1; ++i){
+            ia_Qx[i] = Qx_lower.outerIndexPtr()[i]; 
+        }  
+
+        for (i = 0; i < nnz_Qx; ++i){
+            ja_Qx[i] = Qx_lower.innerIndexPtr()[i];
+        }  
+
+        for (i = 0; i < nnz_Qx; ++i){
+            a_Qx[i] = Qx_lower.valuePtr()[i];
+        }
+
+        t_Qx_factorise = get_time(0.0);
+        //solver->solve_equation(GR);
+        double flops_Qx_factorize = solver_Qx->factorize_noCopyHost(ia_Qx, ja_Qx, a_Qx, log_det_Qx);
+        
+        //double flops_Qx_factorize = solver_Qx->factorize(ia_Qx, ja_Qx, a_Qx);
+        //log_det_Qx = solver_Qx->logDet(ia_Qx, ja_Qx, a_Qx);
+
+        t_Qx_factorise = get_time(t_Qx_factorise);
+
+        printf("logdet       : %f\n", log_det_Qx);
+        printf("time chol(Qx): %lg\n",t_Qx_factorise);
+
+        delete[] ia_Qx;
+        delete[] ja_Qx;
+        delete[] a_Qx;
+
+    }
+
+    delete solver_Qx;
+
+#endif
+
+
+#endif
+
+} // end omp if(thread 0)
+
+
+if(omp_get_thread_num() == 1 || omp_get_num_threads() < 2)
+{
+
+#if 1
     size_t n = ns*nt + nb;
   	SpMat Q(n,n);
   	construct_Q(Q, ns, nt, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);
@@ -405,7 +499,6 @@ int main(int argc, char* argv[])
     Vect rhs(n);
     double exp_theta = exp(theta[0]);
 	rhs = exp_theta*Ax.transpose()*y;
-
 #endif
 
 
@@ -485,44 +578,37 @@ int main(int argc, char* argv[])
 	timeinfo = localtime(&rawtime);
 	printf ("The current date/time is: %s\n",asctime(timeinfo));
 
-	solver = new RGF<T>(ns, nt, nb);
-
-	t_factorise = get_time(0.0);
-	//solver->solve_equation(GR);
-	double flops_factorize = solver->factorize(ia, ja, a);
-	t_factorise = get_time(t_factorise);
-
-	double log_det = solver->logDet(ia, ja, a);
-	printf("logdet: %f\n", log_det);
-
-  	// assign b to correct format
-  	for (int i = 0; i < n; i++){
-	    b[i] = rhs[i];
-	    //printf("%f\n", b[i]);
-  	}
-
-  	t_solve = get_time(0.0); 
-    double flops_solve = solver->solve(ia, ja, a, x, b, 1);
-  	t_solve = get_time(t_solve);
-  	printf("flops solve:     %f\n", flops_solve);
-
-	printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
-	printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
-
-  	// create file with solution vector
-  	/*
-    std::string sol_x_file_name = "x_sol_RGF_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
-  	std::ofstream sol_x_file(sol_x_file_name,    std::ios::out | std::ios::trunc);
-
-	for (i = 0; i < n; i++) {
-		sol_x_file << x[i] << std::endl;
-		// sol_x_file << x[i] << std::endl; 
-	}
-
-  sol_x_file.close();
-  */
+    solver = new RGF<T>(ns, nt, nb);
 
 
+    t_factorise = get_time(0.0);
+    //solver->solve_equation(GR);
+    //double flops_factorize = solver->factorize(ia, ja, a);
+    double log_det;
+    double flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
+    t_factorise = get_time(t_factorise);
+
+    //double log_det = solver->logDet(ia, ja, a);
+    printf("logdet: %f\n", log_det);
+
+    // assign b to correct format
+    /*for (int i = 0; i < n; i++){
+        b[i] = rhs[i];
+        //printf("%f\n", b[i]);
+    }*/
+
+    t_solve = get_time(0.0); 
+    //double flops_solve = solver->solve(ia, ja, a, x, b, 1);
+    t_solve = get_time(t_solve);
+    //printf("flops solve:     %f\n", flops_solve);
+
+    //printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
+    //printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+
+    printf("time chol(Q): %lg\n",t_factorise);
+    printf("time solve  : %lg\n",t_solve);
+
+#if 1
     // true inv diag from Eigen
     //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
     SimplicialLLT<SpMat> solverQ;
@@ -545,6 +631,15 @@ int main(int argc, char* argv[])
    if(n < 20){
         std::cout << "inv(Q):\n" << MatrixXd(inv_Q) << std::endl;
     }
+
+    double logDetEigen = 0.0;
+    for(int i=0; i<n; i++){
+        logDetEigen += 2*log(L.coeffRef(i,i));
+    }
+
+    printf("logDet Eigen: %f\n", logDetEigen);
+    printf("logDetEigen - logDet : %f\n", log_det - logDetEigen);
+#endif
 
     t_inv = get_time(0.0);
     double flops_invDiag = solver->RGFdiag(ia, ja, a, invDiag);
@@ -586,7 +681,9 @@ int main(int argc, char* argv[])
     } else {
         cout << "\ninvDiag BTA[1:20]       : " << invDiag_vec.head(20).transpose() << std::endl;
         cout << "Eigen diag(inv_Q)[1:20] : " << inv_Q.diagonal().head(20).transpose() << endl;
+        cout << "norm(invDiagBTA - invDiagEigen) = " << (invDiag_vec - inv_Q.diagonal()).norm() << std::endl;
     }
+
 
   
   // free memory
@@ -597,7 +694,13 @@ int main(int argc, char* argv[])
   delete[] b;
   delete[] x;
 
-  #endif
+  } // end if
+
+#endif
+
+
+  } // end omp parallel
+
 
     
   return 0;

@@ -18,9 +18,6 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
-//#define WRITE_RESULTS
-
-//#define PRINT_MSG
 //#define WRITE_LOG
 
 #include "mpi.h"
@@ -135,9 +132,8 @@ int main(int argc, char* argv[])
 	threads_level2 = omp_get_max_threads();
 	}
     } else {
-	threads_level1 = omp_get_max_threads();
-	//threads_level2 = omp_get_max_threads();
-    	threads_level2 = 1;
+	threads_level1 = 0;
+	threads_level2 = omp_get_max_threads();
     }
 
     // overwrite in case RGF is used
@@ -147,8 +143,7 @@ int main(int argc, char* argv[])
         printf("\n============== PARALLELISM & NUMERICAL SOLVERS ==============\n");
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
-        //printf("OMP threads level 2 : %d\n", threads_level2);
-	printf("OMP threads level 2 FIXED TO 1!!\n");
+        printf("OMP threads level 2 : %d\n", threads_level2);
 #ifdef RGF_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
@@ -226,7 +221,6 @@ int main(int argc, char* argv[])
 
     // dimension hyperparamter vector
     int dim_th;
-    int dim_spatial_domain;
 
     // spatial component
     SpMat c0; 
@@ -244,20 +238,9 @@ int main(int argc, char* argv[])
     SpMat Ax; 
     Vect y;
 
-    bool constr;
-    int num_constr;
-
-#ifdef DATA_SYNTHETIC
-    constr = false;
-#elif defined(DATA_TEMPERATURE)
-    //constr = true;
-    constr = false;
-    //num_constr = 1;
-#else 
-    printf("Invalid dataset.");
-    exit(1);
-#endif
-    
+    int num_constr = 1;
+    bool constr = false;
+    //bool constr = true;
     Vect e;
     MatrixXd Dx;
     MatrixXd Dxy;
@@ -411,9 +394,6 @@ int main(int argc, char* argv[])
         std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
         file_exists(Ax_file);
 
-	/// need to allocate cores here
-	
-
         // read in matrices
         c0 = read_sym_CSC(c0_file);
         g1 = read_sym_CSC(g1_file);
@@ -432,10 +412,9 @@ int main(int argc, char* argv[])
         // doesnt work for B
         no = Ax.rows();
 
-        if(MPI_rank == 0){
-            //std::cout << "total number of observations : " << no << std::endl;
-            std::cout << "read in all matrices." << std::endl;
-	}
+        /*if(MPI_rank == 0){
+            std::cout << "total number of observations : " << no << std::endl;
+        }*/
 
     } else {
         if(MPI_rank == 0){
@@ -467,18 +446,6 @@ int main(int argc, char* argv[])
         // not a pretty solution. 
         y = read_matrix(y_file, no, 1);
     }
-#endif
-
-#ifdef PRINT_MSG
-    std::cout << "dim(c0) = " << c0.size() << std::endl;
-    std::cout << "dim(g1) = " << g1.size() << std::endl;
-    std::cout << "dim(g2) = " << g2.size() << std::endl;
-    std::cout << "dim(g3) = " << g3.size() << std::endl;
-    std::cout << "dim(M0) = " << M0.size() << std::endl;
-    std::cout << "dim(M1) = " << M1.size() << std::endl;
-    std::cout << "dim(M2) = " << M2.size() << std::endl;
-    std::cout << "dim(Ax) = " << Ax.size() << std::endl;
-    std::cout << "dim(y) = " << y.size() << std::endl;
 #endif
 
 
@@ -527,24 +494,21 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }     
-        // constant in conversion between parametrisations changes dep. on spatial dim
-        // assuming sphere -> assuming R^3
-        dim_spatial_domain = 3;
-
         // sigma.e (noise observations), sigma.u, range s, range t
         //theta_original_param << 0.5, 4, 1, 10;
         // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
         theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
         //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
+        //theta_prior << 1.386294, -5.594859, 1.039721,  3.688879; // here sigma.u = 3
         // using PC prior, choose lambda  
         theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
         //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
+        //theta << 1, -3, 1, 3;   // -> the one used so far !! maybe a bit too close ... 
         theta_param << 4, 0, 0, 0;
         //theta_param << 4,4,4,4;
         //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
-        
-        /*
+        /*theta << 2, -3, 1.5, 5;
         if(MPI_rank == 0){
             std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
         }*/
@@ -670,22 +634,17 @@ int main(int argc, char* argv[])
             if(constr)
                 std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
         }
-
-        // constant in conversion between parametrisations changes dep. on spatial dim
-        // assuming sphere -> assuming R^3
-        dim_spatial_domain = 2;
-
         //theta << 4, 4, 4, 4;    //
         //theta_param << 4, 0, 0, 0;
         //theta_param << -1.308664,  0.498426,  4.776162,  1.451209;
         //theta_param << -1.5, 7, 7, 3;
-        theta_param << 0, 7, 2, 1.4;
-	//theta_param << -1.688, 7.575, 6.888, 2.789;
+        //theta_param << -2.091, 9.241, 11.973, 2.994;
+	theta_param << -1.688, 7.575, 6.888, 2.789;
 	//theta_param << -1.500, 7.000, 7.00, 3.000;
-	//theta_param << -1.500, 10.000, 11.005, 3.000;
-
+        //theta_param << -2.201569, 8.010112, 7.026133, 2.720725;
+	//theta_param << -1.25, 13.6, 10.4, 5.4;
         //theta_original << -1.269613,  5.424197, -8.734293, -6.026165;  // estimated from INLA / same for my code varies a bit according to problem size
-	//theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
+	theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
 
         // using PC prior, choose lambda  
 	// previous order : interpret_theta & lambda order : sigma.e, range t, range s, sigma.u -> doesn't match anymore
@@ -694,13 +653,9 @@ int main(int argc, char* argv[])
 	// NEW ORDER sigma.e, range s, range t, sigma.u
 	// -log(p)/u where c(u, p)
 	theta_prior_param[0] = -log(0.01)/5; 	      //prior.sigma obs : 5, 0.01
-	//theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
-	theta_prior_param[1] = -log(0.01)/300;        
-    //theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
-	theta_prior_param[2] = -log(0.01)/1;
-    //theta_prior_param[3] = -log(0.5)/10;          //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
-    theta_prior_param[3] = -log(0.01)/5;	    
-
+	theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
+	theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
+	theta_prior_param[3] = -log(0.5)/10;	      //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
 	
         //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
         //theta << -0.2, -2, -2, 3;
@@ -838,7 +793,7 @@ int main(int argc, char* argv[])
     }
 
     //exit(1);
- 
+
     // ============================ set up BFGS solver ======================== //
 
     // Set up parameters
@@ -847,23 +802,20 @@ int main(int argc, char* argv[])
     // stop if norm of gradient smaller than :
     // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
     param.epsilon = 1e-1;
-    // param.epsilon = 1e-2; // ref sol
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
     // stops if grad.norm() < eps_rel*x.norm() 
     param.epsilon_rel=1e-3;
-    //param.epsilon_rel=1e-4; // ref sol
     //param.epsilon_rel = 1e-5;
     // in the past ... steps
     param.past = 2;
     // TODO: stepsize too small? seems like it almost always accepts step first step.    
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    //param.delta = 1e-3;
-    param.delta = 1e-7;
-    //param.delta = 1e-9; // ref sol
+    param.delta = 1e-3;
+    //param.delta = 1e-10;
     // maximum line search iterations
-    param.max_iterations = 200; //200;
+    param.max_iterations = 200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -888,12 +840,12 @@ int main(int argc, char* argv[])
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, constr, Dx, Dxy, validate, w);
     } else {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, constr, Dx, Dxy, validate, w);
     }
 
     if(MPI_rank == 0)
@@ -906,27 +858,18 @@ int main(int argc, char* argv[])
 
     // convert from interpretable parametrisation to internal one
     if(dim_th == 4){
-	   theta[0] = theta_param[0];
+        theta[0] = theta_param[0];
         fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
 
         if(MPI_rank == 0){
             Vect theta_interpret_initial(dim_th);
             theta_interpret_initial[0] = theta[0];
             fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
-            std::cout << "theta interpret. param. : " << theta_param.transpose() << std::endl;
-	    std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+            std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
             std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
         }
     }
 
-    //exit(1);
-
-#ifdef WRITE_RESULTS
-   string results_folder = base_path + "/results_param_fixed_inverse";
-   if(MPI_rank == 0){
-    	create_folder(results_folder);
-   }
-#endif
 
 #if 0
 
@@ -978,105 +921,40 @@ if(MPI_rank == 0){
 
 #endif
 
-
-#if 0
-
-    if(MPI_rank == 0){
-
-    double estLogDetQst;
-    int nt_approx;
-    SpMat Qst_approx;
-
-    //theta << 1, -3, 2, 4;
-    //theta = theta_original;
-
-    // construct Qst_approx 
-    nt_approx = 5; //floor(nt/10.0); //nt-2;
-    fun->eval_log_prior_lat_approx(theta, nt_approx, estLogDetQst);
-    std::cout << "\nnt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-
-    /*
-    nt_approx = 10; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-
-    nt_approx = 20; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    
-    nt_approx = 50; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    */
-
-    /*
-    nt_approx = 200; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    */
-
-    double val;
-    fun->eval_log_prior_lat(theta, val);
-    std::cout << "nt : " << nt << ", true LogDet    : " << 2*val << std::endl;
-
-    //std::cout << "\nnorm(Qst - Qst_approx) : " << (Qst - Qst_approx).norm() << std::endl;
-
-    }
-
-#endif // #if true/false
-
-
     double fx;
 
 #if 0
-	
-    //theta_param << -2.152, 9.534, 11.927, 3.245;
-   
-    theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-
-    if(MPI_rank == 0){
-        std::cout << "theta param : " << theta_param.transpose() << std::endl;
-        std::cout << "theta       : " << theta.transpose() << std::endl;
-    }
-
     double t_f_eval = -omp_get_wtime();
 
     ArrayXi fact_to_rank_list(2);
     fact_to_rank_list << 0,0;
-    /*if(MPI_size >= 2){
+    if(MPI_size >= 2){
         fact_to_rank_list[1] = 1; 
         }
     std::cout << "i = " << 0 << ", MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-      */      
-    if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
+            
+    if(MPI_rank == fact_to_rank_list[0]){ // || MPI_rank == fact_to_rank_list[1]){
 
-        // single function evaluation
-        for(int i=0; i<5; i++){
+    	// single function evaluation
+    	for(int i=0; i<1; i++){
 
-            Vect mu_dummy(n);
-        double t_temp = -omp_get_wtime();
-            fx = fun->eval_post_theta(theta, mu_dummy);
-            //fx = fun->eval_post_theta(theta_original, mu_dummy);
-        t_temp += omp_get_wtime();
+    		Vect mu_dummy(n);
+		double t_temp = -omp_get_wtime();
+    		//fx = fun->eval_post_theta(theta, mu_dummy, fact_to_rank_list);
+            	fx = fun->eval_post_theta(theta, mu_dummy);
+		t_temp += omp_get_wtime();
 
-                if(MPI_rank == fact_to_rank_list[0])
-            std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
+    	        if(MPI_rank == fact_to_rank_list[0])
+			std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
 
         }
     }
 
-    t_f_eval += omp_get_wtime();
-    if(MPI_rank == fact_to_rank_list[0])
-        std::cout << "time in f eval loop : " << t_f_eval << std::endl;
+	t_f_eval += omp_get_wtime();
+	if(MPI_rank == fact_to_rank_list[0])
+		std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
 #endif
-
-double time_bfgs = 0.0;
 
 #if 1
     if(MPI_rank == 0)
@@ -1089,8 +967,6 @@ double time_bfgs = 0.0;
     //theta_param << -2.484481  7.836006  7.023295  2.504872
     //theta_param << -1.5, 8, 8, 3;
 
-    //theta_param << -2.15, 9.57, 11.83, 3.24;
-
     theta[0] = theta_param[0];
     fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
 
@@ -1099,7 +975,7 @@ double time_bfgs = 0.0;
         std::cout << "theta       : " << theta.transpose() << std::endl;
     }
 
-    time_bfgs = -omp_get_wtime();
+    double time_bfgs = -omp_get_wtime();
     int niter = solver.minimize(*fun, theta, fx, MPI_rank);
 
     //LIKWID_MARKER_CLOSE;
@@ -1124,16 +1000,6 @@ double time_bfgs = 0.0;
         std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
 
-
-#ifdef WRITE_RESULTS
-    if(MPI_rank == 0){
-    	std::string file_name_theta = results_folder + "/mode_theta_interpret_param.txt";
-    	theta_param[0] = theta[0];
-    	fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_param[1], theta_param[2], theta_param[3]);
-    	write_vector(file_name_theta, theta_param, dim_th);
-    }
-#endif
-
     /*std::cout << "\nestimated mean theta         : " << theta.transpose() << std::endl;
     std::cout << "original theta               : " << theta_prior.transpose() << "\n" << std::endl;*/
 
@@ -1152,8 +1018,8 @@ double time_bfgs = 0.0;
 
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
-        theta_original_param[0] = theta_original[0];
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
+        double prior_sigU; double prior_ranS; double prior_ranT;
+        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], prior_ranT, prior_ranS, prior_sigU);
         //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
         std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
 
@@ -1163,13 +1029,11 @@ double time_bfgs = 0.0;
         std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
     }
 
-#endif
-
- double t_get_covariance = 0.0;
+    #endif
 
 #if 1
     Vect theta_max(dim_th);
-    //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
+    //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
     theta_max = theta;
 
@@ -1200,49 +1064,26 @@ double time_bfgs = 0.0;
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
    
-    //interpret_theta << -2.152, 9.679, 12.015, 3.382;
 #ifdef PRINT_MSG 
     if(MPI_rank == 0){
-        std::cout << "est. Hessian at theta param : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+        std::cout << "est.  mean interpret. param. : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
     }
 #endif
 
-    //double t_get_covariance = -omp_get_wtime();
-    t_get_covariance = -omp_get_wtime();
+    double t_get_covariance = -omp_get_wtime();
+    //t_get_covariance = -omp_get_wtime();
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
     t_get_covariance += omp_get_wtime();
 
 
     if(MPI_rank == 0){
         std::cout << "\ncovariance interpr. param.  : \n" << cov << std::endl;
-        std::cout << "\nsd hyperparameters interpr. :   " << cov.diagonal().cwiseSqrt().transpose() << std::endl;
         //std::cout << "time get covariance         : " << t_get_covariance << " sec" << std::endl;
-
-#ifdef WRITE_RESULTS
-    std::string file_name_cov = results_folder + "/inv_hessian_mode_theta_interpret_param.txt";
-    write_matrix(file_name_cov, cov);
-#endif
     }
-
-#endif
-
-#endif
+    #endif
 
 
 #if 1
-
-    /*
-    //theta_param << -1.407039,  8.841431,  9.956879,  3.770581;
-    theta_param << -1.40701328482976, 9.34039748237832, 11.0020161941741, 4.27820007271347;
-    theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-    //theta << -1.407039, -7.801710, -6.339689, 5.588888;
-
-    if(MPI_rank == 0){
-        std::cout << "Computing mean latent parameters using theta interpret : " << theta_param.transpose() << std::endl;
-    }
-    */
-
     double t_get_fixed_eff;
     Vect mu(n);
 
@@ -1268,52 +1109,10 @@ double time_bfgs = 0.0;
         std::cout << "estimated mean random effects: " << mu.head(10).transpose() << std::endl;
         //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
 
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
         if(constr == true)
             std::cout << "Dxy*mu : " << (Dxy*mu).transpose() << ", \nshould be : " << e.transpose() << std::endl;
-//#endif
-
-#ifdef WRITE_RESULTS
-    std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
-    write_vector(file_name_fixed_eff, mu, n);
 #endif
-
-// write matrix to file for debugging ... 
-#if 0
-
-    SpMat Qprior(ns*nt,ns*nt);
-    fun->construct_Q_spat_temp(theta, Qprior);
-    
-    std::cout << "Qprior(1:10,1:10):\n" << Qprior.block(0,0,20,20) << std::endl;
-    std::string Qprior_file = base_path + "/Qprior_" + n_s + "_" + n_s + ".dat";
-    write_sym_CSC_matrix(Qprior_file, Qprior); 
-     
-    
-    // write to file first time step
-    SpMat Qprior_1stTs =  Qprior.block(0,0,ns,ns);
-    std::cout << "dim(Qprior_1stTs) = " << Qprior_1stTs.rows() << "_" << Qprior_1stTs.cols() << std::endl;
-    std::string Qprior_1stTs_file = base_path + "/Qprior_1stTs_" + ns_s + "_" + ns_s + ".dat";
-    write_sym_CSC_matrix(Qprior_1stTs_file, Qprior_1stTs);  
-
-    
-    SpMat Q(n,n);
-    fun->construct_Q(theta, Q);
-    std::cout << "Q(1:10,1:10):\n" << Q.block(0,0,20,20) << std::endl;
-    std::string Q_file = base_path + "/Qxy_" + n_s + "_" + n_s + ".dat";
-    write_sym_CSC_matrix(Q_file, Q);  
-
-    std::cout << "Q(1:10,1:10)-Qprior(1:10,1:10):\n" << Q.block(0,0,20,20) -  Qprior.block(0,0,20,20) << std::endl;
-
-    Vect b(n);
-    fun->construct_b(theta, b);
-    std::cout << "b(1:10): " << b.head(10).transpose() << std::endl;
-    std::string b_file = base_path + "/b_xy_" + n_s + "_1.dat";
-    write_vector(b_file, b, n);
-    
-
-#endif
-
-
     }
 
 
@@ -1345,6 +1144,7 @@ double time_bfgs = 0.0;
 #endif
 
     
+#endif
 
 
   
@@ -1357,8 +1157,7 @@ double time_bfgs = 0.0;
     if(MPI_rank == 0){
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
-
+        std::cout << "\nUSING ESTIMATED THETA : " << theta_max.transpose() << std::endl;
 
     	t_get_marginals = -omp_get_wtime();
     	fun->get_marginals_f(theta, marg);
@@ -1368,13 +1167,6 @@ double time_bfgs = 0.0;
         std::cout << "est. standard dev fixed eff  : " << marg.tail(nb).cwiseSqrt().transpose() << std::endl;
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
-
-#ifdef WRITE_RESULTS
-    	std::string file_name_marg = results_folder + "/sd_latent_parameters.txt";
-    	write_vector(file_name_marg, marg.cwiseSqrt(), n);
-#endif
-
-
     }
 /*
 #ifdef DATA_SYNTHETIC
@@ -1501,7 +1293,7 @@ double time_bfgs = 0.0;
 
 
     // =================================== print times =================================== //
-#if 1 
+#if 1
 
     int total_fn_call = fun->get_fct_count();
 
