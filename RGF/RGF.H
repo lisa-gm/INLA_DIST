@@ -455,7 +455,6 @@ double RGF<T>::FirstStageFactor()
        init_supernode(blockDense_dev, matrix_nt, magmaGemmCudaStream);
     }
 
-    cudaDeviceSynchronize(); // TO BE REPLACED
     // put it in cudaEvent
     //gpuErrchk(cudaEventRecord(copy_gpu, magmaGemmCudaStream)); // want compute_stream to wait
     //gpuErrchk(cudaStreamWaitEvent(compute_stream, copy_gpu, 0));
@@ -476,9 +475,12 @@ double RGF<T>::FirstStageFactor()
      // factorization first block -> set buffer flag to zero!
      cuda_buffer_flag[0] = 0;
      tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+   // magma_queue currently not supported
+    cudaDeviceSynchronize(); 
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+    cudaDeviceSynchronize();
 #endif
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     t_temp = get_time(t_temp);
@@ -486,8 +488,8 @@ double RGF<T>::FirstStageFactor()
     //printf("IB = %d, t_potrf = %f\n", IB, t_temp);
     flop_count += 1.0/3.0 * NR * NR * NR;
 
-   // the trsm shouldn't be launched until potrf has finished
-    cudaDeviceSynchronize();
+   // the trsm shouldn't be launched until potrf has finished -> should be ok because executed in the same stream
+   //cudaDeviceSynchronize();
 
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
@@ -502,6 +504,7 @@ double RGF<T>::FirstStageFactor()
 
     t_temp = get_time(0.0);
     cudaDeviceSynchronize();
+    // if copy supernode device to host happens while new supernode is being initialized ... memory issues?
     copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
     t_temp = get_time(t_temp);
     t_copy_DtH =+ t_temp;
@@ -562,9 +565,6 @@ double RGF<T>::FirstStageFactor()
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM;
        }
 
-      // how can I get the default stream to wait but make an exception for copyStreamDtH ?
-      cudaDeviceSynchronize(); // TO BE REPLACED
-
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        t_temp = get_time(0.0);
@@ -576,9 +576,12 @@ double RGF<T>::FirstStageFactor()
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+      // how can I get the default stream to wait but make an exception for copyStreamDtH ?
+      cudaDeviceSynchronize(); // TO BE REPLACED
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+       cudaDeviceSynchronize();
 #endif
 
        nvtxRangeEnd(id_dpotrf);
@@ -634,8 +637,6 @@ double RGF<T>::FirstStageFactor()
           flop_count +=  matrix_nd *matrix_nd *(NM+2) + matrix_nd *matrix_nd *NM; 
        }
 
-       cudaDeviceSynchronize(); // TO BE REPLACED
-
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
         nvtxRangeId_t id_dpotrf = nvtxRangeStartA("LastPotrf");       
@@ -645,8 +646,9 @@ double RGF<T>::FirstStageFactor()
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+       cudaDeviceSynchronize(); // TO BE REPLACED
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
 #endif
        nvtxRangeEnd(id_dpotrf);
@@ -696,7 +698,7 @@ double RGF<T>::FirstStageFactor()
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #endif
@@ -771,11 +773,11 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 
        // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
         nvtxRangeId_t id_dpotrf = nvtxRangeStartA("firstPotrf");  
-       cudaDeviceSynchronize();     
 #ifdef CUDA_POTRF
        tpotrf_dev_cuda('L', NR, blockM_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+       cudaDeviceSynchronize();     
        tpotrf_dev('L', NR, blockM_dev, mf_block_lda(IB, IB), &info);
 #endif
        nvtxRangeEnd(id_dpotrf);    
@@ -837,8 +839,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        init_supernode(blockDense_dev, matrix_nt, magmaGemmCudaStream);
     }
 
-    cudaDeviceSynchronize();
-
 #ifdef PRINT_MSG
     std::cout << "calling first Cholesky factorization now" << std::endl;
     std::cout << "IB = " << IB << std::endl;
@@ -854,15 +854,15 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
      // factorization first block -> set buffer flag to zero!
      cuda_buffer_flag[0] = 0;
      tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+    cudaDeviceSynchronize();
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
 #endif
 
     nvtxRangeEnd(id_dpotrf);    
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     flop_count += 1.0/3.0 * NR * NR * NR;
-
     cudaDeviceSynchronize();
 
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
@@ -918,11 +918,8 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
           flop_count += 2.0 * matrix_nd * matrix_nd * NM + 2.0 * matrix_nd * matrix_nd;
        }
 
-       cudaDeviceSynchronize();
-
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
-       cudaDeviceSynchronize();
        nvtxRangeId_t id_dpotrf = nvtxRangeStartA("Potrf_inLoop");       
        //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
 #ifdef CUDA_POTRF
@@ -931,8 +928,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+       cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
 #endif
        nvtxRangeEnd(id_dpotrf);
@@ -983,8 +981,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
           flop_count += 2.0* matrix_nd * matrix_nd * NM + 2.0 * matrix_nd*matrix_nd;
        }
 
-        cudaDeviceSynchronize();
-
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        //tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);    
@@ -994,13 +990,14 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+       cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+       cudaDeviceSynchronize();
 #endif
        flop_count += 1.0/3.0 * NR * NR * NR;
 
-       cudaDeviceSynchronize();
     
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
@@ -1039,7 +1036,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
          cuda_buffer_flag[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
-                       handle, params, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+                       handle, params, magmaGemmCudaStream, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #endif

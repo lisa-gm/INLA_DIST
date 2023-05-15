@@ -452,12 +452,9 @@ inline void tgemm_dev(char transa, char transb, int m, int n, int k, double alph
     magma_trans_t magma_transa = magma_trans_const(transa);
     magma_trans_t magma_transb = magma_trans_const(transb);
 
-    cudaDeviceSynchronize();
-
     //dgemm_on_dev(handle,transa,transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc);
     magma_dgemm(magma_transa,magma_transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc,queue);
 
-    cudaDeviceSynchronize();
 }
 
 template <>
@@ -670,12 +667,12 @@ inline void zgetrs_nopiv_dev(char transa,int n,int nrhs,CPX *a,int lda,CPX *b,in
 
 template <typename T>
 inline void tpotrf_dev_cuda(char uplo,int n,T *a,int lda,int *info, int* cuda_buffer_flag, 
-                       cusolverDnHandle_t* handle, cusolverDnParams_t *params,
+                       cusolverDnHandle_t* handle, cusolverDnParams_t *params, cudaStream_t stream,
                        size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host);
 
 template <>
 inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cuda_buffer_flag, 
-                       cusolverDnHandle_t *handle, cusolverDnParams_t *params,
+                       cusolverDnHandle_t *handle, cusolverDnParams_t *params, cudaStream_t stream,
                        size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host)
 {
 
@@ -743,11 +740,16 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
 
     //printf("n = %d, lda = %d, uplo = %c, dev_size = %ld, host_size = %ld\n", n, lda, uplo, dev_size[0], host_size[0]);
 
-    cudaDeviceSynchronize();
-    cusolverStatus_t cuSolverError = cusolverDnXpotrf(
+    cusolverStatus_t cuSolverError = cusolverDnSetStream(*handle, stream);
+    if(cuSolverError != 0){
+        printf("cuSolverError set Stream! cuSolverError = %d\n", cuSolverError);
+        exit(1);
+    } 
+
+    cuSolverError = cusolverDnXpotrf(
             *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, 
             mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info);
-    cudaDeviceSynchronize();
+
 
     if(cuSolverError != 0){
         printf("cuSolverError potrf! cuSolverError : %d, lda = %d\n", cuSolverError, lda);
@@ -755,7 +757,7 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
     }
 
     int info_host;
-    cudaMemcpy(&info_host, info, sizeof(int), cudaMemcpyDeviceToHost);
+    cudaMemcpyAsync(&info_host, info, sizeof(int), cudaMemcpyDeviceToHost, stream);
 
     if(info_host != 0){
         printf("cuSolverError potrf info not zero! info = %d, lda = %d\n", info_host, lda);
@@ -766,7 +768,7 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
 
 template <>
 inline void tpotrf_dev_cuda(char uplo,int n,CPX *a,int lda,int *info, int *cuda_buffer_flag, 
-                       cusolverDnHandle_t *handle, cusolverDnParams_t *params,
+                       cusolverDnHandle_t *handle, cusolverDnParams_t *params, cudaStream_t stream,
                        size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host)
 {
     printf("just a placeholder. not working!\n");
