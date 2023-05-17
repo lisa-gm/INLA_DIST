@@ -832,11 +832,7 @@ inline void ttrsm_dev(char side, char uplo, char trans, char diag, int m, int n,
     magma_trans_t magma_trans = magma_trans_const(trans);
     magma_diag_t magma_diag = magma_diag_const(diag);
 
-    cudaDeviceSynchronize();
-
     magma_dtrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
-
-    cudaDeviceSynchronize();
 }
 
 template <>
