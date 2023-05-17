@@ -144,6 +144,7 @@ private:
     inline void copy_supernode_to_host_write(T *M_dev, size_t supernode); // debugging ...
 
     inline void copy_supernode_to_device(T *M_dev, size_t supernode);
+    //inline void copy_supernode_diag(T *src, size_t supernode, cudaStream_t stream);
     inline void copy_supernode_diag(T *src, size_t supernode);
     inline void swap_pointers(T **ptr1, T **ptr2);
 
@@ -873,6 +874,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
     // count floating point operations
     double flop_count = 0;
 
+    double t_temp;
+    double t_dgemm;
+
 //tpotrf_dev('L', NR, M1_dev ,NR ,&info)
 //rj dpotrf MF[0,0]
 //rj dtrsm RLTN MF[0,0] MF[1,0]
@@ -905,21 +909,40 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 #else
     cudaDeviceSynchronize();
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+    cudaDeviceSynchronize();
+
 #endif
 
     nvtxRangeEnd(id_dpotrf);    
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     flop_count += 1.0/3.0 * NR * NR * NR;
-    cudaDeviceSynchronize();
 
+    gpuErrchk(cudaEventRecord(potrf_dev_ev, magma_cudaStream_1)); 
+    gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, potrf_dev_ev, 0));   
+
+    // TODO: if nt = 0 but nd != 0 => problem !! 
     //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
     {
+       t_temp = get_time(0.0);	    
        // UPDATE COLUMNS ACCORDING TO CHOLESKY FACTORISATION
-       ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue_1);
-       flop_count += (NR + matrix_nd) * NR * NR;
+       // separate the two operations
+       //ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue_1);
+       ttrsm_dev('R', 'L', 'T', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue_1);
+
+       t_temp = get_time(t_temp);
+       t_dgemm += t_temp;
+       flop_count += NR * NR * NR;
     }
 
+    if (matrix_nd > 0){
+      //printf("mf_dense_block_offset(IB) : %ld\n", mf_dense_block_offset(IB));
+      //printf("mf_dense_block_lda(IB) : %ld\n", mf_dense_block_lda(IB));
+       ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
+       flop_count += matrix_nd * NR * NR;
+    }
+
+    cudaDeviceSynchronize();
     // replace all copy supernode to host by computing sum of current diagonal block
     //copy_supernode_to_host(blockR_dev, IB);
     copy_supernode_diag(blockR_dev, IB);
@@ -942,7 +965,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        swap_pointers(&blockR_dev, &blockM_dev);
        init_supernode(blockR_dev, IB, magma_cudaStream_1);
 
-       cudaDeviceSynchronize();
+       //cudaDeviceSynchronize();
+       gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
+       gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
 
        // UPDATE NEXT DIAGONAL BLOCK 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
@@ -956,12 +981,12 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        if (matrix_nd > 0)
        {
           // Update dense rows of super node IB
-          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_1);
+          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
           // NM = NR
           flop_count += 2.0*matrix_nd * NR * NM + 2.0*matrix_nd * NR; //  matrix_nd *NR *(NM+2) + matrix_nd *NR *NM
           
           // update last diagonal block
-          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_1);
+          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_2);
           flop_count += 2.0 * matrix_nd * matrix_nd * NM + 2.0 * matrix_nd * matrix_nd;
        }
 
@@ -979,29 +1004,36 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 #else
        cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+       cudaDeviceSynchronize();
 #endif
        nvtxRangeEnd(id_dpotrf);
        flop_count += 1.0/3.0 * NR * NR * NR;
 
-       cudaDeviceSynchronize();
-
+       magma_event_record(potrf_dev_magma_ev, magma_queue_1);	      
+       magma_queue_wait_event(magma_queue_2, potrf_dev_magma_ev);	
+       
+       // triangular solve, all columns -> potentially split this ... when nd large ... two separate streams.
        //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
-
        //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
        nvtxRangeId_t id_ttrsm = nvtxRangeStartA("ttrsm_inLoop");       
-       ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue_1);
+       //ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue_1);
+       ttrsm_dev('R', 'L', 'T', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue_1);
+
+       if(matrix_nd > 0){
+         ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
+       }
+
        nvtxRangeEnd(id_ttrsm);       
-       flop_count += (NR + matrix_nd) * NR * NR;
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
-      cudaDeviceSynchronize();
 
+       flop_count += (NR + matrix_nd) * NR * NR;
+
+       cudaDeviceSynchronize();
        //copy_supernode_to_host(blockR_dev, IB);
        copy_supernode_diag(blockR_dev, IB);
 
-      cudaDeviceSynchronize();
-
-    }
+    } // end loop IB
 
     if (matrix_nt > 1)
     {
@@ -1012,7 +1044,8 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        swap_pointers(&blockR_dev, &blockM_dev);
        init_supernode(blockR_dev, IB, magma_cudaStream_1);
 
-       cudaDeviceSynchronize();
+       gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
+       gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
        // todo rj: 3-last parameter ZERO in PARDISO
@@ -1021,10 +1054,10 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 
        if (matrix_nd > 0)
        {
-          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_1);
+          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
           flop_count += 2.0*matrix_nd * NR * NM + 2.0*matrix_nd * NR;
 
-          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_1);
+          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_2);
           flop_count += 2.0* matrix_nd * matrix_nd * NM + 2.0 * matrix_nd*matrix_nd;
        }
 
@@ -1056,8 +1089,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        }
        //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
 
-       cudaDeviceSynchronize();
-
        //copy_supernode_to_host(blockR_dev, IB);
        copy_supernode_diag(blockR_dev, IB);
 
@@ -1085,7 +1116,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
+       cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+       cudaDeviceSynchronize();
 #endif
        flop_count += 1.0/3.0 * matrix_nd * matrix_nd * matrix_nd;
 
