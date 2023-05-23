@@ -794,7 +794,7 @@ void PardisoSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd
 } // end factorize solve with constraints
 
 
-void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
+void PardisoSolver::selected_inversion_diag(SpMat& Q, Vect& inv_diag){
 
     int nrhs = 1; // only dummy?
 
@@ -930,7 +930,7 @@ void PardisoSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
 } // end selected inversion function
 
 
-void PardisoSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V){
+void PardisoSolver::selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V){
 
     #ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;
@@ -1082,7 +1082,7 @@ void PardisoSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vec
 } // end selected inversion with constraints function
 
 
-void PardisoSolver::selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv){
+void PardisoSolver::selected_inversion_full(SpMat& Q, SpMat& Qinv){
 
     int nrhs = 1; // only dummy?
 
@@ -1227,7 +1227,7 @@ void PardisoSolver::selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv){
 
 
 
-void PardisoSolver::selected_inversion_fullTakInv_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V){
+void PardisoSolver::selected_inversion_full_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V){
 
     #ifdef PRINT_PAR
         std::cout << "init = " << init << std::endl;

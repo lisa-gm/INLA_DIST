@@ -104,14 +104,14 @@ class RGFSolver: public Solver {
          * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
          * @note is there some way to potentially reuse Cholesky factor that is already on CPU?
          */
-      	void selected_inversion(SpMat& Q, Vect& inv_diag);
+      	void selected_inversion_diag(SpMat& Q, Vect& inv_diag);
 
         // function description TODO ... 
-        void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
+        void selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
 
-        void selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv);
+        void selected_inversion_full(SpMat& Q, SpMat& Qinv);
 
-        void selected_inversion_fullTakInv_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V);
+        void selected_inversion_full_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V);
 
         void compute_full_inverse(SpMat& Q, MatrixXd& Qinv);
 

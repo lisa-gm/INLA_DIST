@@ -9,8 +9,8 @@
 
 
 // choose one of the two
-//#define DATA_SYNTHETIC
-#define DATA_TEMPERATURE
+#define DATA_SYNTHETIC
+//#define DATA_TEMPERATURE
 
 // enable RGF solver or not
 #define RGF_SOLVER
@@ -19,7 +19,7 @@
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
-#define WRITE_RESULTS
+//#define WRITE_RESULTS
 
 // if predict defined -> account for missing data
 #define PREDICT    
@@ -519,11 +519,11 @@ int main(int argc, char* argv[])
 	threads_level1 = omp_get_max_threads();
 	#pragma omp parallel
 	{
-	threads_level2 = omp_get_max_threads();
+	    threads_level2 = omp_get_max_threads();
 	}
     } else {
-	threads_level1 = omp_get_max_threads();
-	//threads_level2 = omp_get_max_threads();
+	    //threads_level1 = omp_get_max_threads();
+	    //threads_level2 = omp_get_max_threads();
     	threads_level2 = 1;
     }
 
@@ -534,8 +534,8 @@ int main(int argc, char* argv[])
         printf("\n============== PARALLELISM & NUMERICAL SOLVERS ==============\n");
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
-        //printf("OMP threads level 2 : %d\n", threads_level2);
-	printf("OMP threads level 2 FIXED TO 1!!\n");
+        printf("OMP threads level 2 : %d\n", threads_level2);
+	    //printf("OMP threads level 2 FIXED TO 1!!\n");
 #ifdef RGF_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
@@ -1138,7 +1138,8 @@ exit(1);
         no = y_ind.sum(); 
 
         if(MPI_rank == 0){
-            std::cout << "number of missing observations: " << no_all - no << std::endl;
+            std::cout << "total length y : " << no_all << ", total missing : " << no_all - no << std::endl;
+            //std::cout << "total number of missing observations: " << no_all - no << std::endl;
             std::cout << "sum(y_ind) = " << y_ind.sum() << std::endl;
             std::cout << "y(1:10) = " << y_all.head(10).transpose() << std::endl;
         }
@@ -1176,6 +1177,8 @@ exit(1);
     }
 
 //exit(1);
+
+#endif
 
 
 /*
@@ -1746,58 +1749,6 @@ if(MPI_rank == 0){
 
 #endif
 
-
-#if 0
-
-    if(MPI_rank == 0){
-
-    double estLogDetQst;
-    int nt_approx;
-    SpMat Qst_approx;
-
-    //theta << 1, -3, 2, 4;
-    //theta = theta_original;
-
-    // construct Qst_approx 
-    nt_approx = 5; //floor(nt/10.0); //nt-2;
-    fun->eval_log_prior_lat_approx(theta, nt_approx, estLogDetQst);
-    std::cout << "\nnt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-
-    /*
-    nt_approx = 10; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-
-    nt_approx = 20; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    
-    nt_approx = 50; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    */
-
-    /*
-    nt_approx = 200; //floor(nt/10.0); //nt-2;
-    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
-    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
-    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
-    */
-
-    double val;
-    fun->eval_log_prior_lat(theta, val);
-    std::cout << "nt : " << nt << ", true LogDet    : " << 2*val << std::endl;
-
-    //std::cout << "\nnorm(Qst - Qst_approx) : " << (Qst - Qst_approx).norm() << std::endl;
-
-    }
-
-#endif // #if true/false
-
-
     double fx;
 
 #if 0
@@ -1842,7 +1793,7 @@ if(MPI_rank == 0){
     if(MPI_rank == fact_to_rank_list[0])
         std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
-#endif
+#endif 
 
 double time_bfgs = 0.0;
 
@@ -1931,7 +1882,7 @@ double time_bfgs = 0.0;
         std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
     }
 
-#endif
+#endif // end BFGS optimize
 
  double t_get_covariance = 0.0;
 
@@ -1945,7 +1896,7 @@ double time_bfgs = 0.0;
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 0
+#if 0
     double t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
@@ -1958,10 +1909,10 @@ double time_bfgs = 0.0;
         std::cout << "covariance                   : \n" << cov << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
     }
-    #endif
+#endif
 
 
-    #if 1
+#if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -1994,7 +1945,7 @@ double time_bfgs = 0.0;
 
 #endif
 
-#endif
+#endif // end get covariance
 
 
 #if 1
@@ -2049,9 +2000,10 @@ double time_bfgs = 0.0;
     write_vector(file_name_fixed_eff, mu, n);
 #endif
 
+#endif // endif get_mu()
+
 // write matrix to file for debugging ... 
 #if 0
-
         SpMat Qprior(ns*nt,ns*nt);
         fun->construct_Q_spat_temp(theta, Qprior);
         
@@ -2103,38 +2055,6 @@ double time_bfgs = 0.0;
 
 
     } // end if(MPI_rank == fact_to_rank_list[1]), get_mu()
-
-
-    // ============================================ validate ============================================= //
-    if(validate && MPI_rank == 0){
-        // compute 1/n*||(y - Ax*mu))|| for all w_i = 0 and w_i = 1 respectively
-        std::cout << "sum(y) = " << y.sum() << std::endl;
-
-        Vect diff_pred = y - Ax*mu;
-        std::cout << "diff_pred(1:10) = " << diff_pred.head(10).transpose() << std::endl;
-
-        double diff_temp_w1 = 0;
-        double diff_temp_w0 = 0;
-
-        for(int i=0; i<no; i++){
-            if(w(i) == 1){
-                diff_temp_w1 += diff_pred[i]*diff_pred[i];
-            } else {
-                diff_temp_w0 += diff_pred[i]*diff_pred[i];
-            }
-        }
-
-        double diff_w1 = 1/w.sum()*sqrt(diff_temp_w1);
-        double diff_w0 = 1/(no - w.sum())*sqrt(diff_temp_w0);
-
-        std::cout << "difference w_i = 1 : " << diff_w1 << std::endl;
-        std::cout << "difference w_i = 0 : " << diff_w0 << std::endl;
-    }
-#endif
-
-    
-
-
   
     // =================================== compute marginal variances =================================== //
 #if 1
@@ -2165,16 +2085,78 @@ double time_bfgs = 0.0;
 #ifdef PREDICT
 
        // get marginal variances for all locations y using A*inv(Q)*A^T
+       // TODOL QinvSp as rowmajor ...
        SpMat QinvSp(n,n);
        fun->get_fullFact_marginals_f(theta, QinvSp);
+       
+      std::cout << "QinvSp: est. standard dev fixed eff  : " << QinvSp.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
+      std::cout << "QinvSp: est. std dev random eff      : " << QinvSp.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
 
+       std::cout << "nnz(Ax_all) = " << Ax_all.nonZeros() << ", nnz(QinvSp) = " << QinvSp.nonZeros();
+       std::cout << ", dim(QinvSp) = " << QinvSp.rows() << " " << QinvSp.cols() << ", dim(Ax_all) = " << Ax_all.rows() << " " << Ax_all.cols() << std::endl;
+
+       SpRmMat temp = Ax_all;
+       SpRmMat temp2 = Ax_all;
+
+       //double* temp_array = new double[Ax_all.nonZeros()];
+
+       double t_firstMult = - omp_get_wtime();
+
+       // write my own multiplication
+       // for each row in Ax_all iterate through the columns of QinvSp -> only consider nonzero entries of Ax_all
+ 
+        int counter = 0;
+       for (int k=0; k<temp2.outerSize(); ++k){
+			for (SparseMatrix<double, RowMajor>::InnerIterator it(temp2,k); it; ++it)
+			{
+			    // access pattern is row-major -> can i directly write to 
+                it.valueRef() = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
+                //temp.valuePtr()[counter] = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
+                //temp_array[counter] = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
+                //temp.valuePtr()[counter] = temp1;
+                counter++;
+			}
+        } // end outer for loop
+    
+       t_firstMult += omp_get_wtime();
+       printf("time 1st Mult innerIter : %f\n", t_firstMult);
+       //exit(1);
+
+       //printf("norm(temp - temp2) = %f\n", (temp-temp2).norm());
+
+       Vect projMargVar(Ax_all.rows());
+       //Vect projMargVar2(Ax_all.rows());
+
+       double t_secondMult = - omp_get_wtime();
+       for(int i=0; i<Ax_all.rows(); i++){
+            //projMargVar(i) = (temp.row(i)).dot(Ax_ex.row(i));
+            projMargVar(i) = (temp.row(i)).dot(Ax_all.row(i));
+       }
+       t_secondMult += omp_get_wtime();
+       printf("time 2nd Mult: %f\n", t_secondMult);
+
+       //printf("norm(projMargVar - projMargVar2) = %f\n", (projMargVar - projMargVar2).norm());
+       //Vect projMargVar = QinvProj.diagonal();
+
+       printf("size(projMargVar) : %ld, no_all : %ld\n", projMargVar.size(), no_all);
+       
+       //std::cout << "est. std dev 1st 10 loc            : " << projMargVar.head(20).cwiseSqrt().transpose() << std::endl;
+
+       // inv(Q) comes in the form of double* invBlks -> CAREFUL particular order
+       //void get_projMargVar(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, double* invBlks, SpRmMat& A, Vect& projMargVar);
+       
+       Vect projMargSd(Ax_all.rows());
+       projMargSd = projMargVar.cwiseSqrt();
+
+#ifdef WRITE_RESULTS
+        std::string file_name_y_predict_sd = results_folder + "/y_predict_sd_ntFit" + to_string(nt_fit) + "_ntPred" + to_string(nt_pred) + "_tInit" + to_string(nt_init_fit) + ".txt";
+        write_vector(file_name_y_predict_sd, projMargSd, no_all);
+#endif
+
+#if 0
        MatrixXd Qinv_full(n,n);
        fun->compute_fullInverseQ(theta, Qinv_full);
-       
-      std::cout << "Qinv: est. standard dev fixed eff  : " << Qinv_full.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
-      std::cout << "Qinv: est. std dev random eff      : " << Qinv_full.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
-
-       //Vect temp = QinvSp.diagonal() - marg;
+       Vect temp = QinvSp.diagonal() - marg;
        Vect temp2 = Qinv_full.diagonal() - marg;
        //std::cout << "norm(diag(QinvBlks) - marg) = " << temp.norm() << std::endl;
        std::cout << "norm(marg) = " << marg.norm() << ", norm(diag(Qinv_full)) = " << Qinv_full.diagonal().norm() << std::endl;
@@ -2189,162 +2171,16 @@ double time_bfgs = 0.0;
 
        //std::cout << "Qinv_full - QinvSp: " << Qinv_full.block(0,0,20,20) - QinvSp.block(0,0,20,20) << std::endl;
 
-       SpRmMat Ax_allT = Ax_all.transpose();
-
-       SpMat QinvProj = Ax_all*QinvSp*Ax_allT;
-       Vect projMargVar = QinvProj.diagonal();
-
        MatrixXd QinvProjFULL = Ax_all*Qinv_full*Ax_allT;
        Vect projMargVarFULL = QinvProjFULL.diagonal();
-
-
-        //std::cout << "est. std dev 1st 10 loc            : " << projMargVar.head(20).cwiseSqrt().transpose() << std::endl;
-        std::cout << "est. std dev 1st 10 loc FULL       : " << projMargVarFULL.head(20).cwiseSqrt().transpose() << std::endl;
-
-
-       // inv(Q) comes in the form of double* invBlks -> CAREFUL particular order
-       //void get_projMargVar(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, double* invBlks, SpRmMat& A, Vect& projMargVar);
-       
-
-
-       Vect projMargSd(no_all);
-       projMargSd = projMargVar.cwiseSqrt();
-
-#ifdef WRITE_RESULTS
-        std::string file_name_y_predict_sd = results_folder + "/y_predict_sd_ntFit" + to_string(nt_fit) + "_ntPred" + to_string(nt_pred) + "_tInit" + to_string(nt_init_fit) + ".txt";
-        write_vector(file_name_y_predict_sd, projMargSd, no_all);
+       std::cout << "est. std dev 1st 10 loc FULL       : " << projMargVarFULL.head(20).cwiseSqrt().transpose() << std::endl;
 #endif
-
 
 
 #endif // end predict       
 
 
      } // end (MPI_rank == 0) for marginal variances
-
-/*
-#ifdef DATA_SYNTHETIC
-        // ============================================ //
-        Vect marg_original(n);
-        fun->get_marginals_f(theta_original, marg_original);
-
-        std::cout << "\nUSING ORIGINAL THETA : " << theta_original.transpose() << std::endl;
-        //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
-        std::cout << "est. standard dev fixed eff  : " << marg_original.tail(nb).cwiseSqrt().transpose() << std::endl;
-        std::cout << "est. std dev random eff      : " << marg_original.head(10).cwiseSqrt().transpose() << std::endl;
-        //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
-#endif
-
-        // ============================================ //
-        Vect theta_INLA(dim_th);
-#ifdef DATA_SYNTHETIC
-        if(no == 128400)
-            theta_INLA << 1.384902, -5.880753, 1.015273, 3.709717;  // 642, 20, 128400
-        if(no == 25680)
-            theta_INLA << 1.393959, -5.915735, 1.262288, 3.475778;    // 642, 20,  25680
-        if(no == 2520)
-            theta_INLA << 1.306129, -5.840268, 0.879396, 3.718468;
-        if(no == 630)
-             theta_INLA <<  2.005811, -6.074556, 1.112258,  3.828027;
-#elif defined(DATA_TEMPERATURE)
-        Vect theta_INLA_param(4);
-        theta_INLA_param << -1.270, 12.132, 9.773, 4.710;
-        //theta_INLA_param << -1.352, 1.912, 3.301, 3.051;
-
-        theta_INLA[0] = theta_INLA_param[0];
-        fun->convert_interpret2theta(theta_INLA_param[1], theta_INLA_param[2], theta_INLA_param[3], theta_INLA[1], theta_INLA[2], theta_INLA[3]);
-
-#endif
-
-        Vect marg_INLA(n);
-        fun->get_marginals_f(theta_INLA, marg_INLA);
-
-        std::cout << "\nUSING THETA FROM INLA : " << theta_INLA.transpose() << std::endl;
-        //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
-        std::cout << "est. standard dev fixed eff  : " << marg_INLA.tail(nb).cwiseSqrt().transpose() << std::endl;
-        std::cout << "est. std dev random eff      : " << marg_INLA.head(10).cwiseSqrt().transpose() << std::endl;
-        //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
-   */
-
-#endif  // #if 0/1 for marginals
-
-
-#if 0
-    // =================== expected marginal variances ============================ //
-    // first way
-    // construct Q = Qx(theta_mode) + theta_mode*AxTAx => assume Q_b = 1e-5*Id
-    // compute inverse -> using pardiso & using .inverse() => extract diagonal => compare
-
-    SpMat Qst(ns*nt,ns*nt);  // not n?!
-    construct_Q_spat_temp(theta, c0, g1, g2, g3, M0, M1, M2, Qst);
-
-    //SpMat epsId()
-
-    SpMat Qx(n,n);        
-    int nnz = Qst.nonZeros();
-    Qx.reserve(nnz);
-
-    for (int k=0; k<Qst.outerSize(); ++k){
-      for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
-      {
-        Qx.insert(it.row(),it.col()) = it.value();                 
-      }
-    }
-
-    for(int i=ns*nt; i < n; i++){
-        Qx.coeffRef(i,i) = 1e-3;
-    }
-
-    Qx.makeCompressed();
-
-    SpMat Q =  Qx + exp(theta[0]) * Ax.transpose()*Ax;
-
-
-    if(MPI_rank == 0){
-        //std::cout << "Qx(0,0,10,10) : \n" << Qx.block(0,0,10,10) << std::endl;
-        //std::cout << "Ax(0,0,30,30) : \n" << Ax.block(0,0,30,30) << std::endl;
-        
-        //MatrixXd AxTAx = exp(theta[0]) * Ax.transpose()*Ax;
-        //std::cout << "exp(theta[0]) = " << exp(theta[0]) << std::endl;
-        //std::cout << "AxTAx.topLeft(30,30) : \n" << AxTAx.topLeftCorner(30,30) << std::endl;
-        //std::cout << "AxTAx.bottomRight(10,10) : \n" << AxTAx.bottomRightCorner(10,10) << std::endl;
-
-
-        MatrixXd Q_d = MatrixXd(Q);
-        std::cout << "Q_topLeft(0,0,10,10) : \n" << Q_d.topLeftCorner(10,10) << std::endl;
-        std::cout << "Q_bottomRight(0,0,10,10) : \n" << Q_d.bottomRightCorner(10,10) << std::endl;
-
-        /*MatrixXd invQ_d = Q_d.inverse();
-        std::cout << "\nmarginals fixed effects = " << invQ_d.diagonal().tail(10).transpose() << std::endl;
-        std::cout << "marginals random effects= " << invQ_d.diagonal().head(10).transpose() << std::endl;*/
-
-        Solver* solverQ;
-        solverQ   = new PardisoSolver(MPI_rank);
-
-        Vect inv_diag(n);
-        solverQ->selected_inversion(Q, inv_diag);
-        std::cout << "\nmarg std dev FE 'true'       : " << inv_diag.tail(10).cwiseSqrt().transpose() << std::endl;
-        std::cout << "marg std dev RE 'true'       : " << inv_diag.head(10).cwiseSqrt().transpose() << std::endl;
-
-        // invert using eigen
-        /*SimplicialLDLT<SparseMatrix<double>> solverEigen;
-        solverEigen.compute(Q);
-
-        SpMat I(n,n); I.setIdentity();
-        MatrixXd fullInv(n,n);
-
-        std::cout << "identity matrix : \n" << I.block(0,0,10,10) << std::endl;
-
-        fullInv = solverEigen.solve(I);
-        std::cout << "norm(I - Q*fullInv) = " << (I - Q*fullInv).norm() << std::endl;
-
-        std::cout << "marg std dev FE fullInv      : " << fullInv.diagonal().tail(10).cwiseSqrt().transpose() << std::endl;
-        std::cout << "marg std dev RE fullInv      : " << fullInv.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
-        */
-
-    }    
-#endif
-
 
     // =================================== print times =================================== //
 #if 1 
@@ -2360,53 +2196,8 @@ double time_bfgs = 0.0;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
         std::cout << "total time                   : " << t_total << " sec" << std::endl;
     }
-    #endif
-
-
-    // ======================== write LOG file ===================== //
-    // mpi_size, no_threads level 1, level 2, solver_type
-    // ns, nt, nb, no, synthetic/real, theta_prior, theta_original (set all zero in real case), in both 
-    // parametrisations?
-    // theta_max, interpret_param_theta_max
-    // mean fixed effects
-    // var/std fixed effects
-    // no of iterations BFGS
-    // runtimes: BFGS, time per iteration, covariance (hessian), partial inversion, total
-
-#ifdef WRITE_LOG
-    if(MPI_rank == 0){
-
-        // add time stamp to not overwrite?
-        std::string log_file_name = base_path + "/log_"+ solver_type + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
-        std::ofstream log_file(log_file_name);
-        log_file << "mpi_size\t" << MPI_size << std::endl;
-        log_file << "threads_l1\t" << threads_level1 << std::endl;
-        log_file << "threads_l2\t" << threads_level2 << std::endl;
-        log_file << "noGPUs\t" << noGPUs << std::endl;
-        log_file << "solver_type\t" << solver_type << std::endl;
-        log_file << "datatype\t" << data_type << std::endl;
-        log_file << "ns\t" << ns << std::endl;
-        log_file << "nt\t" << nt << std::endl;
-        log_file << "num_fixed\t" << nb << std::endl;
-        log_file << "num_obs\t" << no << std::endl;
-        log_file << "theta_prior_param\t" << theta_prior_param.transpose() << std::endl;
-        log_file << "theta_original\t" << theta_original.transpose() << std::endl;
-        log_file << "theta_max\t" << theta_max.transpose() << std::endl;
-        log_file << "interpret_param_theta_max\t" << interpret_theta.transpose() << std::endl;
-	log_file << "mean_fixed_eff\t" << mu.tail(nb).transpose() << std::endl;
-        log_file << "std_dev_fixed_eff\t" << marg.tail(nb).cwiseSqrt().transpose() << std::endl;          log_file << "time_bfgs\t" << time_bfgs << std::endl;
-        log_file << "noIter\t" << niter << std::endl; 
-        log_file << "time_Iter\t" << time_bfgs/niter << std::endl;
-        log_file << "time_Cov\t" << t_get_covariance << std::endl;               
-        log_file << "time_MargFE\t" << t_get_marginals <<  std::endl;
-        log_file << "t_total\t" << t_total << std::endl;
-
-  log_file.close(); 
-
-    }
 
 #endif
-
 
     delete fun;
 

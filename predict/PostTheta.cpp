@@ -904,7 +904,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			MatrixXd V(n, Dxy.rows());
-			solverQ->selected_inversion_w_constr(Q, Dxy, vars, V);
+			solverQ->selected_inversion_diag_w_constr(Q, Dxy, vars, V);
 			MatrixXd W = Dxy*V;
 			MatrixXd S = W.inverse()*V.transpose();
 
@@ -926,7 +926,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& vars){
 		{
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
-			solverQ->selected_inversion(Q, vars);
+			solverQ->selected_inversion_diag(Q, vars);
 		}
 		}
 	}
@@ -957,7 +957,7 @@ void PostTheta::get_fullFact_marginals_f(Vect& theta, SpMat& Qinv){
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			MatrixXd V(n, Dxy.rows());
-			solverQ->selected_inversion_fullTakInv_w_constr(Q, Dxy, Qinv, V);
+			solverQ->selected_inversion_full_w_constr(Q, Dxy, Qinv, V);
 			//solverQ->selected_inversion_w_constr(Q, Dxy, vars, V);
 			MatrixXd W = Dxy*V;
 			MatrixXd S = W.inverse()*V.transpose();
@@ -973,12 +973,13 @@ void PostTheta::get_fullFact_marginals_f(Vect& theta, SpMat& Qinv){
 			SpMat VS = Q.triangularView<Lower>();
 			size_t nnzQ_lower = VS.nonZeros();
 
-			for (int k=0; k<VS.outerSize(); ++k)
+			for (int k=0; k<VS.outerSize(); ++k){
 			  for (SparseMatrix<double>::InnerIterator it(VS,k); it; ++it)
 			  {
 			    it.valueRef() = V.row(it.row())*S.col(it.col());
 			  }
-
+			}
+			
 			//std::cout << "\nvars        = " << vars.transpose() << std::endl;			
 			//std::cout << "update_vars = " << update_vars.tail(10).transpose() << std::endl;
 			Qinv = Qinv - VS;
@@ -993,7 +994,7 @@ void PostTheta::get_fullFact_marginals_f(Vect& theta, SpMat& Qinv){
 		{
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
-			solverQ->selected_inversion_fullTakInv(Q, Qinv);
+			solverQ->selected_inversion_full(Q, Qinv);
 		}
 		}
 	}

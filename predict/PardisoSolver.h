@@ -128,13 +128,13 @@ public:
      * @param[in]       Q precision matrix.
      * @param[inout]    inv_diag inverse diagonal to hold the solution vector.
      */
-    void selected_inversion(SpMat& Q, Vect& inv_diag);
+    void selected_inversion_diag(SpMat& Q, Vect& inv_diag);
 
-    void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
+    void selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V);
 
-    void selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv);
+    void selected_inversion_full(SpMat& Q, SpMat& Qinv);
 
-    void selected_inversion_fullTakInv_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V);
+    void selected_inversion_full_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V);
     
     /**
      * @brief inversion of the entire matrix (only meant for small matrices) by means of using identity 

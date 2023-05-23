@@ -80,7 +80,7 @@ class PostTheta{
 
 	int fct_count;      /**< count total number of function evaluations 	*/
 	int iter_count;		/**< count total number of operator() call        	*/
-        int iter_acc;
+    int iter_acc;
     Vect y; 		/**<  vector of observations y. has length no. 		*/
     Vect theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */

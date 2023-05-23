@@ -32,11 +32,11 @@ class Solver {
 		virtual void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V) = 0;
 		virtual void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve) = 0;
 		virtual void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V) = 0;
-		virtual void selected_inversion(SpMat&Q, Vect& inv_diag) = 0;
-		virtual void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V) = 0;
-    virtual void selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv) = 0;
-    virtual void selected_inversion_fullTakInv_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V) = 0;
-    virtual void compute_full_inverse(SpMat& Q, MatrixXd& Qinv) = 0;
+		virtual void selected_inversion_diag(SpMat&Q, Vect& inv_diag) = 0;
+		virtual void selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V) = 0;
+    	virtual void selected_inversion_full(SpMat& Q, SpMat& Qinv) = 0;
+    	virtual void selected_inversion_full_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V) = 0;
+    	virtual void compute_full_inverse(SpMat& Q, MatrixXd& Qinv) = 0;
 
 
 		// "simple inversion" function for small matrices. exists already in pardiso.

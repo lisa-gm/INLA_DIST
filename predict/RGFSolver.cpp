@@ -540,7 +540,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
 
 // IMPLEMENT IN A WAY SUCH THAT FACTORISATION WILL BE PERFORMED AGAIN
 // FOR NOW: cannot rely on factorisation to be there.
-void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
+void RGFSolver::selected_inversion_diag(SpMat& Q, Vect& inv_diag) {
 
 #ifdef PRINT_MSG
     std::cout << "in RGF SELECTED_INVERSION()." << std::endl;
@@ -616,7 +616,7 @@ void RGFSolver::selected_inversion(SpMat& Q, Vect& inv_diag) {
 } // end selected inversion function
 
 
-void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V){
+void RGFSolver::selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V){
 
     int nrhs = D.rows();
 
@@ -722,13 +722,87 @@ void RGFSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& i
 }  // end selected inversion with constraints
 
 
-void RGFSolver::selected_inversion_fullTakInv(SpMat& Q, SpMat& Qinv) {
+void RGFSolver::selected_inversion_full(SpMat& Q, SpMat& Qinv) {
     std::cout << "Placeholder selected_inversion_fullTakInv() doesnt exist for BTA solver." << std::endl;
     exit(1);
-}
+
+#ifdef PRINT_MSG
+    std::cout << "in RGF SELECTED_INVERSION_FULL()." << std::endl;
+#endif
+
+    // check if n and Q.size() match
+    if(n != Q.rows()){
+        printf("\nInitialised matrix size and current matrix size don't match!\n");
+        printf("n = %ld.\nnrows(Q) = %ld.\n", n, Q.rows());
+        exit(1);
+    }
+
+    // only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+    size_t nnz = Q_lower.nonZeros();
+
+    // allocate memory
+    size_t* ia = new long unsigned int [n+1];
+    size_t* ja = new long unsigned int [nnz];
+    double* a  = new double [nnz];
+
+    //double* invDiag  = new double[n];
+    double* inva = new double [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        a[i] = Q_lower.valuePtr()[i];
+    }
+
+    double t_factorise, t_inv;
+
+    t_factorise = get_time(0.0);
+    double gflops_factorize = solver->factorize(ia, ja, a);
+    t_factorise = get_time(t_factorise);
+
+#ifdef PRINT_TIMES
+    printf("RGF factorise time: %lg\n",t_factorise);
+#endif
+
+    t_inv = get_time(0.0);
+    double gflops_inv = solver->RGFselInv(ia, ja, a, inva);
+    t_inv = get_time(t_inv);
+
+#ifdef PRINT_MSG
+    printf("gflops factorise:      %f\n", gflops_factorize);
+    printf("gflops inv      :      %f\n", gflops_inv);
+#endif
+
+#ifdef PRINT_TIMES
+    printf("RGF factorise time: %lg\n",t_factorise);
+    printf("RGF sel inv time  : %lg\n",t_inv);
+#endif
+
+    SpMat Qinv_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
+                               Q_lower.innerIndexPtr(),inva);
+
+    // TODO: more efficient way to do this?
+    Qinv = Qinv_lower.selfadjointView<Lower>();
+
+    // free memory
+    delete[] ia;
+    delete[] ja;
+    delete[] a;
+    delete[] inva;
+
+} // end selected_inversion_full
 
 
-void RGFSolver::selected_inversion_fullTakInv_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V){
+void RGFSolver::selected_inversion_full_w_constr(SpMat& Q, const MatrixXd& D, SpMat& Qinv, MatrixXd& V){
     std::cout << "Placeholder selected_inversion_fullTakInv_w_constr() doesnt exist for BTA solver yet." << std::endl;
     exit(1);
 }
