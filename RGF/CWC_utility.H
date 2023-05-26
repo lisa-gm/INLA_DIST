@@ -16,7 +16,7 @@ extern "C" {
   void copy_data_to_device(void*,void*,int,int,size_t);
   void memcpy_to_device( void*, void*, size_t, cudaStream_t ); 
   void copy_data_to_host(void*,void*,int,int,size_t);
-    void memcpy_to_host( void*, void*, size_t, cudaStream_t );
+  void memcpy_to_host( void*, void*, size_t, cudaStream_t );
   void dgemm_on_dev(void*,char,char,int,int,int,double,double*,\
 		    int,double*,int,double,double*,int);
   void zgemm_on_dev(void*,char,char,int,int,int,CPX,CPX*,\

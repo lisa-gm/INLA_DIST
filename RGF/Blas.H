@@ -795,8 +795,8 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
     // 2. explicitly specify the block size to use.
     // Of powers of 2 64 appears to be the best for our test case - 128 would be second-best.
     // Did not evaluate intervening values.
-    magma_int_t potrfErr = magma_dpotrf_expert_gpu(magma_uplo,n,a,lda,info, 64, MagmaNative ); // native: gpu only
-    //magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
+    //magma_int_t potrfErr = magma_dpotrf_expert_gpu(magma_uplo,n,a,lda,info, 64, MagmaNative ); // native: gpu only
+    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
     
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
@@ -856,11 +856,8 @@ inline void tlacpy_dev(char uplo, int m, int n, double *a, int lda, double *b, i
 {
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
-    cudaDeviceSynchronize();
-
     magmablas_dlacpy(magma_uplo, m, n, a, lda, b, ldb, queue);
 
-    cudaDeviceSynchronize();
 }
 
 template <>
