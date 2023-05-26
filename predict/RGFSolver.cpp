@@ -723,8 +723,6 @@ void RGFSolver::selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Ve
 
 
 void RGFSolver::selected_inversion_full(SpMat& Q, SpMat& Qinv) {
-    std::cout << "Placeholder selected_inversion_fullTakInv() doesnt exist for BTA solver." << std::endl;
-    exit(1);
 
 #ifdef PRINT_MSG
     std::cout << "in RGF SELECTED_INVERSION_FULL()." << std::endl;

@@ -22,7 +22,7 @@
 //#define WRITE_RESULTS
 
 // if predict defined -> account for missing data
-#define PREDICT    
+//#define PREDICT    
 
 //#define PRINT_MSG
 //#define WRITE_LOG
@@ -1093,7 +1093,6 @@ exit(1);
         //arma::mat(M2).submat(0,0,nt-1,nt-1).print();
 
 #ifdef PREDICT
-
         // check projection matrix for A.st
         // size Ax : no_per_ts*(nt_fit+nt_predict) x (ns*(nt_fit+nt_predict) + nb)
         std::string Ax_file     =  base_path + "/Ax_wNA_" + to_string(no) + "_" + to_string(n) + ".dat";
@@ -1146,14 +1145,14 @@ exit(1);
 
 #else
         // check projection matrix for A.st
-        std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
+        std::string Ax_file     =  base_path + "/Ax_" + to_string(no) + "_" + n_s + ".dat";
         file_exists(Ax_file);
 
         Ax = readCSC(Ax_file);
         no = Ax.rows();
 
     // data y
-        std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
+        std::string y_file        =  base_path + "/y_" + to_string(no) + "_1" + ".dat";
         file_exists(y_file);
         // at this point no is set ... 
         // not a pretty solution. 
@@ -1617,6 +1616,7 @@ exit(1);
 
     // 
 
+#if PREDICT
     // extract appropriate columns from y
     y = y_all(Eigen::seq(nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1));
     Vect y_ind_sub = y_ind(Eigen::seq(nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1));
@@ -1637,10 +1637,14 @@ exit(1);
         }
     }
     t_mm += omp_get_wtime();
-    
+        
     if(MPI_rank == 0){
         std::cout << "time matrix row multiply                : " << t_mm << std::endl;
     }
+
+#endif
+
+
 
     // ============================ set up Posterior of theta ======================== //
 
@@ -2082,69 +2086,79 @@ double time_bfgs = 0.0;
     	write_vector(file_name_marg, marg.cwiseSqrt(), n);
 #endif
 
-#ifdef PREDICT
+////#ifdef PREDICT
 
        // get marginal variances for all locations y using A*inv(Q)*A^T
        // TODOL QinvSp as rowmajor ...
-       SpMat QinvSp(n,n);
-       fun->get_fullFact_marginals_f(theta, QinvSp);
+       //SpMat QinvSp(n,n);
+        //fun->get_fullFact_marginals_f(theta, QinvSp);
+
+        //std::cout << "norm(diag(invQ_fullMarg) - diag(marg)) = " << (QinvSp.diagonal() - marg).norm() << std::endl;
+
+
+        std::string full_file_name = "Qinv_diag_" + to_string(n) + "_" + solver_type + ".txt";
+        ofstream sol_file(full_file_name);
+        if(sol_file){
+            for (int i = 0; i < n; i++){
+                sol_file << std::setprecision(7) << QinvSp.diagonal()[i] << "\n";
+            }
+            sol_file.close();
+            std::cout << "wrote to file : " << full_file_name << std::endl;
+        } else {
+            std::cout << "There was an error writing " << full_file_name << " to file." << std::endl;
+            exit(1);
+        }
        
       std::cout << "QinvSp: est. standard dev fixed eff  : " << QinvSp.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
       std::cout << "QinvSp: est. std dev random eff      : " << QinvSp.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
 
+#if 1
+       //SpRmMat Ax_all = Ax;
+       SpRmMat temp = Ax_all;
+
        std::cout << "nnz(Ax_all) = " << Ax_all.nonZeros() << ", nnz(QinvSp) = " << QinvSp.nonZeros();
        std::cout << ", dim(QinvSp) = " << QinvSp.rows() << " " << QinvSp.cols() << ", dim(Ax_all) = " << Ax_all.rows() << " " << Ax_all.cols() << std::endl;
 
-       SpRmMat temp = Ax_all;
-       SpRmMat temp2 = Ax_all;
-
-       //double* temp_array = new double[Ax_all.nonZeros()];
-
-       double t_firstMult = - omp_get_wtime();
-
        // write my own multiplication
        // for each row in Ax_all iterate through the columns of QinvSp -> only consider nonzero entries of Ax_all
- 
-        int counter = 0;
-       for (int k=0; k<temp2.outerSize(); ++k){
-			for (SparseMatrix<double, RowMajor>::InnerIterator it(temp2,k); it; ++it)
-			{
-			    // access pattern is row-major -> can i directly write to 
-                it.valueRef() = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
-                //temp.valuePtr()[counter] = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
-                //temp_array[counter] = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
-                //temp.valuePtr()[counter] = temp1;
-                counter++;
-			}
+       double t_firstMult = - omp_get_wtime();
+
+       #pragma omp parallel 
+       {
+
+       #pragma omp parallel for default(shared)
+       for (int k=0; k<temp.outerSize(); ++k){
+            //printf("number of threads %d\n", omp_get_thread_num());
+            for (SparseMatrix<double, RowMajor>::InnerIterator it(temp,k); it; ++it)
+            {   
+                it.valueRef() = 0.0;
+                for (SparseMatrix<double, RowMajor>::InnerIterator it_A(Ax_all,k); it_A; ++it_A)
+                {     
+                    //printf("A(%ld, %ld) = %f\n", it_A.row(), it_A.col(), it_A.value());
+                    it.valueRef() += it_A.value()* QinvSp.coeff(it_A.col(), it.col());
+                }    
+                    //temp2.coeffRef(it.row(), it.col()) = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
+            }
+
         } // end outer for loop
+
+        } // end parallel region
     
        t_firstMult += omp_get_wtime();
        printf("time 1st Mult innerIter : %f\n", t_firstMult);
-       //exit(1);
 
        //printf("norm(temp - temp2) = %f\n", (temp-temp2).norm());
 
        Vect projMargVar(Ax_all.rows());
-       //Vect projMargVar2(Ax_all.rows());
 
        double t_secondMult = - omp_get_wtime();
        for(int i=0; i<Ax_all.rows(); i++){
-            //projMargVar(i) = (temp.row(i)).dot(Ax_ex.row(i));
             projMargVar(i) = (temp.row(i)).dot(Ax_all.row(i));
        }
        t_secondMult += omp_get_wtime();
        printf("time 2nd Mult: %f\n", t_secondMult);
 
-       //printf("norm(projMargVar - projMargVar2) = %f\n", (projMargVar - projMargVar2).norm());
-       //Vect projMargVar = QinvProj.diagonal();
-
-       printf("size(projMargVar) : %ld, no_all : %ld\n", projMargVar.size(), no_all);
-       
-       //std::cout << "est. std dev 1st 10 loc            : " << projMargVar.head(20).cwiseSqrt().transpose() << std::endl;
-
-       // inv(Q) comes in the form of double* invBlks -> CAREFUL particular order
-       //void get_projMargVar(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, double* invBlks, SpRmMat& A, Vect& projMargVar);
-       
+       printf("norm(projMargVar) = %f\n", projMargVar.norm());
        Vect projMargSd(Ax_all.rows());
        projMargSd = projMargVar.cwiseSqrt();
 
@@ -2153,15 +2167,21 @@ double time_bfgs = 0.0;
         write_vector(file_name_y_predict_sd, projMargSd, no_all);
 #endif
 
+#endif
+
+//#endif // end predict    
+
 #if 0
        MatrixXd Qinv_full(n,n);
        fun->compute_fullInverseQ(theta, Qinv_full);
        Vect temp = QinvSp.diagonal() - marg;
        Vect temp2 = Qinv_full.diagonal() - marg;
+       Vect temp3 = Qinv_full.diagonal() - QinvSp.diagonal();
        //std::cout << "norm(diag(QinvBlks) - marg) = " << temp.norm() << std::endl;
        std::cout << "norm(marg) = " << marg.norm() << ", norm(diag(Qinv_full)) = " << Qinv_full.diagonal().norm() << std::endl;
        std::cout << "norm(diag(Qinv_full) - marg) = " << temp2.norm() << std::endl;
-       std::cout << "norm(diag(Qinv_full) - marg) = " << temp2.head(50).transpose() << std::endl;
+       std::cout << "norm(diag(Qinv_full) - diag(QinvSp)) = " << temp3.norm() << std::endl;
+       //std::cout << "norm(diag(Qinv_full) - marg) = " << temp2.head(50).transpose() << std::endl;
 
        MatrixXd Id(n,n);
        Id.setIdentity();
@@ -2169,15 +2189,21 @@ double time_bfgs = 0.0;
        fun->construct_Q(theta, Q);
        std::cout << "norm(Qinv_full*Q - Id) = " << (Qinv_full*Q - Id).norm() << std::endl;
 
+        std::string file_Qinv_full_diag = "Qinv_full_diag_" + to_string(n) + "_" + solver_type + ".txt";
+        write_vector_lowerPrec(file_Qinv_full_diag, Qinv_full.diagonal(), n);
+
+        std::string file_Qinv_diag = "Qinv_diag_" + to_string(n) + "_" + solver_type + ".txt";
+        write_vector_lowerPrec(file_Qinv_diag, marg, n);
+
+        std::string file_Qinv_selInv_diag = "Qinv_selInv_diag_" + to_string(n) + "_" + solver_type +  ".txt";
+        write_vector_lowerPrec(file_Qinv_selInv_diag, QinvSp.diagonal(), n);
+
        //std::cout << "Qinv_full - QinvSp: " << Qinv_full.block(0,0,20,20) - QinvSp.block(0,0,20,20) << std::endl;
 
-       MatrixXd QinvProjFULL = Ax_all*Qinv_full*Ax_allT;
-       Vect projMargVarFULL = QinvProjFULL.diagonal();
-       std::cout << "est. std dev 1st 10 loc FULL       : " << projMargVarFULL.head(20).cwiseSqrt().transpose() << std::endl;
+       //MatrixXd QinvProjFULL = Ax_all*Qinv_full*Ax_allT;
+       //Vect projMargVarFULL = QinvProjFULL.diagonal();
+       //std::cout << "est. std dev 1st 10 loc FULL       : " << projMargVarFULL.head(20).cwiseSqrt().transpose() << std::endl;
 #endif
-
-
-#endif // end predict       
 
 
      } // end (MPI_rank == 0) for marginal variances

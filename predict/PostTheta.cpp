@@ -979,7 +979,7 @@ void PostTheta::get_fullFact_marginals_f(Vect& theta, SpMat& Qinv){
 			    it.valueRef() = V.row(it.row())*S.col(it.col());
 			  }
 			}
-			
+
 			//std::cout << "\nvars        = " << vars.transpose() << std::endl;			
 			//std::cout << "update_vars = " << update_vars.tail(10).transpose() << std::endl;
 			Qinv = Qinv - VS;
@@ -997,6 +997,7 @@ void PostTheta::get_fullFact_marginals_f(Vect& theta, SpMat& Qinv){
 			solverQ->selected_inversion_full(Q, Qinv);
 		}
 		}
+
 	}
 	
 #ifdef PRINT_TIMES
