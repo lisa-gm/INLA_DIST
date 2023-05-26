@@ -4,7 +4,6 @@
 
 RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
    	
-
     MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
@@ -16,7 +15,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     //std::cout << "threads level 1 : " << threads_level1 << std::endl;
 
     MPI_Get_processor_name(processor_name, &name_len);
-    printf("Processor name : %s\n",processor_name);
+    //printf("Processor name : %s\n",processor_name);
 
 
     // CAREFUL USING N in both functions ..
@@ -30,17 +29,17 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
 
-    GPU_rank = 0;
-    printf("Careful! GPU rank hard coded to machine: kw60890!\n");
+    //GPU_rank = 0;
+    //printf("Careful! GPU rank hard coded to machine: kw60890!\n");
 
-    /*
+    
     if(noGPUs < 8){
         printf("not on Alex! change GPU assignment!");
         exit(1);
     }
-    */
+    
 
-    /*
+    
     // assume max 3 ranks per node
     int max_rank_per_node = 4;
     int MPI_rank_mod = MPI_rank % max_rank_per_node; 
@@ -57,8 +56,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
        printf("too many MPI ranks per node ...\n");
        exit(1);
     } 
-    */
-    
+       
     /*
      int max_rank_per_node = 8;
     int GPU_rank = MPI_rank % max_rank_per_node;

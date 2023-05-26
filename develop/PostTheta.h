@@ -103,6 +103,11 @@ class PostTheta{
     							-> account for boundary						*/
     SpMat M2;			/**< stiffness matrix time.							*/
 
+	SpMat Qb;			/**< setup indices once. Only prior fixed effects. */
+	SpMat Qu;			/**< setup indices once. Only prior random effects */
+	SpMat Qx;			/**< setup indices once. Includes Prior RE + FE.   */
+	SpMat Qxy;			/**< setup indices for Qxy once. */
+
     double yTy;			/**< compute t(y)*y once. */
     Vect BTy; 			/**< compute t(B)*y once. regression model only     */
     Vect AxTy;			/**< compute t(Ax)*y once. spat/spat temp model     */

@@ -55,6 +55,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQst = new RGFSolver(ns, nt, 0, no);
 	} 
 
+	// doesn't change throughout the algorithm. just set once
+	Qb = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+
 	prior = "gaussian";
 
 	// set global counter to count function evaluations
@@ -82,7 +85,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 
 }
 
-
+// spatial case
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
@@ -97,6 +100,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	yTy         = y.dot(y);
 	AxTy		= Ax.transpose()*y;	
 	AxTAx       = Ax.transpose()*Ax;
+
+	// should already provide theta_initial in constructor??
+	// construct Qst, Qx, Qxy using to initialize CSC index ptrs
+	//construct_Q_spatial(theta, Qu);
+
 
 
 
@@ -156,14 +164,39 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		solverQst = new RGFSolver(ns, nt, 0, no);
 		//}
 		//}
-}  
+	}
+
+	// construct Qx, Qxy using arbitrary theta to get sparsity pattern 
+	// Qst reconstructed every time, otherwise sparse Kronecker needs to be rewritten.
+	// but we need it now for sparsity structure of Qx, Qxy
+	// get dimension of theta from theta_prior_param (has same dim. as theta)
+	Vect theta_dummy(theta_prior_param.size());
+	theta_dummy.setOnes();
+
+	construct_Q_spatial(theta_dummy, Qu);
+
+	int nnz = Qu.nonZeros();
+	Qx.resize(n,n);
+	Qx.reserve(nnz);
+
+	for (int k=0; k<Qu.outerSize(); ++k){
+		for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
+		{
+		Qx.insert(it.row(),it.col()) = it.value();                 
+		}
+	}
+
+	for(int i=nu; i < n; i++){
+		// CAREFUL 1e-3 is arbitrary choice!!
+		Qx.coeffRef(i,i) = 1e-3;
+	}	  
 
 	prior = "gaussian";
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count         = 0; // have internal iteration count equivalent to operator() calls
-        iter_acc           = 0;
+    iter_acc           = 0;
 
 
 #ifdef SMART_GRAD
@@ -178,7 +211,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 #endif
 
 #ifdef RECORD_TIMES
-	log_file_name = "log_file_per_iter_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
+	log_file_name = "log_file_per_iter_NEW_" + solver_type + "_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(MPI_size) + "_" + std::to_string(threads_level1) + "_" + std::to_string(threads_level2) + ".txt";
     std::ofstream log_file(log_file_name);
     log_file << "MPI_rank threads_level1 threads_level2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     log_file.close(); 
@@ -220,8 +253,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		AxTy		= Ax.transpose()*y;
 		AxTAx       = Ax.transpose()*Ax;
 	}
-
-
 
 #ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -279,6 +310,37 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		}
 		}
 	} 
+
+	// construct Qx, Qxy using arbitrary theta to get sparsity pattern 
+	// Qst reconstructed every time, otherwise sparse Kronecker needs to be rewritten.
+	// but we need it now for sparsity structure of Qx, Qxy
+	// get dimension of theta from theta_prior_param (has same dim. as theta)
+	Vect theta_dummy(theta_prior_param.size());
+	theta_dummy.setOnes();
+
+	construct_Q_spat_temp(theta_dummy, Qu);
+
+	int nnz = Qu.nonZeros();
+	Qx.resize(n,n);
+	Qx.reserve(nnz);
+
+	for (int k=0; k<Qu.outerSize(); ++k){
+		for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
+		{
+		Qx.insert(it.row(),it.col()) = it.value();                 
+		}
+	}
+
+	for(int i=nu; i < n; i++){
+		// CAREFUL 1e-3 is arbitrary choice!!
+		Qx.coeffRef(i,i) = 1e-3;
+	}
+
+	// TODO: for precision matrix with add. spatial field -> update
+	// generate separate index lists for each of them??
+
+	// ======================================================================================= //
+	
 
 	// set prior to be gaussian
 	//prior = "gaussian";
@@ -1925,7 +1987,7 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 	double exp_theta0 = exp(theta[0]);
 
 	if(ns > 0){
-		SpMat Qu(nu, nu);
+		//SpMat Qu(nu, nu);
 		// TODO: find good way to assemble Qx
 
 		if(nt > 1){
@@ -1934,37 +1996,49 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			construct_Q_spatial(theta, Qu);
 		}	
 
+		// ovewrite value ptr of Qst part -> Q_fe stays the same 
+		// ATTENTION: won't work anymore when added spatial field! careful!
+		//t_Qcomp = - omp_get_wtime();
+	    for(int i=0; i<Qu.nonZeros(); i++){
+            Qx.valuePtr()[i] = Qu.valuePtr()[i];
+            //Qx_new.valuePtr()[i] = 0.0;
+        }
+		//t_Qcomp += omp_get_wtime();
 
-		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
-		// construct Qx from Qs values, extend by zeros 
-		SpMat Qx(n,n);         // default is column major			
-
+		// old way to assemble matrix, inefficient
+		/*
+		double t_Qcomp = -omp_get_wtime();	
+		// if the sparsity pattern of Qx is not set up yet
+		SpMat Qx_comp(n,n);
 		int nnz = Qu.nonZeros();
-		Qx.reserve(nnz);
+		Qx_comp.reserve(nnz);
 
 		for (int k=0; k<Qu.outerSize(); ++k){
 		  for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
 		  {
-		    Qx.insert(it.row(),it.col()) = it.value();                 
+		    Qx_comp.insert(it.row(),it.col()) = it.value();                 
 		  }
 		}
-		//Qs.makeCompressed();
-		//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
-        //                   Qs.innerIndexPtr(),Qs.valuePtr());
 
 		for(int i=nu; i < n; i++){
 			// CAREFUL 1e-3 is arbitrary choice!!
-			Qx.coeffRef(i,i) = 1e-3;
+			Qx_comp.coeffRef(i,i) = 1e-3;
 		}
 
+		t_Qcomp += omp_get_wtime();
+		printf("old way: %f\n", t_Qcomp);
+		
+		printf("new way: %f\n", t_Qcomp);
+		printf("norm(Qx - Qx_comp) = %f\n", (Qx - Qx_comp).norm());
+		*/
 
-		Qx.makeCompressed();
 
 #ifdef PRINT_MSG
 		std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 		//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
 #endif
-
+		// can also be optimized but not as straight forward
+		// would need zero-padding in Qx
 		Q =  Qx + exp_theta0 * AxTAx;
 
 #ifdef PRINT_MSG
@@ -1980,13 +2054,13 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 	if(ns == 0){
 
-		SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+		Qb = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
 		/*std::cout << "Q_b " << std::endl;
 		std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
 		
 		// Q.e <- Diagonal(no, exp(theta))
 		// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
-		Q = Q_b + exp_theta0*B.transpose()*B;	
+		Q = Qb + exp_theta0*B.transpose()*B;	
 
 		#ifdef PRINT_MSG
 			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
@@ -2102,7 +2176,7 @@ void PostTheta::record_times(std::string file_name, int iter_count, double t_Fth
 								double t_priorLat, double t_priorLatAMat, double t_priorLatChol, double t_likel, 
 								double t_thread_denom, double t_condLat, double t_condLatAMat, double t_condLatChol, double t_condLatSolve){
 
-	//std::cout << "in record times function" << std::endl;
+	std::cout << "in record times function" << std::endl;
     std::ofstream log_file(file_name, std::ios_base::app | std::ios_base::out);
     log_file << MPI_rank       << " " << threads_level1 << " " << threads_level2 << " " << iter_count     << " ";
     log_file << t_Ftheta_ext   << " " << t_thread_nom   << " " << t_priorHyp     << " " << t_priorLat     << " " << t_priorLatAMat << " " << t_priorLatChol << " " << t_likel << " ";
