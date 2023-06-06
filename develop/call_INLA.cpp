@@ -158,17 +158,19 @@ int main(int argc, char* argv[])
 #endif
     }  
     
-    if(argc != 1 + 6 && MPI_rank == 0){
+    if(argc != 1 + 7 && MPI_rank == 0){
         std::cout << "wrong number of input parameters. " << std::endl;
 
-        std::cerr << "INLA Call : ns nt nb no path/to/files" << std::endl;
+        std::cerr << "INLA Call : ns nt nb no path/to/files solver_type" << std::endl;
 
         std::cerr << "[integer:ns]                number of spatial grid points " << std::endl;
         std::cerr << "[integer:nt]                number of temporal grid points " << std::endl;
+        std::cerr << "[integer:nss]               number of spatial grid points add. spatial field" << std::endl;
         std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
         std::cerr << "[integer:no]                number of data samples" << std::endl;
 
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
+        std::cerr << "[string:solver_type]        BTA or PARDISO" << std::endl;
 
         exit(1);
     }
@@ -179,10 +181,11 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    size_t ns = atoi(argv[1]);
-    size_t nt = atoi(argv[2]);
-    size_t nb = atoi(argv[3]);
-    size_t no = atoi(argv[4]);
+    size_t ns  = atoi(argv[1]);
+    size_t nt  = atoi(argv[2]);
+    size_t nss = atoi(argv[3]);
+    size_t nb  = atoi(argv[4]);
+    size_t no  = atoi(argv[5]);
 
     // to be filled later
 
@@ -191,22 +194,21 @@ int main(int argc, char* argv[])
         nt = 1;
     } 
 
-    size_t n = ns*nt + nb;
-
+    size_t n = ns*nt + nss + nb;
 
     // also save as string
     std::string ns_s = std::to_string(ns);
     std::string nt_s = std::to_string(nt);
     std::string nb_s = std::to_string(nb);
     std::string no_s = std::to_string(no); 
-    std::string n_s  = std::to_string(ns*nt + nb);
+    std::string n_s  = std::to_string(n);
 
-    std::string base_path = argv[5];    
+    std::string base_path = argv[6];    
 
-    std::string solver_type = argv[6];
+    std::string solver_type = argv[7];
 
     // check if solver type is neither PARDISO nor RGF :
-    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("RGF") != 0){
+    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
         std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
         exit(1);
     }
@@ -385,10 +387,19 @@ int main(int argc, char* argv[])
 
     } else if(ns > 0 && nt > 1) {
 
-        if(MPI_rank == 0)
-            std::cout << "spatial-temporal model." << std::endl;
-        
-        dim_th = 4;
+        if(nss == 0){
+            dim_th = 4;
+        } else {
+            dim_th = 6;
+        }
+
+        if(MPI_rank == 0){
+            printf("spatial-temporal model");
+            if(nss > 0){
+                printf(" with add. spatial field");
+            }
+            printf(".\n");
+        }
 
         // files to construct Q.u depending on HYPERPARAMETERS theta
         std::string c0_file      =  base_path + "/c0_" + ns_s + ".dat";
@@ -410,9 +421,6 @@ int main(int argc, char* argv[])
         // check projection matrix for A.st
         std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
         file_exists(Ax_file);
-
-	/// need to allocate cores here
-	
 
         // read in matrices
         c0 = read_sym_CSC(c0_file);
@@ -531,24 +539,30 @@ int main(int argc, char* argv[])
         // assuming sphere -> assuming R^3
         dim_spatial_domain = 3;
 
-        // sigma.e (noise observations), sigma.u, range s, range t
-        //theta_original_param << 0.5, 4, 1, 10;
-        // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
-        theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
-        //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
-        // using PC prior, choose lambda  
-        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+        if(nss == 0){
+            // sigma.e (noise observations), sigma.u, range s, range t
+            //theta_original_param << 0.5, 4, 1, 10;
+            // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
+            theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
+            //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
+            // using PC prior, choose lambda  
+            theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
-        //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
-        theta_param << 4, 0, 0, 0;
-        //theta_param << 4,4,4,4;
-        //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
-        
-        /*
-        if(MPI_rank == 0){
-            std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }*/
-
+            //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
+            theta_param << 4, 0, 0, 0;
+            //theta_param << 4,4,4,4;
+            //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
+        } else {
+            // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
+            theta_original     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
+            //theta_prior_param  << -log(0.01)/5, -log(0.01)/0.1, -log(0.01)/1, -log(0.01)/1, -log(0.01)/(1000.0/6371.0), -log(0.01)/5;
+            std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
+            // same order as above
+            //theta_param << 3, 0.5, 0.5, 2, -1, 2;
+            theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
+        }
 
         if(constr == true){
 
@@ -846,7 +860,7 @@ int main(int argc, char* argv[])
     // set convergence criteria
     // stop if norm of gradient smaller than :
     // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
-    param.epsilon = 1e-1;
+    param.epsilon = 1e-2;
     // param.epsilon = 1e-2; // ref sol
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
@@ -877,24 +891,35 @@ int main(int argc, char* argv[])
     //std::optional<PostTheta> fun;
     PostTheta* fun;
 
-    if(ns == 0){
+    if(ns == 0 && nss == 0){
         // fun.emplace(nb, no, B, y);
         if(MPI_rank == 0){
             std::cout << "Call constructor for regression model." << std::endl;
         }
         fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type, constr, Dxy, validate, w);
-    } else if(ns > 0 && nt == 1) {
+    } else if(ns > 0 && nt == 1 && nss == 0) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
-    } else {
+    } else if(ns > 0 && nt > 1 && nss == 0){
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
+        printf("nb = %ld\n", nb);
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+    } else if(ns > 0 && nt > 1 && nss > 0){
+         if(MPI_rank == 0){
+            std::cout << "\ncall spatial-temporal constructor with add. spatial field." << std::endl;
+        }       
+        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+    } else {
+        printf("invalid combination of parameters!\n");
+        printf("ns = %ld, nt = %ld, nss = %ld\n", ns, nt, nss);
+        exit(1);
     }
+
 
     if(MPI_rank == 0)
         printf("\n======================= HYPERPARAMETERS =====================\n");
@@ -905,21 +930,21 @@ int main(int argc, char* argv[])
     }
 
     // convert from interpretable parametrisation to internal one
-    if(dim_th == 4){
+    if(dim_th >= 4){
 	   theta[0] = theta_param[0];
-        fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+        fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+        fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
 
         if(MPI_rank == 0){
             Vect theta_interpret_initial(dim_th);
             theta_interpret_initial[0] = theta[0];
-            fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
-            std::cout << "theta interpret. param. : " << theta_param.transpose() << std::endl;
-	    std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+            fun->convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
+            fun->convert_theta2interpret_spat(theta[4], theta[5], theta_interpret_initial[4], theta_interpret_initial[5]);
+            std::cout << "theta interpret. param.         : " << theta_param.transpose() << std::endl;
+	        std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;
             std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
         }
     }
-
-    //exit(1);
 
 #ifdef WRITE_RESULTS
    string results_folder = base_path + "/results_param_fixed_inverse";
@@ -941,7 +966,7 @@ if(MPI_rank == 0){
 
     std::cout << "theta param : " << theta_param.transpose() << std::endl;
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     std::cout << "theta       : " << theta.transpose() << std::endl;
 
     // includes prior fixed effects
@@ -1037,7 +1062,7 @@ if(MPI_rank == 0){
     //theta_param << -2.152, 9.534, 11.927, 3.245;
    
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
 
     if(MPI_rank == 0){
         std::cout << "theta param : " << theta_param.transpose() << std::endl;
@@ -1092,11 +1117,20 @@ double time_bfgs = 0.0;
     //theta_param << -2.15, 9.57, 11.83, 3.24;
 
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+
 
     if(MPI_rank == 0){    
         std::cout << "theta param : " << theta_param.transpose() << std::endl;
         std::cout << "theta       : " << theta.transpose() << std::endl;
+    }
+
+    fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
+
+    if(MPI_rank == 0){    
+        std::cout << "theta param : " << theta_param.transpose() << std::endl;
+        //std::cout << "theta       : " << theta.transpose() << std::endl;
     }
 
     time_bfgs = -omp_get_wtime();
@@ -1153,14 +1187,29 @@ double time_bfgs = 0.0;
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
         theta_original_param[0] = theta_original[0];
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
+        fun->convert_theta2interpret_spatTemp(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
         //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
         std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranS, ranT, sigU);
+        fun->convert_theta2interpret_spatTemp(lgamE, lgamS, lgamT, ranS, ranT, sigU);
         std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
+    }
+
+        // convert between different theta parametrisations
+    if(dim_th == 6 && MPI_rank == 0){
+        theta_original_param[0] = theta_original[0];
+        fun->convert_theta2interpret_spatTemp(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
+        fun->convert_theta2interpret_spat(theta_original[4], theta_original[5], theta_original_param[4], theta_original_param[5]);
+        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        std::cout << "\norig. mean interpret. param. : " << theta_original_param.transpose() << std::endl;
+
+        double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
+        double sigU; double ranS; double ranT;
+        fun->convert_theta2interpret_spatTemp(lgamE, lgamS, lgamT, ranS, ranT, sigU);
+        fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
+        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << " " << theta_param[4] << " " << theta_param[5] << std::endl;
     }
 
 #endif
@@ -1170,15 +1219,16 @@ double time_bfgs = 0.0;
 #if 1
     Vect theta_max(dim_th);
     //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
-    //theta_max = theta_prior;
+    //theta_max << 1.377415, -4.522942, 0.6501593, 1.710503, -4.603187, 2.243890;
+    //theta_max << 1.374504, -4.442819,  0.672056,  1.592387, -4.366334,  2.014707;
     theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
     double eps = 0.005;
     MatrixXd cov(dim_th,dim_th);
 
-    #if 0
-    double t_get_covariance = -omp_get_wtime();
+#if 0
+    t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
     //cov = fun->get_Covariance(theta_max, sqrt(eps));
@@ -1190,20 +1240,20 @@ double time_bfgs = 0.0;
         std::cout << "covariance                   : \n" << cov << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
     }
-    #endif
+#endif
 
 
-    #if 1
+#if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
-    Vect interpret_theta(4);
+    Vect interpret_theta(dim_th);
     interpret_theta[0] = theta_max[0];
-    fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
-   
+    fun->convert_theta2interpret_spatTemp(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
+    fun->convert_theta2interpret_spat(theta_max[4], theta_max[5], interpret_theta[4], interpret_theta[5]);
     //interpret_theta << -2.152, 9.679, 12.015, 3.382;
 #ifdef PRINT_MSG 
     if(MPI_rank == 0){
-        std::cout << "est. Hessian at theta param : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+        std::cout << "est. Hessian at theta param : " << interpret_theta.transpose() << std::endl;
     }
 #endif
 
@@ -1235,7 +1285,7 @@ double time_bfgs = 0.0;
     //theta_param << -1.407039,  8.841431,  9.956879,  3.770581;
     theta_param << -1.40701328482976, 9.34039748237832, 11.0020161941741, 4.27820007271347;
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     //theta << -1.407039, -7.801710, -6.339689, 5.588888;
 
     if(MPI_rank == 0){
@@ -1344,13 +1394,11 @@ double time_bfgs = 0.0;
     }
 #endif
 
-    
-
-
   
     // =================================== compute marginal variances =================================== //
+    double t_get_marginals = 0.0;
+
 #if 1
-    double t_get_marginals;
     Vect marg(n);
 
     // when the range of u is large the variance of b0 is large.
@@ -1406,7 +1454,7 @@ double time_bfgs = 0.0;
         //theta_INLA_param << -1.352, 1.912, 3.301, 3.051;
 
         theta_INLA[0] = theta_INLA_param[0];
-        fun->convert_interpret2theta(theta_INLA_param[1], theta_INLA_param[2], theta_INLA_param[3], theta_INLA[1], theta_INLA[2], theta_INLA[3]);
+        fun->convert_interpret2theta_spatTemp(theta_INLA_param[1], theta_INLA_param[2], theta_INLA_param[3], theta_INLA[1], theta_INLA[2], theta_INLA[3]);
 
 #endif
 
