@@ -29,19 +29,18 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
 
-    //GPU_rank = 0;
-    //printf("Careful! GPU rank hard coded to machine: kw60890!\n");
+    GPU_rank = 0;
+    if(MPI_rank == 0){
+        printf("Careful! GPU rank hard coded to machine: kw60890!\n");
+    }
 
-    
-    if(noGPUs < 8){
+    /*if(noGPUs < 8){
         printf("not on Alex! change GPU assignment!");
         exit(1);
-    }
-    
-
+    }*/
     
     // assume max 3 ranks per node
-    int max_rank_per_node = 4;
+    /*int max_rank_per_node = 4;
     int MPI_rank_mod = MPI_rank % max_rank_per_node; 
 
     if(MPI_rank_mod == 0){
@@ -55,7 +54,8 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     } else {
        printf("too many MPI ranks per node ...\n");
        exit(1);
-    } 
+    }
+    */ 
        
     /*
      int max_rank_per_node = 8;
@@ -150,7 +150,6 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 	std::cout << "MPI rank : " << MPI_rank << ", in RGF FACTORIZE()." << std::endl;
 #endif
 
-
     // check if n and Q.size() match
     if(n != Q.rows()){
         printf("\nInitialised matrix size and current matrix size don't match!\n");
@@ -165,10 +164,6 @@ void RGFSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 	// only take lower triangular part of A
     SpMat Q_lower = Q.triangularView<Lower>(); 
     nnz = Q_lower.nonZeros();
-
-    // allocate memory
-    
-    // pin here!
 
     size_t* ia = new long unsigned int [n+1];
     size_t* ja = new long unsigned int [nnz];

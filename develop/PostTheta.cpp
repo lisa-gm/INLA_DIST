@@ -970,8 +970,6 @@ void PostTheta::convert_theta2interpret_spatTemp(double lgamE, double lgamS, dou
 	double gS = exp(lgamS);
 	double gT = exp(lgamT);
 
-
-
 	sigU = log(sqrt(c1)/((gE*sqrt(gT))*pow(gS,alpha-1)));
 	ranS = log(sqrt(8*nu_s)/gS);
 	ranT = log(gT*sqrt(8*nu_t)/(pow(gS, alpha_s)));
