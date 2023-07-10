@@ -966,7 +966,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 
         }
 
-        std::cout << "factorize times: " << t_factorize_vec.transpose() << std::endl;
+        //std::cout << "factorize times: " << t_factorize_vec.transpose() << std::endl;
 
 
     //}

@@ -801,7 +801,7 @@ double RGF<T>::FirstStageFactor()
    cudaDeviceSynchronize(); // TO BE REPLACED
 
    t_fact = get_time(t_fact);
-   std::cout << "gflop count    : " << flop_count / 1e9 << std::endl;
+   //nt    : " << flop_count / 1e9 << std::endl;
    //std::cout << "time factorize : " << t_fact << ", sum time copy DtH : " << t_copy_DtH << ", sum t potrf : " << t_potrf << ", sum t dgemm : " << t_dgemm << std::endl;
    double gflops = flop_count / (1e9*t_fact);
    printf("GFLOPS factorize : %f\n", gflops);
@@ -1345,13 +1345,15 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
    T *tmp3_dev;  // extra buffer of size nb*ns (ie. nb*b_size)
    T *tmp4_dev;  // extra buffer of size ns*ns
 
-   mem_alloc_dev = allocate_data_on_device((void**)&G_LastDense_dev,ND*ND*sizeof(T));   
-   mem_alloc_dev = allocate_data_on_device((void**)&G_dense_i_dev  ,ND*matrix_ns*sizeof(T));   
-   mem_alloc_dev = allocate_data_on_device((void**)&tmp_AH_dev     ,ND*matrix_ns*sizeof(T));
-   mem_alloc_dev = allocate_data_on_device((void**)&tmp3_dev       ,ND*matrix_ns*sizeof(T));
+   allocate_data_on_device((void**)&G_LastDense_dev,ND*ND*sizeof(T));   
+   allocate_data_on_device((void**)&G_dense_i_dev  ,ND*matrix_ns*sizeof(T));   
+   allocate_data_on_device((void**)&tmp_AH_dev     ,ND*matrix_ns*sizeof(T));
+   allocate_data_on_device((void**)&tmp3_dev       ,ND*matrix_ns*sizeof(T));
    mem_alloc_dev = allocate_data_on_device((void**)&tmp4_dev       ,matrix_ns*matrix_ns*sizeof(T));  
 
+#ifdef PRINT_MSG
    printf("in 3rd Stage Factor. Allocated GPU memory sel Inv: %ld, cpy ind %d\n", mem_alloc_dev, cpy_indicator);
+#endif
 
 #ifdef PRINT_MSG
    // temporary buffer on host, just to check results ...
@@ -1848,10 +1850,9 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
    deallocate_data_on_dev(tmp3_dev,    ND*matrix_ns*sizeof(T));
    mem_alloc_dev = deallocate_data_on_dev(tmp4_dev,    matrix_ns*matrix_ns*sizeof(T));
 
+#ifdef PRINT_MSG
    printf("Allocated GPU memory after sel Inv: %ld, cpyInd %d\n", mem_alloc_dev, cpy_indicator);
 
-
-#ifdef PRINT_MSG
    cudaFreeHost(tmp3);
    cudaFreeHost(tmp4);
 #endif
@@ -1985,7 +1986,9 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
     allocate_data_on_device((void**)&ja_dev,max_rows*max_cols*sizeof(size_t));
     mem_alloc_dev = allocate_data_on_device((void**)&a_dev,max_rows*max_cols*sizeof(T));
 
+#ifdef PRINT_MSG
     printf("Allocated GPU memory Factorize: %ld\n", mem_alloc_dev);
+#endif
 
     //Computation
     double gflops = FirstStageFactor();
@@ -2005,8 +2008,9 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
     deallocate_data_on_dev(ja_dev,max_rows*max_cols*sizeof(size_t));
     mem_alloc_dev = deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));
 
+#ifdef PRINT_MGS
     printf("Allocated GPU memory after Factorize: %ld\n", mem_alloc_dev);
-
+#endif
 
     factorization_completed = true;
 
@@ -2058,7 +2062,9 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
    allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
    mem_alloc_dev = allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
 
+#ifdef PRINT_MSG
    printf("Allocated GPU memory Factorize noCpyHost: %ld\n", mem_alloc_dev);
+#endif
 
    //Copy diag_pos to device
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
@@ -2077,7 +2083,9 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
     deallocate_data_on_dev(ja_dev,max_rows*max_cols*sizeof(size_t));
     mem_alloc_dev = deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));
 
+#ifdef PRINT_MSG
     printf("Allocated GPU memory after Factorize noCpyHost: %ld\n", mem_alloc_dev);
+#endif
 
     // factor doesn't exist, hence mark as false
     factorization_completed = false;
@@ -2172,14 +2180,18 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     T *tmp1_dev;
     T *tmp2_dev;
 
-    printf("\nRGFSelInv: allocating data on device now. CPY indicator %d\n", cpy_indicator);
+#ifdef PRINT_MSG
+    printf("\nRGFSelInv: before allocating data on device now. CPY indicator %d\n", cpy_indicator);
+#endif
 
     allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
     allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
     allocate_data_on_device((void**)&tmp1_dev,matrix_ns*matrix_ns*sizeof(T));
     mem_alloc_dev = allocate_data_on_device((void**)&tmp2_dev,matrix_ns*matrix_ns*sizeof(T));
 
+#ifdef PRINT_MSG
     printf("Allocated GPU memory sel Inv: %ld, cpy ind %d\n", mem_alloc_dev, cpy_indicator);
+#endif
 
     //Copy diag_pos to device
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
@@ -2196,8 +2208,9 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     deallocate_data_on_dev(tmp1_dev,matrix_ns*matrix_ns*sizeof(T));
     deallocate_data_on_dev(tmp2_dev,matrix_ns*matrix_ns*sizeof(T));
 
+#ifdef PRINT_MSG
     printf("Allocated GPU memory after sel Inv: %ld, cpy ind %d\n", mem_alloc_dev, cpy_indicator);
-
+#endif
 
     return gflops;
 }
@@ -2230,7 +2243,9 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
     size_t max_cols = max(matrix_ns, matrix_nd);
 
+#ifdef PRINT_MSG
     printf("\nRGFSelInv: allocating data on device now. CPY indicator %d\n", cpy_indicator);
+#endif
 
     //allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
     //allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
@@ -2435,8 +2450,6 @@ inline void RGF<T>::get_max_supernode_nnz()
       printf("supernode= %d, supernode_nnz = %ld, max_supernode_nnz= %ld\n", supernode, supernode_nnz, max_supernode_nnz);
 #endif
     }
-
-   printf("final max supernode nnz : %ld\n", max_supernode_nnz);
 
 }
 
