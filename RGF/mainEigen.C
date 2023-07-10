@@ -15,6 +15,7 @@
 #include <armadillo>
 #include "generate_testMat_selInv.cpp"
 #include "../read_write_functions.cpp"
+#include "helper_functions.h"
 
 #include "RGF.H"
 
@@ -505,7 +506,7 @@ size_t i; // iteration variable
 
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
 
-        std::cerr << "[string:solver_type]        RGF or PARDISO" << std::endl;
+        std::cerr << "[string:solver_type]        BTA or PARDISO" << std::endl;
     
 
         exit(1);
@@ -537,9 +538,9 @@ size_t i; // iteration variable
     std::string base_path = argv[5];    
 
     std::string solver_type = argv[6];
-    // check if solver type is neither PARDISO nor RGF :
-    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("RGF") != 0){
-        std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
+    // check if solver type is neither PARDISO nor BTA :
+    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
+        std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
         exit(1);
     }
 
@@ -905,41 +906,67 @@ printf("# threads: %d\n", omp_get_max_threads());
         double t_factorise;
     	double t_solve;
 
+        // *** pin GPU & combine with appropriate cores *** //
+        int GPU_rank = 0;
+        cudaSetDevice(GPU_rank);
+        int numa_node = topo_get_numNode(GPU_rank);
+
+        int* hwt = NULL;
+        int hwt_count = read_numa_threads(numa_node, &hwt);
+        pin_hwthreads(1, &hwt[omp_get_thread_num()]);
+        std::cout<<"Pinning GPU & hw threads. GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+        std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
+        // *********************************************** //
+
         RGF<T> *solver;
         solver = new RGF<T>(ns, nt, nb);
 
-    	t_factorise = get_time(0.0);
-    	//solver->solve_equation(GR);
-    	double flops_factorize = solver->factorize(ia, ja, a);
-        double log_det;
-        log_det = solver->logDet(ia, ja, a);
-        printf("logdet: %f\n", log_det);
-        t_factorise = get_time(t_factorise);
-        printf("time factorize            : %f\n", t_factorise);
+        int m = 1;
+        Vect t_factorize_vec(m-1);
 
-    	t_factorise = get_time(0.0);
-    	flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
-        t_factorise = get_time(t_factorise);
-        printf("time factorize noCopyHost : %f\n", t_factorise);
+        for(int i=0; i<m; i++){
 
-    	printf("logdet: %f\n", log_det);
+            printf("i = %d\n", i);
+            t_factorise = get_time(0.0);
+            //solver->solve_equation(GR);
+            double flops_factorize = solver->factorize(ia, ja, a);
+            double log_det;
+            log_det = solver->logDet(ia, ja, a);
+            printf("logdet: %f\n", log_det);
+            t_factorise = get_time(t_factorise);
+            printf("time factorize:             %f\n", t_factorise);
 
-      	// assign b to correct format
-      	/*for (int i = 0; i < n; i++){
-    	    b[i] = rhs[i];
-    	    //printf("%f\n", b[i]);
-      	}*/
+            if(i>0){
+                t_factorize_vec(i-1) = t_factorise;
+            }
 
-      	t_solve = get_time(0.0); 
-        double flops_solve = solver->solve(ia, ja, a, x, b, 1);
-      	t_solve = get_time(t_solve);
-      	//printf("flops solve:     %f\n", flops_solve);
+            t_solve = get_time(0.0); 
+            double flops_solve = solver->solve(ia, ja, a, x, b, 1);
+            t_solve = get_time(t_solve);
+            //printf("flops solve:     %f\n", flops_solve);
 
-        //printf("time chol(Q): %lg\n",t_factorise);
-        printf("time factorize + solve  : %lg\n",t_solve);
+            //printf("time chol(Q): %lg\n",t_factorise);
+            printf("time solve:                %f\n",t_solve);
 
-    	printf("Residual norm.           : %e\n", solver->residualNorm(x, b));
-    	printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+            t_factorise = get_time(0.0);
+            flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
+            t_factorise = get_time(t_factorise);
+            printf("time factorize noCopyHost: %f\n", t_factorise);
+
+            printf("logdet: %f\n", log_det);
+
+            // assign b to correct format
+            /*for (int i = 0; i < n; i++){
+                b[i] = rhs[i];
+                //printf("%f\n", b[i]);
+            }*/
+
+            printf("Residual norm.:           %e\n", solver->residualNorm(x, b));
+            printf("Residual norm normalized: %e\n", solver->residualNormNormalized(x, b));
+
+        }
+
+        std::cout << "factorize times: " << t_factorize_vec.transpose() << std::endl;
 
 
     //}
@@ -1056,6 +1083,10 @@ printf("# threads: %d\n", omp_get_max_threads());
 
     std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
 
+    //std::string invQ_fileName = "invQ_newV_" + to_string(n) + ".txt";
+    //write_sym_CSC_matrix(invQ_fileName, invQ_new_lower);
+
+    /*
     std::string invQ_new_fileName = "invQ_new_diag_" + to_string(n) + ".txt";
     ofstream invQ_new_file(invQ_new_fileName,    ios::out | ::ios::trunc);
 
@@ -1075,6 +1106,7 @@ printf("# threads: %d\n", omp_get_max_threads());
     invQ_diag_file.close();
     //invQ_full_file.close();
 
+    */
 
     /*
     t_invBlks = get_time(0.0);

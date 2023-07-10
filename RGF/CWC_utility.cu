@@ -55,6 +55,9 @@ size_t allocate_data_on_device(void **data,size_t size_data){
 	 exit(0);
      }else{
          c_memory = c_memory+size_data;
+         //double c_memory_gb = c_memory*(1.0*10^9);
+         printf("size data: %ld, mem alloc dev: %ld\n",size_data, c_memory);
+
      }
 
      return c_memory;
