@@ -229,6 +229,7 @@ int main(int argc, char* argv[])
     // dimension hyperparamter vector
     int dim_th;
     int dim_spatial_domain;
+    string manifold = ""; // if empty or unknown -> R^d, for now add only sphere
 
     // spatial component
     SpMat c0; 
@@ -531,13 +532,24 @@ int main(int argc, char* argv[])
 #ifdef DATA_SYNTHETIC
         data_type = "synthetic";
 
+        // constant in conversion between parametrisations changes dep. on spatial dim
+        // assuming sphere -> assuming R^3
+        dim_spatial_domain = 2;
+
+        // define if on the sphere or plane
+        manifold = "sphere";
+
         // =========== synthetic data set =============== //
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
+            if(manifold == "sphere"){
+                std::cout << "spatial domain: " << manifold << std::endl;
+            }
+            else if(manifold.length() > 0){
+                std::cout << "spatial domain: " << manifold << ", only SPHERE supported!" << std::endl;
+                exit(1);
+            }
         }     
-        // constant in conversion between parametrisations changes dep. on spatial dim
-        // assuming sphere -> assuming R^3
-        dim_spatial_domain = 3;
 
         if(nss == 0){
             // sigma.e (noise observations), sigma.u, range s, range t
@@ -555,13 +567,17 @@ int main(int argc, char* argv[])
         } else {
             // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
             theta_original     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
-            theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
             // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
-            //theta_prior_param  << -log(0.01)/5, -log(0.01)/0.1, -log(0.01)/1, -log(0.01)/1, -log(0.01)/(1000.0/6371.0), -log(0.01)/5;
-            std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
+            //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
+            theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1,-log(0.01)*(3000.0/6371.0), -log(0.01)/5;
+            if(MPI_rank == 0){
+                std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
+            }
             // same order as above
             //theta_param << 3, 0.5, 0.5, 2, -1, 2;
-            theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
+            //theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
+            theta_param <<  4, 1, 3, 2, -1, 0;
         }
 
         if(constr == true){
@@ -902,18 +918,17 @@ int main(int argc, char* argv[])
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss == 0){
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        printf("nb = %ld\n", nb);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss > 0){
          if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor with add. spatial field." << std::endl;
         }       
-        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else {
         printf("invalid combination of parameters!\n");
         printf("ns = %ld, nt = %ld, nss = %ld\n", ns, nt, nss);
@@ -933,13 +948,17 @@ int main(int argc, char* argv[])
     if(dim_th >= 4){
 	   theta[0] = theta_param[0];
         fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-        fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+        if(dim_th == 6){
+            fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+        }
 
         if(MPI_rank == 0){
             Vect theta_interpret_initial(dim_th);
             theta_interpret_initial[0] = theta[0];
             fun->convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
-            fun->convert_theta2interpret_spat(theta[4], theta[5], theta_interpret_initial[4], theta_interpret_initial[5]);
+            if(dim_th == 6){
+                fun->convert_theta2interpret_spat(theta[4], theta[5], theta_interpret_initial[4], theta_interpret_initial[5]);
+            }
             std::cout << "theta interpret. param.         : " << theta_param.transpose() << std::endl;
 	        std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;
             std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
@@ -1084,13 +1103,13 @@ if(MPI_rank == 0){
         for(int i=0; i<5; i++){
 
             Vect mu_dummy(n);
-        double t_temp = -omp_get_wtime();
+            double t_temp = -omp_get_wtime();
             fx = fun->eval_post_theta(theta, mu_dummy);
             //fx = fun->eval_post_theta(theta_original, mu_dummy);
-        t_temp += omp_get_wtime();
+             t_temp += omp_get_wtime();
 
                 if(MPI_rank == fact_to_rank_list[0])
-            std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
+                    std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
 
         }
     }
@@ -1118,7 +1137,9 @@ double time_bfgs = 0.0;
 
     theta[0] = theta_param[0];
     fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-    fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+    if(dim_th == 6){
+        fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+    }
 
 
     if(MPI_rank == 0){    
@@ -1126,7 +1147,9 @@ double time_bfgs = 0.0;
         std::cout << "theta       : " << theta.transpose() << std::endl;
     }
 
-    fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
+    if(dim_th == 6){
+        fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
+    }
 
     if(MPI_rank == 0){    
         std::cout << "theta param : " << theta_param.transpose() << std::endl;
@@ -1157,6 +1180,8 @@ double time_bfgs = 0.0;
     if(MPI_rank == 0){
         std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
+
+    //exit(1);
 
 
 #ifdef WRITE_RESULTS
@@ -1249,7 +1274,9 @@ double time_bfgs = 0.0;
     Vect interpret_theta(dim_th);
     interpret_theta[0] = theta_max[0];
     fun->convert_theta2interpret_spatTemp(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
-    fun->convert_theta2interpret_spat(theta_max[4], theta_max[5], interpret_theta[4], interpret_theta[5]);
+    if(nss > 0){
+        fun->convert_theta2interpret_spat(theta_max[4], theta_max[5], interpret_theta[4], interpret_theta[5]);
+    }
     //interpret_theta << -2.152, 9.679, 12.015, 3.382;
 #ifdef PRINT_MSG 
     if(MPI_rank == 0){
@@ -1338,7 +1365,6 @@ double time_bfgs = 0.0;
     std::string Qprior_file = base_path + "/Qprior_" + n_s + "_" + n_s + ".dat";
     write_sym_CSC_matrix(Qprior_file, Qprior); 
      
-    
     // write to file first time step
     SpMat Qprior_1stTs =  Qprior.block(0,0,ns,ns);
     std::cout << "dim(Qprior_1stTs) = " << Qprior_1stTs.rows() << "_" << Qprior_1stTs.cols() << std::endl;

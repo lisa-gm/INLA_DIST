@@ -2039,7 +2039,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 #endif
 
 	// assemble overall precision matrix Q.st
-	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + 2*exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 	/*
 	if(MPI_rank == 0)
 		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;

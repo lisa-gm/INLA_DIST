@@ -55,6 +55,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQst = new RGFSolver(ns, nt, 0);
 	} 
 
+	// doesn't change throughout the algorithm. just set once
+	Qb = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+
 	prior = "gaussian";
 
 	// set global counter to count function evaluations
@@ -82,7 +85,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 
 }
 
-
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
@@ -97,8 +99,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 	yTy         = y.dot(y);
 	AxTy		= Ax.transpose()*y;	
 	AxTAx       = Ax.transpose()*Ax;
-
-
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -156,14 +156,40 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 		solverQst = new RGFSolver(ns, nt, 0);
 		//}
 		//}
-}  
+	}  
+
+	// construct Qx, Qxy using arbitrary theta to get sparsity pattern 
+	// Qst reconstructed every time, otherwise sparse Kronecker needs to be rewritten.
+	// but we need it now for sparsity structure of Qx, Qxy
+	// get dimension of theta from theta_prior_param (has same dim. as theta)
+
+	Vect theta_dummy(theta_prior_param.size());
+	theta_dummy.setOnes();
+
+	construct_Q_spatial(theta_dummy, Qu);
+
+	int nnz = Qu.nonZeros();
+	Qx.resize(n,n);
+	Qx.reserve(nnz);
+
+	for (int k=0; k<Qu.outerSize(); ++k){
+		for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
+		{
+		Qx.insert(it.row(),it.col()) = it.value();                 
+		}
+	}
+
+	for(int i=nu; i < n; i++){
+		// CAREFUL 1e-3 is arbitrary choice!!
+		Qx.coeffRef(i,i) = 1e-3;
+	}	
 
 	prior = "gaussian";
 
 	// set global counter to count function evaluations
 	fct_count          = 0;
 	iter_count         = 0; // have internal iteration count equivalent to operator() calls
-        iter_acc           = 0;
+    iter_acc           = 0;
 
 
 #ifdef SMART_GRAD
@@ -183,7 +209,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
     log_file << "MPI_rank threads_level1 threads_level2 iter_count t_Ftheta_ext t_thread_nom t_priorHyp t_priorLat t_priorLatAMat t_priorLatChol t_likel t_thread_denom t_condLat t_condLatAMat t_condLatChol t_condLatSolve" << std::endl;
     log_file.close(); 
 #endif
-
 
 }
 
@@ -220,8 +245,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 		AxTy		= Ax.transpose()*y;
 		AxTAx       = Ax.transpose()*Ax;
 	}
-
-
 
 #ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -262,7 +285,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 	#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
-
+		
 	if(solver_type == "PARDISO"){
 		#pragma omp parallel
 		{
@@ -280,6 +303,31 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 		}
 		}
 	} 
+
+	// construct Qx, Qxy using arbitrary theta to get sparsity pattern 
+	// Qst reconstructed every time, otherwise sparse Kronecker needs to be rewritten.
+	// but we need it now for sparsity structure of Qx, Qxy
+	// get dimension of theta from theta_prior_param (has same dim. as theta)
+	Vect theta_dummy(theta_prior_param.size());
+	theta_dummy.setOnes();
+
+	construct_Q_spat_temp(theta_dummy, Qu);
+
+	int nnz = Qu.nonZeros();
+	Qx.resize(n,n);
+	Qx.reserve(nnz);
+
+	for (int k=0; k<Qu.outerSize(); ++k){
+		for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
+		{
+		Qx.insert(it.row(),it.col()) = it.value();                 
+		}
+	}
+
+	for(int i=nu; i < n; i++){
+		// CAREFUL 1e-3 is arbitrary choice!!
+		Qx.coeffRef(i,i) = 1e-3;
+	}
 
 	// set prior to be gaussian
 	//prior = "gaussian";
@@ -314,7 +362,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
     //}	
 #endif
 
-}
+} // end spatial-temporal constructor
 
 /* operator() does exactly two things. 
 1) evaluate f(theta) 
@@ -371,8 +419,6 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		std::cout << "G : \n" << G << std::endl;
 	}
 #endif
-
-
 
 	// initialise local f_value lists
 	Vect f_temp_list_loc(no_f_eval); f_temp_list_loc.setZero();
@@ -1803,16 +1849,16 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	double log_det;
 
 	double time_construct_Qst = -omp_get_wtime();
-	SpMat Qu(nu, nu);
+	SpMat Qst_logP(nu, nu);
 
 #ifdef RECORD_TIMES
 	t_priorLatAMat = -omp_get_wtime();
 #endif
 
 	if(nt > 1){
-		construct_Q_spat_temp(theta, Qu);
+		construct_Q_spat_temp(theta, Qst_logP);
 	} else {
-		construct_Q_spatial(theta, Qu);
+		construct_Q_spatial(theta, Qst_logP);
 	}
 
 #ifdef RECORD_TIMES
@@ -1826,7 +1872,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		//std::cout << "in eval log det Qu in constr true" << std::endl;
 		MatrixXd V(nu, Dx.rows());
 		//std::cout << "before factorize w constraint. theta = " << theta.transpose() << std::endl;
-		solverQst->factorize_w_constr(Qu, Dx, log_det, V);
+		solverQst->factorize_w_constr(Qst_logP, Dx, log_det, V);
 
 		Vect constr_mu(nu);
 		Vect e = Vect::Zero(Dx.rows());
@@ -1842,11 +1888,11 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 
 		Vect x = Vect::Zero(nu);
 		// multiplication with 0.5 is already included
-		eval_log_dens_constr(x, unconstr_mu, Qu, log_det, Dx, W, val);
+		eval_log_dens_constr(x, unconstr_mu, Qst_logP, log_det, Dx, W, val);
 
 	} else{
 
-		solverQst->factorize(Qu, log_det, t_priorLatChol);
+		solverQst->factorize(Qst_logP, log_det, t_priorLatChol);
 		/*if(MPI_rank == 0){
 			std::cout << "t_priorLatChol : " << t_priorLatChol << std::endl;
 		}*/
@@ -2024,7 +2070,7 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 	double exp_theta0 = exp(theta[0]);
 
 	if(ns > 0){
-		SpMat Qu(nu, nu);
+		//SpMat Qu(nu, nu);
 		// TODO: find good way to assemble Qx
 
 		if(nt > 1){
@@ -2033,10 +2079,18 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			construct_Q_spatial(theta, Qu);
 		}	
 
+		// ovewrite value ptr of Qst part -> Q_fe stays the same 
+		// ATTENTION: needs to be adapted when additional spatial field is there. 
+		//t_Qcomp = - omp_get_wtime();
+	    for(int i=0; i<Qu.nonZeros(); i++){
+            Qx.valuePtr()[i] = Qu.valuePtr()[i];
+            //Qx_new.valuePtr()[i] = 0.0;
+        }
+		//t_Qcomp += omp_get_wtime();		
 
-		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
-		// construct Qx from Qs values, extend by zeros 
-		SpMat Qx(n,n);         // default is column major			
+
+		// old way
+		/*SpMat Qx(n,n);         // default is column major			
 
 		int nnz = Qu.nonZeros();
 		Qx.reserve(nnz);
@@ -2047,17 +2101,13 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 		    Qx.insert(it.row(),it.col()) = it.value();                 
 		  }
 		}
-		//Qs.makeCompressed();
-		//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
-        //                   Qs.innerIndexPtr(),Qs.valuePtr());
 
 		for(int i=nu; i < n; i++){
 			// CAREFUL 1e-3 is arbitrary choice!!
 			Qx.coeffRef(i,i) = 1e-3;
 		}
-
-
 		Qx.makeCompressed();
+		*/
 
 #ifdef PRINT_MSG
 		std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
@@ -2079,13 +2129,13 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 	if(ns == 0){
 
-		SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+		SpMat Qb = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
 		/*std::cout << "Q_b " << std::endl;
 		std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
 		
 		// Q.e <- Diagonal(no, exp(theta))
 		// Q.xy <- Q.x + crossprod(A.x, Q.e)%*%A.x  # crossprod = t(A)*Q.e (faster)	
-		Q = Q_b + exp_theta0*B.transpose()*B;	
+		Q = Qb + exp_theta0*B.transpose()*B;	
 
 		#ifdef PRINT_MSG
 			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;

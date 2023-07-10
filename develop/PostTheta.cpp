@@ -51,10 +51,13 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
 		}
-	} else if(solver_type == "RGF"){
+	} else if(solver_type == "BTA"){
 		solverQ   = new RGFSolver(ns, nt, nb, no);
 		solverQst = new RGFSolver(ns, nt, 0, no);
-	} 
+	} else {
+		printf("wrong solver type! \n");
+		exit(1);
+	}
 
 	// doesn't change throughout the algorithm. just set once
 	Qb = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
@@ -87,7 +90,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 }
 
 // spatial case
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, string manifold_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), manifold(manifold_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
 	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -146,7 +149,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
 		}
-	} else if(solver_type == "RGF"){
+	} else if(solver_type == "BTA"){
 		//#pragma omp parallel
 		//#pragma omp single
 		//{
@@ -159,6 +162,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		solverQst = new RGFSolver(ns, nt, 0, no);
 		//}
 		//}
+	} else {
+		printf("wrong solver type! \n");
+		exit(1);
 	}
 
 	// construct Qx, Qxy using arbitrary theta to get sparsity pattern 
@@ -216,7 +222,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 }
 
 // constructor for spatial-temporal case
-PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, string manifold_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), manifold(manifold_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -295,7 +301,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
 		}
-	} else if(solver_type == "RGF"){
+	} else if(solver_type == "BTA"){
 		#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
@@ -305,7 +311,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 			solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
 		}
 		}
-	} 
+	} else {
+		printf("wrong solver type! \n");
+		exit(1);
+	}
 
 	// construct Qx, Qxy using arbitrary theta to get sparsity pattern 
 	// Qst reconstructed every time, otherwise sparse Kronecker needs to be rewritten.
@@ -314,14 +323,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	Vect theta_dummy(theta_prior_param.size());
 	theta_dummy.setOnes();
 
-	construct_Q_spat_temp(theta_dummy, Qu);
+	construct_Q_spat_temp(theta_dummy, Qst);
 
-	int nnz = Qu.nonZeros();
+	int nnz = Qst.nonZeros();
 	Qx.resize(n,n);
 	Qx.reserve(nnz);
 
-	for (int k=0; k<Qu.outerSize(); ++k){
-		for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
+	for (int k=0; k<Qst.outerSize(); ++k){
+		for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
 		{
 		Qx.insert(it.row(),it.col()) = it.value();                 
 		}
@@ -371,7 +380,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 // assume that Ax_ contains A.st, A.s, B (in that order)
 // use c0, g1, g2 to construct spatial field (order 2)
 // neglegt constraint case for now -> later add constraints for spatial-temporal and spatial field separately
-PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nss(nss_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string solver_type_, int dim_spatial_domain_, string manifold_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nss(nss_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), manifold(manifold_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -387,6 +396,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 		printf("invalid value for nss = %d\n!!", nss);
 		exit(1);
 	}
+
+	std::cout << "manifold: " << manifold << std::endl;
 	
 	nst         = ns*nt;
 	nu          = nst   + nss;
@@ -468,9 +479,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 	// get dimension of theta from theta_prior_param (has same dim. as theta)
 	Vect theta_dummy(theta_prior_param.size());
 	//theta_dummy.setOnes();
-	//theta_dummy << 1.3699873, -4.480845, 0.643757, 1.707338, -4.6113032, 2.2386310;
-    theta_dummy << 1.422895, -4.502342,  0.623269,  1.652469, -4.611303, 2.238631;
-	std::cout << "theta dummy : " << theta_dummy.transpose() << std::endl;
+	theta_dummy << 1.386796, -4.434666, 0.6711493, 1.632289, -5.058083, 2.664039;
+    //theta_dummy << 1.422895, -4.502342,  0.623269,  1.652469, -4.611303, 2.238631;
+	if(MPI_rank == 0){
+		std::cout << "theta dummy : " << theta_dummy.transpose() << std::endl;
+	}
 
 	construct_Q_spat_temp(theta_dummy, Qst);
 
@@ -507,14 +520,15 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 
 	//std::cout << "Qx = \n" << Qx << std::endl;
 
+	//std::string Qprior_fileName = "Q_prior.txt";
+	//SpMat A_lower = Qx.triangularView<Lower>();
+	
 	/*
-	std::string Qprior_fileName = "Q_prior.txt";
-	SpMat A_lower = Qx.block(0,0,nu,nu).triangularView<Lower>();
+	std::string Qprior_fileName = "Q.txt";
+	Qxy = Qx + exp(theta_dummy[0])*AxTAx;
+	SpMat A_lower = Qxy.triangularView<Lower>();
 
-	//std::string Qprior_fileName = "Q.txt";
-	//Qxy = Qx + exp(theta_dummy[0])*AxTAx;
-	//SpMat A_lower = Qxy.triangularView<Lower>();
-
+	
 	int n = A_lower.cols();
 	int nnz = A_lower.nonZeros();
 
@@ -535,13 +549,13 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 
 	sol_file.close();
 	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
-	//exit(1);
+	
+	exit(1);
 	*/
 	
-
 	// set prior to be gaussian
-	prior = "gaussian";
-	//prior = "pc";
+	//prior = "gaussian";
+	prior = "pc";
 
 	if(MPI_rank == 0){
 		std::cout << "Prior : " << prior << std::endl;	
@@ -630,8 +644,6 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	}
 #endif
 
-
-
 	// initialise local f_value lists
 	Vect f_temp_list_loc(no_f_eval); f_temp_list_loc.setZero();
 
@@ -666,6 +678,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
 		//std::cout << "before record times section." << std::endl;
+
 #ifdef RECORD_TIMES		
 		t_Ftheta_ext += omp_get_wtime();
 
@@ -962,17 +975,32 @@ void PostTheta::convert_theta2interpret_spatTemp(double lgamE, double lgamS, dou
 	double nu_s  = alpha - 1; 
 	double nu_t  = alpha_t - 0.5;
 
-	//double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, 1.0/2.0); // second for temporal dim
-	double c1_scaling_const = pow(4*M_PI, 1.5);
-	//std::cout << "c1_scaling_const theta2interpret : " << c1_scaling_const << std::endl;	
-	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
 	double gE = exp(lgamE);
 	double gS = exp(lgamS);
 	double gT = exp(lgamT);
 
-	sigU = log(sqrt(c1)/((gE*sqrt(gT))*pow(gS,alpha-1)));
 	ranS = log(sqrt(8*nu_s)/gS);
 	ranT = log(gT*sqrt(8*nu_t)/(pow(gS, alpha_s)));
+	
+	if(manifold == "sphere"){
+		double cR_t = std::tgamma(alpha_t - 1.0/2.0)/(std::tgamma(alpha_t)*pow(4*M_PI, 1.0/2.0));
+		double cS = 0.0;
+		for(int k=0; k<50; k++) // compute 1st 100 terms of infinite sum
+		{  
+			cS += (2.0*k + 1) / (4*M_PI* pow(pow(gS, 2) + k*(k+1), alpha));
+		}
+		//printf("cS : %f\n", cS);
+		sigU = log(sqrt(cR_t*cS)/(gE*sqrt(gT)));
+
+	} else {
+		double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, 1.0/2.0); // second for temporal dim
+		//double c1_scaling_const = pow(4*M_PI, 1.5);
+		//std::cout << "c1_scaling_const theta2interpret : " << c1_scaling_const << std::endl;	
+		double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
+		sigU = log(sqrt(c1)/((gE*sqrt(gT))*pow(gS,alpha-dim_spatial_domain/2)));
+	}
+
+
 }
 
 void PostTheta::convert_interpret2theta_spatTemp(double ranS, double ranT, double sigU, double& lgamE, double& lgamS, double& lgamT){
@@ -985,13 +1013,31 @@ void PostTheta::convert_interpret2theta_spatTemp(double ranS, double ranT, doubl
 	double nu_s  = alpha - 1; 
 	double nu_t  = alpha_t - 0.5; // because dim temporal domain always 1
 
-	//double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, 1.0/2.0); // second for temporal dim
-	double c1_scaling_const = pow(4*M_PI, 1.5);
-	//std::cout << "c1_scaling_const interpret2theta : " << c1_scaling_const << std::endl;
-	double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
 	lgamS = 0.5*log(8*nu_s) - ranS;
 	lgamT = ranT - 0.5*log(8*nu_t) + alpha_s * lgamS;
-	lgamE = 0.5*log(c1) - 0.5*lgamT - nu_s*lgamS - sigU;
+
+	if(manifold == "sphere"){
+		double cR_t = std::tgamma(alpha_t - 1.0/2.0)/(std::tgamma(alpha_t)*pow(4*M_PI, 1.0/2.0));
+		double cS = 0.0;
+		double t_loop = - omp_get_wtime();
+		for(int k=0; k<50; k++) // compute 1st 100 terms of infinite sum
+		{  
+			cS += (2.0*k + 1) / (4*M_PI* pow(pow(exp(lgamS), 2) + k*(k+1), alpha));
+		}
+		t_loop += omp_get_wtime();
+		// printf("cS: %f\n", cS);
+		//printf("sphere. c3 : %f, t loop : %f\n",  0.5*log(cR_t) + 0.5*log(cS), t_loop);
+		lgamE = 0.5*log(cR_t) + 0.5*log(cS) - 0.5*lgamT - sigU;
+
+	} else {
+		//double c1_scaling_const = pow(4*M_PI, dim_spatial_domain/2.0) * pow(4*M_PI, 1.0/2.0); // second for temporal dim
+		double c1_scaling_const = pow(4*M_PI, 1.5);
+		//std::cout << "c1_scaling_const interpret2theta : " << c1_scaling_const << std::endl;
+		double c1 = std::tgamma(nu_t)*std::tgamma(nu_s)/(std::tgamma(alpha_t)*std::tgamma(alpha)*c1_scaling_const);
+		//printf("R^d. c3 : %f\n", 0.5*log(c1) - (alpha-dim_spatial_domain/2)*lgamS);
+		lgamE = 0.5*log(c1) - 0.5*lgamT - (alpha-dim_spatial_domain/2)*lgamS - sigU;
+	}
+
 }
 
 #if 0
@@ -1836,7 +1882,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 		theta_interpret[0] = theta[0];
 		convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 		//theta_interpret << 0.5, 10, 1, 4; 
-		convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
+		if(nss > 0){
+			convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
+		}
 
 		//Vect lambda(4);
 		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
@@ -1975,26 +2023,27 @@ void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interp
   double prior_se = log(lambda[0]) - lambda[0] * exp(interpret_theta[0]) + interpret_theta[0];
   //printf("prior se = %f\n", prior_se);
   double prior_su = log(lambda[3]) - lambda[3] * exp(interpret_theta[3]) + interpret_theta[3];
-  //printf("prior su = %f\n", prior_su);
+  //printf("sigma : %f, prior su = %f\n", interpret_theta[3], prior_su);
 
   double prior_rs = log(lambda[1]) - lambda[1] * exp(-interpret_theta[1]) - interpret_theta[1];
-  //printf("prior rs = %f\n", prior_rs);
+  //printf("range s: %f, prior rs = %f\n", interpret_theta[1], prior_rs);
   
   double prior_rt = log(lambda[2]) - lambda[2] * exp(-0.5*interpret_theta[2]) + log(0.5) - 0.5*interpret_theta[2];
-  //printf("prior rt = %f\n", prior_rt);
+  //printf("range t: %f, prior rt = %f\n", interpret_theta[2], prior_rt);
 
   log_sum = prior_rt + prior_rs + prior_su + prior_se;
 
   if(interpret_theta.size() > 4){
+	    double dHalf = dim_spatial_domain / 2.0;
 		// prior range s for add. spatial field
-		//log_sum += log(lambda[4]) - lambda[4] * exp(-interpret_theta[4]) - interpret_theta[4];
-		log_sum += log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]);
-		printf("prior range s for add. s: %f",log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]));
+		log_sum += log(dHalf * lambda[4]) - lambda[4] * exp(- dHalf * interpret_theta[4]) - dHalf * interpret_theta[4];
+		//log_sum += log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]);
+		//printf("prior range s for add. s: %f",log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]));
 
 		// prior sigma u for add. spatial field
- 		//log_sum += log(lambda[5]) - lambda[5] * exp(interpret_theta[5]) + interpret_theta[5];
-		log_sum += log(lambda[5]) - lambda[5]*exp(interpret_theta[5]);
-		printf(", prior sigma u for add. s: %f", log(lambda[5]) - lambda[5]*exp(interpret_theta[5]));
+ 		log_sum += log(lambda[5]) - lambda[5] * exp(interpret_theta[5]) + interpret_theta[5];
+		//log_sum += log(lambda[5]) - lambda[5]*exp(interpret_theta[5]);
+		//printf(", prior sigma u for add. s: %f", log(lambda[5]) - lambda[5]*exp(interpret_theta[5]));
   }
 
   		//std::cout << ", total log prior sum hyperparam " << log_sum << std::endl;
@@ -2260,7 +2309,6 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 
 
 #ifdef PRINT_MSG
-	/*
 	if(MPI_rank == 0){
 		std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
 
@@ -2275,13 +2323,13 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	    std::cout << "M1  : \n" << M1.block(0,0,10,10) << std::endl;
 	    std::cout << "M2  : \n" << M2.block(0,0,10,10) << std::endl;
 	   }
-	*/
 #endif
 
 	// assemble overall precision matrix Q.st
 	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
-	/*if(MPI_rank == 0)
-		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;*/
+	/*if(MPI_rank == 0){
+		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
+	}*/
 
 	/*
 	// check for NaN values in matrix

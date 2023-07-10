@@ -69,6 +69,7 @@ class PostTheta{
 
 	int dim_th;			/**<  dimension of hyperparameter vector theta 		*/
 	int dim_spatial_domain; 
+	string manifold;    /**<  in R^d or on the sphere */
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
@@ -199,7 +200,7 @@ class PostTheta{
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2,
 		Vect theta_prior, string solver_type, 
-		int dim_spatial_domain,
+		int dim_spatial_domain, string manifold,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w);
 
@@ -219,12 +220,17 @@ class PostTheta{
      * @param[in] M0_ diagonalised mass matrix time.
      * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
      * @param[in] M2_ stiffness matrix time.
+	 * @param[in] theta_prior prior hyperparameters
+	 * @param[in] solver_type linear solver: currently PARDISO, BTA
+	 * @param[in] dim_spatial_domain dimension spatial field 1D/2D ... 
+	 * @param[in] manifold plane: "", "sphere", can add more later
+	 * @param[in] constr constraints, mainly sum-to-zero
      */	
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
 		SpMat M0, SpMat M1, SpMat M2, 
 		Vect theta_prior, string solver_type, 
-		int dim_spatial_domain,
+		int dim_spatial_domain, string manifold,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w); 
 
@@ -250,7 +256,7 @@ class PostTheta{
 		SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, 
 		SpMat M0_, SpMat M1_, SpMat M2_, 
 		Vect theta_prior_param_, string solver_type_, 
-		int dim_spatial_domain_, 
+		int dim_spatial_domain_, string manifold_,
 		const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, 
 		const bool validate_, const Vect w_);
 

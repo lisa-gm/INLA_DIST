@@ -22,7 +22,7 @@
 //#define WRITE_RESULTS
 
 // if predict defined -> account for missing data
-//#define PREDICT    
+#define PREDICT    
 
 //#define PRINT_MSG
 //#define WRITE_LOG
@@ -1616,7 +1616,7 @@ exit(1);
 
     // 
 
-#if PREDICT
+#ifdef PREDICT
     // extract appropriate columns from y
     y = y_all(Eigen::seq(nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1));
     Vect y_ind_sub = y_ind(Eigen::seq(nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1));
@@ -1801,7 +1801,7 @@ if(MPI_rank == 0){
 
 double time_bfgs = 0.0;
 
-#if 0
+#if 1
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -1890,7 +1890,7 @@ double time_bfgs = 0.0;
 
  double t_get_covariance = 0.0;
 
-#if 0
+#if 1
     Vect theta_max(dim_th);
     //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
     //theta_max = theta_prior;
@@ -2086,14 +2086,14 @@ double time_bfgs = 0.0;
     	write_vector(file_name_marg, marg.cwiseSqrt(), n);
 #endif
 
-////#ifdef PREDICT
+#ifdef PREDICT
 
        // get marginal variances for all locations y using A*inv(Q)*A^T
        // TODOL QinvSp as rowmajor ...
-       //SpMat QinvSp(n,n);
-        //fun->get_fullFact_marginals_f(theta, QinvSp);
+       SpMat QinvSp(n,n);
+       fun->get_fullFact_marginals_f(theta, QinvSp);
 
-        //std::cout << "norm(diag(invQ_fullMarg) - diag(marg)) = " << (QinvSp.diagonal() - marg).norm() << std::endl;
+        std::cout << "norm(diag(invQ_fullMarg) - diag(marg)) = " << (QinvSp.diagonal() - marg).norm() << std::endl;
 
 
         std::string full_file_name = "Qinv_diag_" + to_string(n) + "_" + solver_type + ".txt";
@@ -2169,7 +2169,7 @@ double time_bfgs = 0.0;
 
 #endif
 
-//#endif // end predict    
+#endif // end predict    
 
 #if 0
        MatrixXd Qinv_full(n,n);
