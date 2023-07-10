@@ -1,8 +1,18 @@
 #ifndef helperfunctions_h
 #define helperfunction_h
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sched.h>
+#include <string.h>
+#include <errno.h>
+#include <iostream>
+
 #include "cuda.h"
 #include "cuda_runtime_api.h"
+
+//#define DEBUG
 
 //Mit diesen 3 Werte kannst du dir die NUMA Node ID holen:
 inline int topo_get_numNode(int GPU_rank)
@@ -35,6 +45,58 @@ inline int topo_get_numNode(int GPU_rank)
         }
     }
     return -1;
+}
+
+// given a numa domain -> identify all corresponding hwthreads/cores
+// returns # of threads and writes corresponding indices into hwthread list
+inline int read_numa_threads(int numa_node, int** hwthread_list)
+{
+    char path[1024];
+    int total_hwthreads = sysconf(_SC_NPROCESSORS_CONF);
+    int cpuidx = 0;
+    int* cpulist = new int[total_hwthreads];
+    if (!cpulist)
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < total_hwthreads; i++)
+    {
+        int ret = snprintf(path, 1023, "/sys/devices/system/node/node%d/cpu%d", numa_node, i);
+        if (!access(path, F_OK))
+        {
+#ifdef DEBUG
+            printf("HWthread %d located in NUMA domain %d\n", i, numa_node);
+#endif
+            cpulist[cpuidx++] = i;
+        }
+    }
+    *hwthread_list = cpulist;
+#ifdef DEBUG
+    printf("NUMA domain %d has %d HWThreads\n", numa_node, cpuidx);
+#endif
+    return cpuidx;
+}
+
+// pin count-many threads from hwthread list
+inline int pin_hwthreads(int count, int* hwthread_list)
+{
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+#ifdef DEBUG
+    printf("Pinning to");
+#endif
+    for (int i = 0; i < count; i++)
+    {
+        CPU_SET(hwthread_list[i], &cpuset);
+#ifdef DEBUG
+        printf(" %d", hwthread_list[i]);
+#endif
+    }
+#ifdef DEBUG
+    printf("\n");
+#endif
+    return sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
 }
 
 

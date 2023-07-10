@@ -797,7 +797,8 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
     // Did not evaluate intervening values.
     //magma_int_t potrfErr = magma_dpotrf_expert_gpu(magma_uplo,n,a,lda,info, 64, MagmaNative ); // native: gpu only
     magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
-    
+    //magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version    
+
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
         int ind_error = (potrfErr-1)*(lda+1);
