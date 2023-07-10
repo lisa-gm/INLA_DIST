@@ -63,7 +63,10 @@ PardisoSolver::PardisoSolver(int MPI_rank_) : MPI_rank(MPI_rank_){
     	hwt[i] = i;
     }
 
-    pin_hwthreads(threads_level2, hwt);
+    if(MPI_rank == 0){
+        printf("no internal pinning\n");
+    }
+    //pin_hwthreads(threads_level2, hwt);
 
 } // end constructor
 

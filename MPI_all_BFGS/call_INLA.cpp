@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
     Vect y;
 
     bool constr;
-    int num_constr;
+    int num_constr = 0;
 
 #ifdef DATA_SYNTHETIC
     constr = false;
@@ -570,7 +570,7 @@ int main(int argc, char* argv[])
 
                 //std::cout << "ns*i_end = " << ns*i_end << std::endl;
 
-                for(int j=ns*i_start; j<ns*i_end; j++){
+                for(size_t j=ns*i_start; j<ns*i_end; j++){
                     //Dx(i,j) = 1.0;
                     Dx(i,j) = D_diag(j);
                 }
@@ -583,7 +583,7 @@ int main(int argc, char* argv[])
                 std::cout << Dx << std::endl;*/
 
             // rescale Dx such that each row sums to one
-            for(int i=0; i<num_constr; i++){
+            for(size_t i=0; i<num_constr; i++){
                 double sum_row = Dx.row(i).sum();
                 Dx.row(i) = 1/sum_row*Dx.row(i);
             }
@@ -796,7 +796,7 @@ int main(int argc, char* argv[])
         double r = 0.1;
         w = Vect::Random(no);
 
-        for(int i=0;i<no; i++){
+        for(size_t i=0;i<no; i++){
             if(w[i] < 1 - 2*r){
                 w[i] = 1;
             } else {
@@ -832,7 +832,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-3;
     param.delta = 1e-7;
     // maximum line search iterations
-    param.max_iterations = 200; //200;
+    param.max_iterations = 5; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -999,7 +999,7 @@ if(MPI_rank == 0){
 #endif // #if true/false
 
 
-#if 0
+#if 1
 
     double t_f_eval = -omp_get_wtime();
 
@@ -1035,8 +1035,9 @@ if(MPI_rank == 0){
 
 #endif
 
+double time_bfgs = 0.0;
 
-#if 1
+#if 0
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
@@ -1054,7 +1055,7 @@ if(MPI_rank == 0){
     //int threads_Eigen = 1;
     //Eigen::setNbThreads(threads_Eigen);
 
-    double time_bfgs = -omp_get_wtime();
+    time_bfgs = -omp_get_wtime();
     int niter = solver.minimize(*fun, theta, fx, MPI_rank);
 
     //LIKWID_MARKER_CLOSE;
@@ -1120,7 +1121,9 @@ if(MPI_rank == 0){
 
     #endif
 
-#if 1
+    double t_get_covariance = 0.0;
+
+#if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -1133,7 +1136,7 @@ if(MPI_rank == 0){
     MatrixXd cov(dim_th,dim_th);
 
     #if 0
-    double t_get_covariance = -omp_get_wtime();
+    t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
     //cov = fun->get_Covariance(theta_max, sqrt(eps));
@@ -1142,13 +1145,13 @@ if(MPI_rank == 0){
     t_get_covariance += omp_get_wtime();
 
     if(MPI_rank ==0){
-        std::cout << "covariance                   : \n" << cov << std::endl;
+        std:cout << "covariance                   : \n" << cov << std::endl;
         std::cout << "time get covariance          : " << t_get_covariance << " sec" << std::endl;
     }
     #endif
 
 
-    #if 1
+    #if 0
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(4);
@@ -1161,7 +1164,7 @@ if(MPI_rank == 0){
     }
 #endif
 
-    double t_get_covariance = -omp_get_wtime();
+    t_get_covariance = -omp_get_wtime();
     //t_get_covariance = -omp_get_wtime();
     cov = fun->get_Cov_interpret_param(interpret_theta, eps);
     t_get_covariance += omp_get_wtime();
@@ -1180,9 +1183,10 @@ if(MPI_rank == 0){
 
 #endif
 
+    double t_get_fixed_eff = 0.0;
 
-#if 1
-    double t_get_fixed_eff;
+
+#if 0
     Vect mu(n);
 
     ArrayXi fact_to_rank_list(2);
@@ -1249,11 +1253,10 @@ if(MPI_rank == 0){
     
 #endif
 
-
+    double t_get_marginals = 0.0;
   
     // =================================== compute marginal variances =================================== //
-#if 1
-    double t_get_marginals;
+#if 0
     Vect marg(n);
 
     // when the range of u is large the variance of b0 is large.
