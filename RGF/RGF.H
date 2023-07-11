@@ -88,7 +88,8 @@ private:
 
 #ifdef CUDA_POTRF
     int* info_cuda = NULL;
-    int *cuda_buffer_flag;
+    int *cuda_buffer_flag_potrf;
+    int *cuda_buffer_flag_trtri;
 
     cusolverDnHandle_t *handle;
     cusolverDnParams_t *params;
@@ -262,8 +263,11 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 #ifdef CUDA_POTRF
     cudaMalloc((void**)&info_cuda, sizeof(int));
 
-    cudaMallocHost((void**)&cuda_buffer_flag, sizeof(int));
-    cuda_buffer_flag[0] = 0;
+    cudaMallocHost((void**)&cuda_buffer_flag_potrf, sizeof(int));
+    cuda_buffer_flag_potrf[0] = 0;
+
+    cudaMallocHost((void**)&cuda_buffer_flag_trtri, sizeof(int));
+    cuda_buffer_flag_trtri[0] = 0;
 
     cudaMallocHost((void**)&handle,sizeof(cusolverDnHandle_t));
     cudaMallocHost((void**)&params,sizeof(cusolverDnParams_t));
@@ -341,7 +345,8 @@ RGF<T>::~RGF()
 
 #ifdef CUDA_POTRF
     cudaFreeHost(info_cuda);
-    cudaFreeHost(cuda_buffer_flag);
+    cudaFreeHost(cuda_buffer_flag_potrf);
+    cudaFreeHost(cuda_buffer_flag_trtri);
 
     cudaFreeHost(host_size);
     cudaFreeHost(dev_size);
@@ -501,8 +506,8 @@ double RGF<T>::FirstStageFactor()
     // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
 #ifdef CUDA_POTRF
      // factorization first block -> set buffer flag to zero!
-     cuda_buffer_flag[0] = 0;
-     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+     cuda_buffer_flag_potrf[0] = 0;
+     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
    // magma_queue currently not supported
@@ -626,9 +631,9 @@ double RGF<T>::FirstStageFactor()
 #ifdef CUDA_POTRF
        if(NR != NM){
          //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
-         cuda_buffer_flag[0] = 0;
+         cuda_buffer_flag_potrf[0] = 0;
        }
-       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
       // how can I get the default stream to wait but make an exception for copyStreamDtH ?
@@ -717,9 +722,9 @@ double RGF<T>::FirstStageFactor()
 #ifdef CUDA_POTRF
        if(NR != NM){
          //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
-         cuda_buffer_flag[0] = 0;
+         cuda_buffer_flag_potrf[0] = 0;
        }
-       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        cudaDeviceSynchronize(); // TO BE REPLACED
@@ -773,10 +778,10 @@ double RGF<T>::FirstStageFactor()
        //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #ifdef CUDA_POTRF
        if(NR != NM){
-         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
-         cuda_buffer_flag[0] = 0;
+         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag_potrf[0] = 0;
        }
-       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
@@ -804,7 +809,7 @@ double RGF<T>::FirstStageFactor()
    //nt    : " << flop_count / 1e9 << std::endl;
    //std::cout << "time factorize : " << t_fact << ", sum time copy DtH : " << t_copy_DtH << ", sum t potrf : " << t_potrf << ", sum t dgemm : " << t_dgemm << std::endl;
    double gflops = flop_count / (1e9*t_fact);
-   printf("GFLOPS factorize : %f\n", gflops);
+   //printf("GFLOPS factorize : %f\n", gflops);
 
    //std::cout << "time factorization Qxy : " << t_fact << std::endl;
    //std::cout << "gflop count Qxy        : " << flop_count / 1e9 << std::endl;
@@ -853,7 +858,7 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
        // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
         nvtxRangeId_t id_dpotrf = nvtxRangeStartA("firstPotrf");  
 #ifdef CUDA_POTRF
-       tpotrf_dev_cuda('L', NR, blockM_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockM_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        cudaDeviceSynchronize();     
@@ -934,8 +939,8 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 
 #ifdef CUDA_POTRF
      // factorization first block -> set buffer flag to zero!
-     cuda_buffer_flag[0] = 0;
-     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+     cuda_buffer_flag_potrf[0] = 0;
+     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
     cudaDeviceSynchronize();
@@ -1029,9 +1034,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 #ifdef CUDA_POTRF
        if(NR != NM){
          //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
-         cuda_buffer_flag[0] = 0;
+         cuda_buffer_flag_potrf[0] = 0;
        }
-       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        cudaDeviceSynchronize();
@@ -1098,9 +1103,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 #ifdef CUDA_POTRF
        if(NR != NM){
          //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
-         cuda_buffer_flag[0] = 0;
+         cuda_buffer_flag_potrf[0] = 0;
        }
-       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        cudaDeviceSynchronize();
@@ -1142,9 +1147,9 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
 #ifdef CUDA_POTRF
        if(NR != NM){
          printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
-         cuda_buffer_flag[0] = 0;
+         cuda_buffer_flag_potrf[0] = 0;
        }
-       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag, 
+       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
        cudaDeviceSynchronize();
@@ -1168,7 +1173,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
    //std::cout << "gflop count    : " << flop_count / 1e9 << std::endl;
    //std::cout << "time factorize : " << t_fact << std::endl;
    double gflops = flop_count / (1e9*t_fact);
-   printf("GFLOPS factorize Qu : %f\n", gflops);
+   //printf("GFLOPS factorize Qu : %f\n", gflops);
 
    //std::cout << "time factorization Qu : " << t_fact << std::endl;
    //std::cout << "gflop count Qu        : " << flop_count / 1e9 << std::endl;
@@ -1391,9 +1396,18 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       // tmp1_dev contains lower-triangular matrix, if 2nd argument 'N', maybe means U = L^T?
       // only computes inv(L)??
       // redirect to magma_queue_1
-      ttrtri_dev('L', 'N', NR, G_LastDense_dev, NR, &info);
-      flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
 
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     cuda_buffer_flag_trtri[0] = 0;
+     ttrtri_dev_cuda('L', 'N', NR, G_LastDense_dev, NR, info_cuda, cuda_buffer_flag_trtri, 
+               handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+   // magma_queue currently not supported
+    cudaDeviceSynchronize(); 
+    ttrtri_dev('L', 'N', NR, G_LastDense_dev, NR, &info);
+#endif
+      flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
       cudaDeviceSynchronize();
 
       // if tmp1_dev contains L^-1, then
@@ -1434,7 +1448,17 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       // solve inv(A)*L = inv(U) for inv(A) by inverting U 
       // G = L^-T * L^-1 => G*L = L^-T
       // redirect to magma_queue_1
-      ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     if(NR != NP){
+         cuda_buffer_flag_trtri[0] = 0;
+     }
+     ttrtri_dev_cuda('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_trtri, 
+                       handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+     ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
+
       flop_count +=  1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
 
       cudaDeviceSynchronize();
@@ -1488,12 +1512,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 2.0 * NP * NR * NR;
 
 #ifdef PRINT_MSG
-      cudaMemcpy(tmp3, G_dense_i_dev, matrix_ns*ND*sizeof(T), cudaMemcpyDeviceToHost);
-      printf("Sigma_n+1n : \n");
-      for(int i=0; i<matrix_ns*ND; i++){
-         printf("%f ", tmp3[i]);
+      if(matrix_ns*ND < 200){
+         cudaMemcpy(tmp3, G_dense_i_dev, matrix_ns*ND*sizeof(T), cudaMemcpyDeviceToHost);
+         printf("Sigma_n+1n : \n");
+         for(int i=0; i<matrix_ns*ND; i++){
+            printf("%f ", tmp3[i]);
+         }
+         printf("\n"); 
       }
-      printf("\n"); 
 #endif
 
       cudaDeviceSynchronize();
@@ -1512,12 +1538,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
          cudaMemcpy(&invBlks[ind_invBlks_fi], G_dense_i_dev, matrix_nd*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
 #ifdef PRINT_MSG
-         printf("first index last ns x nd diagonal block: %ld\n", ind_invBlks_fi);
-         printf("last ns x ns small block : \n");
-         for(int i=0; i<matrix_nd*matrix_ns; i++){
-            printf("%f ", invBlks[ind_invBlks_fi+i]);
+         if(matrix_ns*ND < 200){
+            printf("first index last ns x nd diagonal block: %ld\n", ind_invBlks_fi);
+            printf("last ns x ns small block : \n");
+            for(int i=0; i<matrix_nd*matrix_ns; i++){
+               printf("%f ", invBlks[ind_invBlks_fi+i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
       }
       cudaDeviceSynchronize();
@@ -1526,12 +1554,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       tlacpy_dev('F', NR, NR, tmp1_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
 
 #ifdef PRINT_MSG
-      cudaMemcpy(tmp4, tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
-      printf("Sigma_nn : \n");
-      for(int i=0; i<matrix_ns*matrix_ns; i++){
-         printf("%f ", tmp4[i]);
+      if(matrix_ns*matrix_ns < 200){
+         cudaMemcpy(tmp4, tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+         printf("Sigma_nn : \n");
+         for(int i=0; i<matrix_ns*matrix_ns; i++){
+            printf("%f ", tmp4[i]);
+         }
+         printf("\n");
       }
-      printf("\n");
 #endif
 
    }
@@ -1549,7 +1579,17 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       tril_dev(tmp1_dev, NR, NR);
 
       // compute L^-1 = inv(tmp1_dev) which is lower triangular
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     cuda_buffer_flag_trtri[0] = 0;
+     ttrtri_dev_cuda('L', 'N', NR, tmp1_dev, NR, info_cuda, cuda_buffer_flag_trtri, 
+                       handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+      // magma_queue currently not supported
+      cudaDeviceSynchronize(); 
       ttrtri_dev('L', 'N', NR, tmp1_dev, NR, &info);
+#endif
+
       flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0*NR;
       
       // blockR_dev = L^-T*L^-1
@@ -1563,14 +1603,15 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
          //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
          cudaMemcpy(&invBlks[ind_invBlks_fi], tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
-#ifdef PRINT_MSG       
-         printf("first index last ns x ns diagonal block case with no fixed effects : %ld\n", ind_invBlks_fi);
-         printf("last ns x ns block : \n");
-         for(int i=0; i<NR*NR; i++){
-            printf("%f ", invBlks[ind_invBlks_fi+i]);
+#ifdef PRINT_MSG   
+         if(NR*NR < 200){
+            printf("first index last ns x ns diagonal block case with no fixed effects : %ld\n", ind_invBlks_fi);
+            printf("last ns x ns block : \n");
+            for(int i=0; i<NR*NR; i++){
+               printf("%f ", invBlks[ind_invBlks_fi+i]);
+            }
+            printf("\n");
          }
-         printf("\n");
-
 #endif
       }
 
@@ -1628,7 +1669,16 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR);
       // if L = blockR_dev, then compute L^-1
       nvtxRangeId_t id_trtri = nvtxRangeStartA("TriangularSolve_inLoop");
-      ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     if(NR != NP){
+      cuda_buffer_flag_trtri[0] = 0;
+     }
+     ttrtri_dev_cuda('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_trtri, 
+                       handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else 
+    ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+#endif
       nvtxRangeEnd(id_trtri);
       flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
 
@@ -1663,12 +1713,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          flop_count += 2.0 * NP * NR * ND;
 
 #ifdef PRINT_MSG
-         cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("L_Fi^T*Gn+1i+1: \n");
-         for(int i=0; i<NR*NR; i++){
-            printf("%f ", tmp4[i]);
-         }
-         printf("\n"); 
+         if(NR*NR < 200){
+            cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("L_Fi^T*Gn+1i+1: \n");
+            for(int i=0; i<NR*NR; i++){
+               printf("%f ", tmp4[i]);
+            }
+            printf("\n");
+         } 
 #endif
 
          // tmp2_dev = tmp4_dev*L_Ei
@@ -1676,12 +1728,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          flop_count += 2.0 * NR * NP * NR;
 
 #ifdef PRINT_MSG
-         cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("L_Fi^T*Gn+1i+1*L_Ei:\n");
-         for(int i=0; i<NR*NR; i++){
-            printf("%f ", tmp4[i]);
+         if(NR*NR < 200){
+            cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("L_Fi^T*Gn+1i+1*L_Ei:\n");
+            for(int i=0; i<NR*NR; i++){
+               printf("%f ", tmp4[i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
 
          // copy tmp2 into temp4 
@@ -1691,12 +1745,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          flop_count += 2.0 * NR * NR * NR;
 
 #ifdef PRINT_MSG
-         cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("L_Fi^T*Gn+1i+1*L_Ei + t(L_Fi^T*Gn+1i+1*L_Ei): \n");
-         for(int i=0; i<NR*NR; i++){
-            printf("%f ", tmp4[i]);
+         if(NR*NR < 200){
+            cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("L_Fi^T*Gn+1i+1*L_Ei + t(L_Fi^T*Gn+1i+1*L_Ei): \n");
+            for(int i=0; i<NR*NR; i++){
+               printf("%f ", tmp4[i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
 
          // tmp1_dev = tmp4_dev + tmp1_dev (rest happens outside this if statement)
@@ -1704,12 +1760,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          flop_count += 2.0 * NR * NR * NR;
 
 #ifdef PRINT_MSG
-         cudaMemcpy(tmp4, tmp1_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("tmp4_dev: \n");
-         for(int i=0; i<NR*NR; i++){
-            printf("%f ", tmp4[i]);
+         if(NR*NR < 200){
+            cudaMemcpy(tmp4, tmp1_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("tmp4_dev: \n");
+            for(int i=0; i<NR*NR; i++){
+               printf("%f ", tmp4[i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
          // compute inv Dense rows
          // Gn+1i = - (Gn+1i+1*L_Ei + Gn+1n+1*L_Fi)*L_Di^-1 , dim(Gn+1i+1*L_Ei) = dim(Gn+1i+1) = (nb, ns)
@@ -1718,12 +1776,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          flop_count += 2.0 * ND * NP * NR;
 
 #ifdef PRINT_MSG
-         cudaMemcpy(tmp3, tmp3_dev,NR*ND*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("tmp3_dev: \n");
-         for(int i=0; i<ND*NR; i++){
-            printf("%f ", tmp3[i]);
+         if(NR*ND < 200){
+            cudaMemcpy(tmp3, tmp3_dev,NR*ND*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("tmp3_dev: \n");
+            for(int i=0; i<ND*NR; i++){
+               printf("%f ", tmp3[i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
 
          // compute inv Dense rows
@@ -1731,13 +1791,15 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          tgemm_dev('N', 'N', ND, NR, ND, ONE, blockDense_dev, ND, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ONE, tmp_AH_dev, ND, magma_queue_2);
          flop_count += 2.0 * ND * NR * ND;
 
-#ifdef PRINT_MSG         
-         cudaMemcpy(tmp3, tmp3_dev,NR*ND*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("tmp3_dev: \n");
-         for(int i=0; i<ND*NR; i++){
-            printf("%f ", tmp3[i]);
+#ifdef PRINT_MSG    
+         if(NR*ND < 200){
+            cudaMemcpy(tmp3, tmp3_dev,NR*ND*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("tmp3_dev: \n");
+            for(int i=0; i<ND*NR; i++){
+               printf("%f ", tmp3[i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
          // compute inv Dense rows
          // Gn+1i = tmp_AH_dev*L_Di^-1 => G_dense_i_dev*blockR_dev
@@ -1745,12 +1807,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          flop_count += 2.0 * ND * NR * NR;
 
 #ifdef PRINT_MSG
-         cudaMemcpy(tmp3, G_dense_i_dev,NR*ND*sizeof(T), cudaMemcpyDeviceToHost);
-         printf("tmp3_dev: \n");
-         for(int i=0; i<ND*NR; i++){
-            printf("%f ", tmp3[i]);
+         if(NR*ND < 200){
+            cudaMemcpy(tmp3, G_dense_i_dev,NR*ND*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("tmp3_dev: \n");
+            for(int i=0; i<ND*NR; i++){
+               printf("%f ", tmp3[i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
 
          if(cpy_indicator == 2){
@@ -1759,13 +1823,15 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
             //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
             //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
             cudaMemcpy(&invBlks[ind_invBlks_fi], G_dense_i_dev, matrix_nd*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
-#ifdef PRINT_MSG         
+#ifdef PRINT_MSG    
+         if(matrix_nd*matrix_ns < 200){
             printf("first index of i-th ns x nd diagonal block: %ld\n", ind_invBlks_fi);
             printf(" i-th ns x nd dense block : \n");
             for(int i=0; i<matrix_nd*matrix_ns; i++){
                printf("%f ", invBlks[ind_invBlks_fi+i]);
             }
             printf("\n");
+         }
  #endif
          } // end cpy invBlks
 
@@ -1780,12 +1846,14 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 2.0 * NR * NR * NR; 
 
 #ifdef PRINT_MSG
-      cudaMemcpy(tmp4, tmp1_dev, NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
-      printf("Gii: \n");
-      for(int i=0; i<NR*NR; i++){
-         printf("%f ", tmp4[i]);
+      if(NR*NR < 200){
+         cudaMemcpy(tmp4, tmp1_dev, NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
+         printf("Gii: \n");
+         for(int i=0; i<NR*NR; i++){
+            printf("%f ", tmp4[i]);
+         }
+         printf("\n");
       }
-      printf("\n");
 #endif
 
       if(cpy_indicator == 2){
@@ -1795,13 +1863,15 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          //memcpy_to_host(&invBlks[ind_invBlks_fi], blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
          //memcpy_to_host(invBlks, blockDense_dev, matrix_nd*matrix_nd*sizeof(T));
          cudaMemcpy(&invBlks[ind_invBlks_fi], tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
-#ifdef PRINT_MSG         
-         printf("first index last ns x ns diagonal block case with no fixed effects : %ld\n", ind_invBlks_fi);
-         printf("i-th ns x ns block : \n");
-         for(int i=0; i<NR*NR; i++){
-            printf("%f ", invBlks[ind_invBlks_fi+i]);
+#ifdef PRINT_MSG     
+         if(NR*NR < 200){
+            printf("first index last ns x ns diagonal block case with no fixed effects : %ld\n", ind_invBlks_fi);
+            printf("i-th ns x ns block : \n");
+            for(int i=0; i<NR*NR; i++){
+               printf("%f ", invBlks[ind_invBlks_fi+i]);
+            }
+            printf("\n");
          }
-         printf("\n");
 #endif
       }
 
