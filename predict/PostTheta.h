@@ -57,13 +57,19 @@ class PostTheta{
 
 	int ns;				/**<  number of spatial grid points per timestep 	*/
 	int nt;				/**<  number of temporal time steps 				*/
+	int nss;			/**<  size of add. spatial field, not def = 0    	*/
     int nb;				/**<  number of fixed effects 						*/
     int no;				/**<  number of observations 						*/
-    int nu;				/**<  number of random effects, that ns*nu 			*/
+ 	int nst;            /**<   ns*nt, equal to nu if nss =0                 */   
+	int nu;				/**<  number of random effects, that ns*nu 			*/
     int n;				/**<  total number of unknowns, i.e. ns*nt + nb 	*/
+
+	size_t nnz_Qst;
+	size_t nnz_Qs;
 
 	int dim_th;			/**<  dimension of hyperparameter vector theta 		*/
 	int dim_spatial_domain; 
+	string manifold;    /**<  in R^d or on the sphere */
 	int dim_grad_loop;  /**<  dimension of gradient loop 					*/
 	int num_solvers;    /**<  number of pardiso solvers 					*/
 
@@ -73,10 +79,6 @@ class PostTheta{
 	string solver_type;
 
 	std::string prior;  /**<  type of pripr to be used                      */
-
-
-	//PardisoSolver* solverQ;   /**<  list of Pardiso solvers, for denom.		*/
-	//PardisoSolver* solverQst; /**<  list of Pardiso solvers, for Qu         */
 
 	int fct_count;      /**< count total number of function evaluations 	*/
 	int iter_count;		/**< count total number of operator() call        	*/
@@ -106,6 +108,8 @@ class PostTheta{
 
 	SpMat Qb;			/**< setup indices once. Only prior fixed effects. */
 	SpMat Qu;			/**< setup indices once. Only prior random effects */
+	SpMat Qst;
+	SpMat Qs;
 	SpMat Qx;			/**< setup indices once. Includes Prior RE + FE.   */
 	SpMat Qxy;			/**< setup indices for Qxy once. */
 
@@ -197,7 +201,7 @@ class PostTheta{
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpRmMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2,
 		Vect theta_prior, string solver_type, 
-		int dim_spatial_domain,
+		int dim_spatial_domain, string manifold,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w);
 
@@ -217,14 +221,46 @@ class PostTheta{
      * @param[in] M0_ diagonalised mass matrix time.
      * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
      * @param[in] M2_ stiffness matrix time.
+	 * @param[in] theta_prior prior hyperparameters
+	 * @param[in] solver_type linear solver: currently PARDISO, BTA
+	 * @param[in] dim_spatial_domain dimension spatial field 1D/2D ... 
+	 * @param[in] manifold plane: "", "sphere", can add more later
+	 * @param[in] constr constraints, mainly sum-to-zero
      */	
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpRmMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
 		SpMat M0, SpMat M1, SpMat M2, 
 		Vect theta_prior, string solver_type, 
-		int dim_spatial_domain,
+		int dim_spatial_domain, string manifold,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w); 
+
+	/**
+     * @brief constructor for spatial temporal model w/ add. spatial field
+     * @brief constructor for both spatial models (order 2).
+     * @param[in] ns_ number of spatial grid points per time step.
+     * @param[in] nt_ number of temporal time steps.
+     * @param[in] nss_ number of spatial grid points in add. spatial field
+     * @param[in] nb_ number of fixed effects.
+     * @param[in] no_ number of observations.
+     * @param[in] Ax_  covariate matrix.
+     * @param[in] y_  vector with observations.
+     * @param[in] c0_ diagonalised mass matrix space.
+     * @param[in] g1_ stiffness matrix space.
+     * @param[in] g2_ defined as : g1 * c0^-1 * g1
+     * @param[in] g3_ defined as : g1 * (c0^-1 * g1)^2
+     * @param[in] M0_ diagonalised mass matrix time.
+     * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
+     * @param[in] M2_ stiffness matrix time.
+     */
+	PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, 
+		SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, 
+		SpMat M0_, SpMat M1_, SpMat M2_, 
+		Vect theta_prior_param_, string solver_type_, 
+		int dim_spatial_domain_, string manifold_,
+		const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, 
+		const bool validate_, const Vect w_);
+
 
 	/**
      * @brief structure required by BFGS solver, requires : theta, gradient theta
@@ -259,7 +295,7 @@ class PostTheta{
 	 * @param [inout]	log(ranS) 	 spatial range
 	 * @param [inout]	log(ranT) 	 temporal range
 	 */
-	void convert_theta2interpret(double lgamE, double lgamS, double lgamT, double& sigU, double& ranS, double& ranT);
+	void convert_theta2interpret_spatTemp(double lgamE, double lgamS, double lgamT, double& sigU, double& ranS, double& ranT);
 	
 	/**
 	 * @brief convert hyperparameters theta from the interpretable parametrisation to the
@@ -271,7 +307,28 @@ class PostTheta{
 	 * @param [inout]	log(gamma_s)
 	 * @param [inout]	log(gamma_t)
 	 */
-	void convert_interpret2theta(double sigU, double ranS, double ranT, double& lgamE, double& lgamS, double& lgamT);
+	void convert_interpret2theta_spatTemp(double sigU, double ranS, double ranT, double& lgamE, double& lgamS, double& lgamT);
+
+
+	/**
+	 * @brief convert hyperparameters theta from the interpretable parametrisation to the
+	 * model parametrisation ie. from log(rangeS, sigma.u) to log(gamma_s, gamma_E) for spatial model order 2
+	 * @param [in]		log(ranS) 	 spatial range
+	 * @param [in]		log(sigma.u) precision of random effects
+	 * @param [inout]	log(gamma_s)
+	 * @param [inout]	log(gamma_E) 
+	 */
+ 	void convert_interpret2theta_spat(double lranS, double lsigU, double& lgamS, double& lgamE);
+
+	/**
+	 * @brief convert hyperparameters theta from the interpretable parametrisation to the
+	 * model parametrisation ie. from log(rangeS, sigma.u) to log(gamma_s, gamma_E) for spatial model order 2
+	 * @param [in]			log(gamma_s)
+	 * @param [in]			log(gamma_E) 
+	 * @param [inout]		log(ranS) 	 spatial range
+	 * @param [inout]		log(sigma.u) precision of random effects
+	 */
+	void convert_theta2interpret_spat(double lgamS, double lgamE, double& lranS, double& lsigU);
 
 	// ============================================================================================ //
 	// FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED

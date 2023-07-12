@@ -85,388 +85,6 @@ using namespace LBFGSpp;
     std::cout << '\n';
 }*/
 
-// construct sparse Matrix from invBlks 
-// invBlks have particular order ... non-contiguous ... 
-// but we want to fill sparse matrix by column 
-void construct_lower_CSC_invBlks(size_t ns, size_t nt, size_t nb, size_t nnz_lower_invBlks, double* invBlks, SpMat& QinvBlks){
-
-    //std::cout << "nnz_invBlks lower = " << nnz_lower_invBlks << ", ns = " << ns << ", nt = " << nt << ", nb = " << nb << std::endl;
-    int n = ns*nt + nb;
-    SpMat QinvBlks_lower(n,n);
-    QinvBlks_lower.reserve(nnz_lower_invBlks);
-
-    int* row_ind_a; // row index of each nnz value
-    int* col_ptr_a; // list of val indices where each column starts
-    double* a;
-
-    row_ind_a = new int [nnz_lower_invBlks];
-    col_ptr_a = new int [n+1];
-    a         = new double[nnz_lower_invBlks];
-
-    size_t counter = 0;
-
-    double t_loop = - omp_get_wtime();
-
-    // deal with final block later
-    // only read-out values from lower triangular part
-    for(int col=0; col<ns*nt; col++){
-        int ts = col / ns; // determine which time step we are in
-        int col_ts = col % ns; // col relative to the current timestep
-        //printf("ts = %d, col ts = %d, counter = %ld\n", ts, col_ts, counter);
-        
-        col_ptr_a[col] = counter;
-
-        for(int i=col_ts; i<ns; i++){
-            int row = ns * ts + i;
-            // get correct entry from invBlks array
-            // invBlks sorted as D1, F1, D2, F2, ... Fn, Dn+1n+1, column-major
-            int ind_invBlks = ts * (ns + nb) * ns + col_ts * ns + i;
-            //QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
-            a[counter]         = invBlks[ind_invBlks];
-            row_ind_a[counter] = row;
-            counter++;
-
-        }
-
-        for(int i=0; i<nb; i++){   
-            // always last rows
-            int row = ns*nt+i;
-            int ind_invBlks = ts * (ns + nb) * ns + ns * ns + col_ts * nb + i;
-
-            a[counter] = invBlks[ind_invBlks];
-            row_ind_a[counter] = row;
-            counter++;
-
-        }
-    }
-
-    // ... and finally for last nb columns
-    int ind_offset = (ns + nb) * ns * nt;
-    for(int col=ns*nt; col<ns*nt+nb; col++){
-        int col_ts = col % ns;
-        //printf("col ts = %d\n", col_ts);
-
-        col_ptr_a[col] = counter;
-
-        for(int i=col_ts; i<nb; i++){
-            int row = ns*nt+i;
-            int ind_invBlks = ind_offset + col_ts*nb + i;
-
-            a[counter] = invBlks[ind_invBlks];
-            row_ind_a[counter] = row;
-            counter++;
-        }
-    }
-
-    // final column ptr entry
-    col_ptr_a[n] = counter;
-
-    t_loop += omp_get_wtime();
-    printf("lowerCSC: time in loop : %f\n", t_loop);
-
-#if 0
-    printf("row_ind_a: ");
-    for(int i=0; i<nnz_lower_invBlks; i++){
-        printf("%d ", row_ind_a[i]);
-    }
-    printf("\n");
-
-
-    printf("col_ptr_a: ");
-    for(int i=0; i<n+1; i++){
-        printf("%d ", col_ptr_a[i]);
-    }
-    printf("\n");
-
-    printf("a: ");
-    for(int i=0; i<nnz_lower_invBlks; i++){
-        printf("%f ", a[i]);
-    }
-    printf("\n");
-#endif
-
-    t_loop = - omp_get_wtime();
-    QinvBlks_lower =  Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz_lower_invBlks,col_ptr_a, row_ind_a,a);
-    t_loop += omp_get_wtime();
-    printf("lowerCSC: time Eigen Map : %f\n", t_loop);
-
-    t_loop = - omp_get_wtime();
-    QinvBlks = QinvBlks_lower.selfadjointView<Lower>();
-    t_loop += omp_get_wtime();
-    printf("lowerCSC: time Eigen copy symmetrize : %f\n", t_loop);
-    //std::cout << "QinvBlks : \n" << MatrixXd(QinvBlks) << std::endl;
-
-}
-
-
-// construct sparse Matrix from invBlks -> generate full CSC structure -> no symmetric multiplication routine
-// invBlks have particular order ... non-contiguous ... 
-// but we want to fill sparse matrix by column
-void construct_full_CSC_invBlks(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, double* invBlks, SpMat& QinvBlks){
-
-    //std::cout << "nnz_invBlks lower = " << nnz_lower_invBlks << ", ns = " << ns << ", nt = " << nt << ", nb = " << nb << std::endl;
-    int n = ns*nt + nb;
-    //SpMat QinvBlks_lower(n,n);
-    QinvBlks.reserve(nnz_invBlks);
-
-    int* row_ind_a; // row index of each nnz value
-    int* col_ptr_a; // list of val indices where each column starts
-    double* a;
-
-    row_ind_a = new int [nnz_invBlks];
-    col_ptr_a = new int [n+1];
-    a         = new double[nnz_invBlks];
-
-    size_t counter = 0;
-
-    double t_loop = - omp_get_wtime();
-
-    // deal with final block later
-    // only read-out values from lower triangular part
-    for(int col=0; col<ns*nt; col++){
-        int ts = col / ns; // determine which time step we are in
-        int col_ts = col % ns; // col relative to the current timestep
-        //printf("ts = %d, col ts = %d, counter = %ld\n", ts, col_ts, counter);
-        
-        col_ptr_a[col] = counter;
-
-        for(int i=0; i<ns; i++){
-            int row = ns * ts + i;
-            // get correct entry from invBlks array
-            // invBlks sorted as D1, F1, D2, F2, ... Fn, Dn+1n+1, column-major
-            int ind_invBlks = ts * (ns + nb) * ns + col_ts * ns + i;
-            //QinvBlks_lower.insert(row, col) = invBlks[ind_invBlks];
-            a[counter]         = invBlks[ind_invBlks];
-            row_ind_a[counter] = row;
-            counter++;
-
-        }
-
-        for(int i=0; i<nb; i++){   
-            // always last rows
-            int row = ns*nt+i;
-            int ind_invBlks = ts * (ns + nb) * ns + ns * ns + col_ts * nb + i;
-
-            a[counter] = invBlks[ind_invBlks];
-            row_ind_a[counter] = row;
-            counter++;
-
-        }
-    }
-
-    int ind_offset = (ns + nb) * ns * nt;
-    for(int col=ns*nt; col<ns*nt+nb; col++){
-        int col_ts = col % ns;
-        //printf("col ts = %d\n", col_ts);
-
-        col_ptr_a[col] = counter;
-
-        for(int ts=0;ts<nt; ts++){
-            for(int ss=0; ss<ns; ss++){
-                int row = ts*ns + ss;
-                int ind_invBlks = (ns+nb)*ns*ts + ns*ns + col_ts + ss*nb;
-                a[counter] = invBlks[ind_invBlks];
-                row_ind_a[counter] = row;
-                counter++;
-            }
-
-        }
-
-        for(int i=0; i<nb; i++){
-            int row = ns*nt+i;
-            int ind_invBlks = ind_offset + col_ts*nb + i;
-
-            a[counter] = invBlks[ind_invBlks];
-            row_ind_a[counter] = row;
-            counter++;
-        }
-    }
-
-    // final column ptr entry
-    col_ptr_a[n] = counter;
-
-    t_loop += omp_get_wtime();
-    printf("fullCSC: time in loop : %f\n", t_loop);
-
-    t_loop = - omp_get_wtime();
-    QinvBlks =  Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz_invBlks,col_ptr_a, row_ind_a,a);
-    t_loop += omp_get_wtime();
-    printf("fullCSC: time Eigen Map : %f\n", t_loop);
-
-    //std::cout << "QinvBlks full: \n" << MatrixXd(QinvBlks) << std::endl;
-
-}
-
-
-// construct sparse Matrix from invBlks -> generate full CSC structure -> no symmetric multiplication routine
-// invBlks have particular order ... non-contiguous ... 
-// but we want to fill sparse matrix by column
-void get_projMargVar(size_t ns, size_t nt, size_t nb, size_t nnz_invBlks, double* invBlks, SpRmMat& A, Vect& projMargVar){
-
-    // for block array returned from GPU ...
-    size_t nrows = A.rows();
-    size_t ncols = A.cols();
-
-    size_t n = ns*nt+nb; 
-
-    if(n != ncols){
-        printf("Dimensions don't match! ns*nt + nb = %ld, cols(A) = %ld\n", n, ncols);
-        exit(1);
-    }
-
-    SpMat QinvBlks;
-    //size_t nnz_lower_invBlks = nt*ns*(ns+1)/2 + ns*nb*nt + (nb+1)*nb/2;
-    //construct_lower_CSC_invBlks(ns, nt, nb, nnz_lower_invBlks, invBlks, QinvBlks);
-    construct_full_CSC_invBlks(ns, nt, nb, nnz_invBlks, invBlks, QinvBlks);
-    //std::cout << "QinvBlks:\n" << MatrixXd(QinvBlks) << std::endl;
-
-    projMargVar.setZero();
-
-    Vect F_comp(nrows);
-    F_comp.setZero();
-
-    double t_AinvQAt = -omp_get_wtime();
-
-    for (int row = 0; row < nrows; row++){
-        //printf("\nrow = %d\n", row);
-        int arow = row;  
-        Eigen::SparseVector<double> T_vect(ncols);
-        //Eigen::SparseVector<double> T_comp(ncols);
-        T_vect.setZero();
-        //T_comp.setZero();
-        // we only have to iterate through the columns of S, where A(row,col) != 0
-        for(int sind = A.outerIndexPtr()[row]; sind < A.outerIndexPtr()[row+1]; sind++){
-            int scol = A.innerIndexPtr()[sind];  
-            int ts = scol / ns; 
-            int col_rel = scol % ns;
-            // iterating through non-zero entries of each row of A
-            T_vect.insert(scol) =0.0;
-            //T_comp.insert(scol) =0.0;
-            for(int aind = A.outerIndexPtr()[row]; aind < A.outerIndexPtr()[row+1]; aind++){   
-                int acol = A.innerIndexPtr()[aind]; 
-                int acol_shift = acol % ns;
-                int acol_ts = acol / ns; // determine which time step we are in
-                
-                //printf("A: row = %d, col = %d , value = %f\n", row, A.innerIndexPtr()[aind], A.valuePtr()[aind]);
-                //printf("S(%d, %d) = %f\n", acol, scol, S.coeff(acol, scol));
-                // to compute T(row, col) += A(row, acol)*S(acol, col)
-
-                if((acol_ts == ts) && (acol < ns*nt) && (scol < ns*nt)){
-                    // acol is the desired row index
-                    int ind_invBlks = ts * (ns + nb) * ns + col_rel * ns + acol_shift;
-                    double invBlkVal = invBlks[ind_invBlks];
-                    //printf("ts = %d, col_rel = %d, scol = %d, acol = %d\n", ts, col_rel, scol, acol);
-                    //printf("A(%d, %d) = %f, \n", row, acol, A.valuePtr()[aind]);
-                    //printf("ind_invBlks = %d, QinvBlk(%d, %d) = %f, SHOULD BE: %f\n", ind_invBlks, acol, scol, invBlkVal, QinvBlks.coeffRef(acol, scol));
-                    T_vect.coeffRef(scol) += A.valuePtr()[aind]*invBlks[ind_invBlks];
-
-                }
-                if(acol < ns*nt && scol >= ns*nt) {
-                // to compute T(scol) += A(row, acol)*S(acol, scol)
-                    int ind_invBlks = (ns+nb)*ns*acol_ts + ns*ns + acol_shift*nb + col_rel;
-                    double invBlkVal = invBlks[ind_invBlks];
-                    //printf("ts = %d, col_rel = %d, scol = %d, acol = %d\n", ts, col_rel, scol, acol);
-                    //printf("ind_invBlks = %d, QinvBlk(%d, %d) = %f, SHOULD BE: %f\n", ind_invBlks, acol, scol, invBlkVal, QinvBlks.coeffRef(acol, scol));
-                    T_vect.coeffRef(scol) += A.valuePtr()[aind]*invBlks[ind_invBlks];
-                }
-
-                if(acol >= ns*nt && scol < ns*nt) {
-                // to compute T(scol) += A(row, acol)*S(acol, scol)
-                    int ind_invBlks = ts * (ns + nb) * ns + ns * ns + col_rel * nb + acol_shift;
-                    double invBlkVal = invBlks[ind_invBlks];
-                    //printf("ts = %d, col_rel = %d, scol = %d, acol = %d\n", ts, col_rel, scol, acol);
-                    //printf("ind_invBlks = %d, QinvBlk(%d, %d) = %f, SHOULD BE: %f\n", ind_invBlks, acol, scol, invBlkVal, QinvBlks.coeffRef(acol, scol));
-                    T_vect.coeffRef(scol) += A.valuePtr()[aind]*invBlks[ind_invBlks];
-
-                }
-                if(acol >= ns*nt && scol >= ns*nt) {
-                    int ind_offset = (ns + nb) * ns * nt;
-                    int ind_invBlks = ind_offset + col_rel*nb + acol_shift;
-                    double invBlkVal = invBlks[ind_invBlks];
-                    //printf("ind_invBlks = %d, QinvBlk(%d, %d) = %f, SHOULD BE: %f\n", ind_invBlks, acol, scol, invBlkVal, QinvBlks.coeffRef(acol, scol));
-                    T_vect.coeffRef(scol) += A.valuePtr()[aind]*invBlks[ind_invBlks];
-                }
-                //T_comp.coeffRef(scol) += A.valuePtr()[aind]*QinvBlks.coeff(acol, scol);
-
-            }
-        }
-
-        //std::cout << "row = " << row << ", T_vect : " << T_vect.transpose();
-        //std::cout << "row = " << row << ", T_comp : " << T_comp.transpose() << std::endl;
-
-        // now multiply by A^T, 1 scalarproduct in each row, iterate again for outerindexPtr of A  
-        for(int aind = A.outerIndexPtr()[row]; aind < A.outerIndexPtr()[row+1]; aind++){   
-            int acol = A.innerIndexPtr()[aind]; 
-            //printf("A: row = %d, col = %d , value = %f\n", row, acol, A.valuePtr()[aind]);
-            //printf("T(%d) = %f\n", acol, T_vect.coeffRef(acol));
-            //printf("A.valuePtr()[aind]*T_vect.coeffRef(acol) = %f\n", A.valuePtr()[aind]*T_vect.coeffRef(acol));
-            projMargVar(row) += A.valuePtr()[aind]*T_vect.coeffRef(acol);
-            //F_comp(row) += A.valuePtr()[aind]*T_comp.coeffRef(acol);
-            //printf("F(%d) = %f\n", row, F_vect(row));
-        }
-
-    }  
-
-    t_AinvQAt += omp_get_wtime();
-    printf("time AinvQAt : %f\n", t_AinvQAt);
-
-    SpMat F_true(nrows,nrows);
-    F_true = A*QinvBlks*A.transpose();
-
-    //std::cout << "norm(F_comp - F_vect) = " << (F_comp - projMargVar).norm() << std::endl;
-    std::cout << "norm(F_vect - F_true) = " << (F_true.diagonal() - projMargVar).norm() << std::endl;
-
-    //std::cout << "F_comp - F_vect       = " << F_comp.transpose() - projMargVar.transpose() << std::endl;
-    //std::cout << "F_comp - diag(F_true) = " << F_comp.transpose() - F_true.diagonal().transpose() << std::endl;
-
-
-//std::cout << "\ndiag(F)" << F_vect.transpose() << std::endl;
-//std::cout << "F_true : " << F_true.diagonal().transpose() << std::endl;
-
-}
-
-
-#if 0
-
-// ============================================================================== //
-// for block array returned from GPU ...
-
-for (int row = 0; row < nrows; row++){
-    //printf("\nrow = %d\n", row);
-    int arow = row;  
-    Eigen::SparseVector<double> T_vect(ncols);
-    T_vect.setZero();
-    // we only have to iterate through the columns of S, where A(row,col) != 0
-    //for(int scol = 0; scol < ncols; scol++){
-    for(int sind = A.outerIndexPtr()[row]; sind < A.outerIndexPtr()[row+1]; sind++){
-        int scol = A.innerIndexPtr()[sind];    
-        // iterating through non-zero entries of each row of A
-        T_vect.insert(scol) =0.0;
-        for(int aind = A.outerIndexPtr()[row]; aind < A.outerIndexPtr()[row+1]; aind++){   
-            int acol = A.innerIndexPtr()[aind]; 
-            //printf("A: row = %d, col = %d , value = %f\n", row, A.innerIndexPtr()[aind], A.valuePtr()[aind]);
-            //printf("S(%d, %d) = %f\n", acol, scol, S.coeff(acol, scol));
-            // entry of S: S
-            // to compute T(row, col) += A(row, acol)*S(acol, col)
-            T_vect.coeffRef(scol) += A.valuePtr()[aind]*S.coeff(acol, scol);
-        }
-    }
-    //std::cout << "T.row(" << row << ") : " << T_vect.transpose() << std::endl;  
-    // now multiply by A^T, 1 scalarproduct in each row, iterate again for outerindexPtr of A  
-    for(int aind = A.outerIndexPtr()[row]; aind < A.outerIndexPtr()[row+1]; aind++){   
-        int acol = A.innerIndexPtr()[aind]; 
-        //printf("A: row = %d, col = %d , value = %f\n", row, acol, A.valuePtr()[aind]);
-        //printf("T(%d) = %f\n", acol, T_vect.coeffRef(acol));
-        //printf("A.valuePtr()[aind]*T_vect.coeffRef(acol) = %f\n", A.valuePtr()[aind]*T_vect.coeffRef(acol));
-        F_vect(row) += A.valuePtr()[aind]*T_vect.coeffRef(acol);
-        //printf("F(%d) = %f\n", row, F_vect(row));
-    }
-
-}  
-
-#endif
-
-
 
 void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3, SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Qst){
 
@@ -519,11 +137,11 @@ int main(int argc, char* argv[])
 	threads_level1 = omp_get_max_threads();
 	#pragma omp parallel
 	{
-	    threads_level2 = omp_get_max_threads();
+	threads_level2 = omp_get_max_threads();
 	}
     } else {
-	    //threads_level1 = omp_get_max_threads();
-	    //threads_level2 = omp_get_max_threads();
+	threads_level1 = omp_get_max_threads();
+	//threads_level2 = omp_get_max_threads();
     	threads_level2 = 1;
     }
 
@@ -534,8 +152,8 @@ int main(int argc, char* argv[])
         printf("\n============== PARALLELISM & NUMERICAL SOLVERS ==============\n");
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
-        printf("OMP threads level 2 : %d\n", threads_level2);
-	    //printf("OMP threads level 2 FIXED TO 1!!\n");
+        //printf("OMP threads level 2 : %d\n", threads_level2);
+	printf("OMP threads level 2 FIXED TO 1!!\n");
 #ifdef RGF_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
@@ -544,24 +162,25 @@ int main(int argc, char* argv[])
     noGPUs = 0;
 #endif
     }  
-
     
-    if(argc != 1 + 8 && MPI_rank == 0){
+    
+    if(argc != 1 + 9 && MPI_rank == 0){
         std::cout << "wrong number of input parameters. " << std::endl;
 
-        std::cerr << "INLA Call : ns nt nb t_fit path/to/files solver_type" << std::endl;
+        std::cerr << "INLA Call : ns nss nt_fit nt_pred nt_total no_per_ts nb path/to/files solver_type" << std::endl;
 
         std::cerr << "[integer:ns]                number of spatial grid points " << std::endl;
-        std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
+        std::cerr << "[integer:nss]               number of spatial grid points add. spatial field" << std::endl;
 
         std::cerr << "[integer:nt_fit]            number of days used for fitting" << std::endl;
         std::cerr << "[integer:nt_pred]           number of days predicted" << std::endl;
         std::cerr << "[integer:nt_total]          number of days for which we have data" << std::endl;
 
         std::cerr << "[integer:no_per_ts]         number of data samples per ts (includes NA)" << std::endl;
+        std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
 
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
-        std::cerr << "[string:solver_type]        BTA or PARDISO " << std::endl;
+        std::cerr << "[string:solver_type]        BTA or PARDISO" << std::endl;
 
         exit(1);
     }
@@ -572,38 +191,40 @@ int main(int argc, char* argv[])
     }
 #endif
 
-    size_t ns        = atoi(argv[1]);
-    size_t nb        = atoi(argv[2]);
+    size_t ns  = atoi(argv[1]);
+    size_t nss = atoi(argv[2]);
 
     size_t nt_fit    = atoi(argv[3]);
     size_t nt_pred   = atoi(argv[4]);
     size_t nt        = nt_fit + nt_pred; // internal model size
     size_t nt_total  = atoi(argv[5]);
-
+    
     size_t no_per_ts = atoi(argv[6]);
     size_t no        = nt*no_per_ts;
+    size_t nb        = atoi(argv[7]);
 
     // set nt = 1 if ns > 0 & nt = 0
     if(ns > 0 && nt == 0){
         nt = 1;
     } 
 
-    size_t n = ns*(nt_fit + nt_pred) + nb;
+    size_t n = ns*(nt_fit + nt_pred) + nss + nb;
 
     // also save as string
     std::string ns_s        = std::to_string(ns);
     std::string nt_s        = std::to_string(nt);    
-    std::string nb_s        = std::to_string(nb);
+
 
     std::string nt_fit_s    = std::to_string(nt_fit);
     std::string nt_pred_s   = std::to_string(nt_pred);
     std::string nt_total_s  = std::to_string(nt_total);
 
     std::string no_per_ts_s = std::to_string(no_per_ts); 
+    std::string nb_s        = std::to_string(nb);
     std::string n_s         = std::to_string(n);
 
-    std::string base_path   = argv[7];    
-    std::string solver_type = argv[8];
+    std::string base_path   = argv[8];    
+    std::string solver_type = argv[9];
 
     // check if solver type is neither PARDISO nor RGF :
     if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
@@ -622,274 +243,12 @@ int main(int argc, char* argv[])
         printf("Memory Usage of each Cholesky factor on CPU = %f GB\n\n", mem_gb);
     }
 
-
-// implement sparse multiplication of A*BlkDiag(Q^-1)*A*T
-#if 0
-
-size_t ns = 100;
-size_t nt = 30;
-size_t nb = 4;
-size_t n = ns*nt+nb;
-
-size_t nnz_invBlks = ns*ns*nt+2*nb*ns*nt + nb*nb;
-// generate random Vector nnz_invBlks entries
-Vect invBlks = Vect::Random(nnz_invBlks);
-//std::cout << "invBlks : " << invBlks.transpose() << std::endl;
-
-/*
-SpMat QinvBlks(n,n);
-construct_full_CSC_invBlks(ns, nt, nb, nnz_invBlks, invBlks.data(), QinvBlks);
-std::cout << "QinvBlks:\n" << MatrixXd(QinvBlks) << std::endl;
-*/
-
-size_t no = ns*nt+nb+3;    
-
-int nrows = no;
-int ncols = n;
-
-// generate sparse matrix A with random sparsity pattern
-MatrixXd A_dense = MatrixXd::Random(nrows,ncols);
-
-//std::cout << "A: \n" << A_dense << std::endl;
-
-
- for(int i=0; i<nrows; i++){
-    for(int j=0; j<ncols; j++){
-        if(A_dense(i,j) < 0.4){
-            A_dense(i,j) = 0;
-        }
-    }
- }
-
- //std::cout << "A: \n" << A_dense << std::endl;
-
- MatrixXd S_dense =  MatrixXd::Random(ncols,ncols);
-
- //std::cout << "S: \n" << S_dense << std::endl;
-
- MatrixXd T_dense = MatrixXd::Zero(nrows, ncols);
- MatrixXd F_dense = MatrixXd::Zero(nrows, nrows);
-
-
- for(int i=0; i<nrows; i++){
-    for(int k=0; k<ncols; k++){
-        if(A_dense(i,k) != 0){
-            for(int j=0; j<ncols; j++){
-                T_dense(i,k) += A_dense(i,j)*S_dense(j,k);               
-            }
-        }
-    }
-    for(int k=0; k<ncols; k++){
-        if(A_dense(i,k) != 0){
-            F_dense(i,i) += T_dense(i,k)*A_dense(i,k); 
-        } 
-    }     
- }
-
-MatrixXd T_true = A_dense*S_dense;
-MatrixXd F_true = T_true*A_dense.transpose();
-
-/*
-  std::cout << "T = A*S true: \n" << T_true << std::endl;
-  
-  std::cout << "T = A*S : \n" << T_dense << std::endl;
-
-  std::cout << "F = A*S*A^T true:\n" << F_true << std::endl;
-  std::cout << "F :\n" << F_dense << std::endl;
-
-  std::cout << "norm(diag(F_dense - F_true)) = " << (F_dense.diagonal() - F_true.diagonal()).norm() << std::endl;
-*/
-
-#if 0
- // ================================ sparse version ... ==================================== //
- SpMat S = S_dense.sparseView();
- SpMat A = A_dense.sparseView();
-
- SpMat T(nrows, ncols);
- SpMat F(nrows, nrows);
-
- T.setZero();
- F.setZero();
-
-
- for(int i=0; i<nrows; i++){
-    for(int k=0; k<ncols; k++){
-        if(A.coeff(i,k) != 0){
-            T.insert(i,k) = 0.0;
-            for(int j=0; j<ncols; j++){
-                T.coeffRef(i,k) += A.coeff(i,j)*S.coeff(j,k);               
-            }
-        }
-    }
-    F.insert(i,i) = 0.0;
-    for(int k=0; k<ncols; k++){
-        F.coeffRef(i,i) += T.coeff(i,k)*A.coeff(i,k);  
-    }     
- }
-
-std::cout << "norm(diag(F - F_true)) = " << (F.diagonal() - F_true.diagonal()).norm() << std::endl;
-#endif
-
- // ================================ better sparse version ... ==================================== //
-
-
- SpMat S = S_dense.sparseView();
- SpRmMat A = A_dense.sparseView();
-
- // max number of nonzeros per row are 3 + nb
- // just store 1 column, overwrite every time
- Vect F_vect(nrows);
- F_vect.setZero();
-
- Vect projMargVar(no);
- get_projMargVar(ns, nt, nb, nnz_invBlks, invBlks.data(), A, projMargVar);
-
-/*
- for(int i=0; i<nrows; i++){
-    Eigen::SparseVector<double> T_vect(ncols);
-    T_vect.setZero();
-    for(int k=0; k<ncols; k++){
-        if(A.coeff(i,k) != 0){
-            T_vect.insert(k) = 0.0;
-            for(int j=0; j<ncols; j++){
-                T_vect.coeffRef(k) += A.coeff(i,j)*S.coeff(j,k);               
-            }
-        }
-    }
-    for(int k=0; k<ncols; k++){
-        if(A.coeff(i,k) != 0){
-            F_vect(i) += T_vect.coeff(k)*A.coeff(i,k);  
-        }
-    }     
- }
- */
-
-
-// A*S*A^T assuming that A is in row-major, S is ideally in column-major (not so important)
-// we are only computing diag(A*S*A^T), thus we only need those entries in S that match sparsity pattern of A
-// for an arbitrary sparse/dense matrix S
-//std::cout << "S : \n" << S << std::endl;
-//std::cout << "A : \n" << A << std::endl;
-
-/*
-for (int row = 0; row < nrows; row++){
-    printf("\nrow = %d\n", row);
-    int arow = row;  
-    Eigen::SparseVector<double> T_vect(ncols);
-    T_vect.setZero();
-    // we only have to iterate through the columns of S, where A(row,col) != 0
-    //for(int scol = 0; scol < ncols; scol++){
-    for(int sind = A.outerIndexPtr()[row]; sind < A.outerIndexPtr()[row+1]; sind++){
-        int scol = A.innerIndexPtr()[sind];    
-        // iterating through non-zero entries of each row of A
-        T_vect.insert(scol) =0.0;
-        for(int aind = A.outerIndexPtr()[row]; aind < A.outerIndexPtr()[row+1]; aind++){   
-            int acol = A.innerIndexPtr()[aind]; 
-            printf("A: row = %d, col = %d , value = %f\n", row, A.innerIndexPtr()[aind], A.valuePtr()[aind]);
-            printf("S(%d, %d) = %f\n", acol, scol, S.coeff(acol, scol));
-            // entry of S: S
-            // to compute T(row, col) += A(row, acol)*S(acol, col)
-            T_vect.coeffRef(scol) += A.valuePtr()[aind]*S.coeff(acol, scol);
-        }
-    }
-    std::cout << "T.row(" << row << ") : " << T_vect.transpose() << std::endl;  
-    // now multiply by A^T, 1 scalarproduct in each row, iterate again for outerindexPtr of A  
-    for(int aind = A.outerIndexPtr()[row]; aind < A.outerIndexPtr()[row+1]; aind++){   
-        int acol = A.innerIndexPtr()[aind]; 
-        printf("A: row = %d, col = %d , value = %f\n", row, acol, A.valuePtr()[aind]);
-        printf("T(%d) = %f\n", acol, T_vect.coeffRef(acol));
-        //printf("A.valuePtr()[aind]*T_vect.coeffRef(acol) = %f\n", A.valuePtr()[aind]*T_vect.coeffRef(acol));
-        F_vect(row) += A.valuePtr()[aind]*T_vect.coeffRef(acol);
-        printf("F(%d) = %f\n", row, F_vect(row));
-    }
-
-}   
-*/
-
-
-  
-
-//std::cout << "T_true : " << MatrixXd(A*S) << std::endl;
-
-
-//std::cout << "\ndiag(F)" << F_vect.transpose() << std::endl;
-//std::cout << "F_true : " << F_true.diagonal().transpose() << std::endl;
-
-//std::cout << "norm(diag(F) - diag(F_true)) = " << (F_vect - F_true.diagonal()). norm() << std::endl;
-
-//std::cout << "F : " << F_vect.transpose() << std::endl;
-//std::cout << "norm(diag(F - F_true)) = " << (F_vect - F_true.diagonal()).norm() << std::endl;
-
-exit(1);
-#endif 
-
-
-#if 0
-    // ============================================================================== //
-
-    // read test matrix
-    int length_tv = 6;
-    std::string test_file = "test_vector.dat";
-    file_exists(test_file);
-    Vect test_vector = read_matrix(test_file, length_tv, 1); 
-    std::cout << "test vector : " << test_vector.transpose() << std::endl;
-
-    std::string test_ind_file = "test_ind_vector.dat";
-    file_exists(test_ind_file);
-
-    Vect test_ind_vector = read_matrix(test_ind_file, length_tv, 1); 
-    std::cout << "test ind vector : " << test_ind_vector.transpose() << std::endl;
-
-    //std::cout << "test_vector " << test_vector.isNaN() << std::endl;
-
-    std::cout << "check if vector has NaN entries: " << std::endl;
-    for(int i=0; i<length_tv; i++){
-        double a = test_vector[i];
-        std::cout << "test_vector[" << i << "] : " << test_vector[i] << ", is NaN: " << isnan(test_vector[i]) << std::endl;
-    }
-
-    SpMat A_test = MatrixXd::Random(length_tv,7).sparseView();
-    std::cout << "A_test : \n" << A_test << std::endl;
-
-    Vect ATtv = A_test.transpose() * test_vector;
-    std::cout << "\nA_test * test_vector: \n" << ATtv.transpose() << std::endl; 
-
-    SpMat A_test_new = A_test;
-    Vect test_new_vector = test_vector;
-
-    // TODO: make more efficient! 
-    // row/column-wise multiplication with sclar ... points.array().colwise() *= scalars.array();
-    // set A matrix values to zero according to y_ind vector
-    for(int i = 0; i<length_tv; i++){
-        if(test_ind_vector(i) == 0){
-            A_test_new.row(i) *= 0;  
-            test_new_vector(i) = 0;  
-        }
-    }
-
-    std::cout << "A_test : \n" << A_test << std::endl;
-    std::cout << "A_test_new : \n" << A_test_new << std::endl;
-
-    std::cout << "y_test_new : " << test_new_vector.transpose() << std::endl;
-
-    SpMat ATA_test = A_test_new.transpose() * A_test_new;
-    Vect ATy_test  = A_test_new.transpose() * test_new_vector;
-
-    std::cout << "ATA test : \n" << ATA_test << std::endl;
-    std::cout << "ATy_test : " << ATy_test.transpose() << std::endl;
-
-    exit(1);
-#endif
-
-    // ============================================================================== //
-
-
     /* ---------------- read in matrices ---------------- */
 
-#if 1
     // dimension hyperparamter vector
     int dim_th;
     int dim_spatial_domain;
+    string manifold = ""; // if empty or unknown -> R^d, for now add only sphere
 
     // spatial component
     SpMat c0; 
@@ -924,7 +283,7 @@ exit(1);
 #elif defined(DATA_TEMPERATURE)
     //constr = true;
     constr = false;
-    num_constr = 1;
+    //num_constr = 1;
 #else 
     printf("Invalid dataset.");
     exit(1);
@@ -1057,10 +416,19 @@ exit(1);
 
     } else if(ns > 0 && nt > 1) {
 
-        if(MPI_rank == 0)
-            std::cout << "spatial-temporal model." << std::endl;
-        
-        dim_th = 4;
+        if(nss == 0){
+            dim_th = 4;
+        } else {
+            dim_th = 6;
+        }
+
+        if(MPI_rank == 0){
+            printf("spatial-temporal model");
+            if(nss > 0){
+                printf(" with add. spatial field");
+            }
+            printf(".\n");
+        }
 
         // files to construct Q.u depending on HYPERPARAMETERS theta
         std::string c0_file      =  base_path + "/c0_" + ns_s + ".dat";
@@ -1078,7 +446,7 @@ exit(1);
         file_exists(M1_file);
         std::string M2_file      =  base_path + "/M2_" + nt_s + ".dat";
         file_exists(M2_file);  
-	
+
         // read in matrices
         c0 = read_sym_CSC(c0_file);
         g1 = read_sym_CSC(g1_file);
@@ -1128,11 +496,13 @@ exit(1);
         // not a pretty solution. 
         y_ind = read_matrix(y_ind_file, no_all, 1); 
 
+        /*
         std::string y_times_file        =  base_path + "/y_times_" + to_string(no_all) + "_1" + ".dat";
         file_exists(y_times_file);
         // at this point no is set ... 
         // not a pretty solution. 
         y_times = read_matrix(y_times_file, no_all, 1); 
+        */
 
         no = y_ind.sum(); 
 
@@ -1166,7 +536,7 @@ exit(1);
         if(MPI_rank == 0){
             //std::cout << "total number of observations : " << no << std::endl;
             std::cout << "read in all matrices." << std::endl;
-	    }
+	}
 
     } else {
         if(MPI_rank == 0){
@@ -1175,23 +545,6 @@ exit(1);
         }    
     }
 
-//exit(1);
-
-#endif
-
-
-/*
-#ifdef DATA_SYNTHETIC
-    if(constr == false){
-        // data y
-        std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
-        file_exists(y_file);
-        // at this point no is set ... 
-        // not a pretty solution. 
-        y = read_matrix(y_file, no, 1);
-    }
-#endif
-*/
 
 #ifdef PRINT_MSG
     std::cout << "dim(c0) = " << c0.rows() << " " << c0.cols() << std::endl;
@@ -1247,32 +600,53 @@ exit(1);
 #ifdef DATA_SYNTHETIC
         data_type = "synthetic";
 
+        // constant in conversion between parametrisations changes dep. on spatial dim
+        // assuming sphere -> assuming R^3
+        dim_spatial_domain = 2;
+
+        // define if on the sphere or plane
+        manifold = "sphere";
+
         // =========== synthetic data set =============== //
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
+            if(manifold == "sphere"){
+                std::cout << "spatial domain: " << manifold << std::endl;
+            }
+            else if(manifold.length() > 0){
+                std::cout << "spatial domain: " << manifold << ", only SPHERE supported!" << std::endl;
+                exit(1);
+            }
         }     
-        // constant in conversion between parametrisations changes dep. on spatial dim
-        // assuming sphere -> assuming R^3
-        dim_spatial_domain = 3;
 
-        // sigma.e (noise observations), sigma.u, range s, range t
-        //theta_original_param << 0.5, 4, 1, 10;
-        // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
-        theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
-        //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
-        // using PC prior, choose lambda  
-        theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+        if(nss == 0){
+            // sigma.e (noise observations), sigma.u, range s, range t
+            //theta_original_param << 0.5, 4, 1, 10;
+            // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
+            theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
+            //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
+            // using PC prior, choose lambda  
+            theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
-        //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
-        theta_param << 4, 0, 0, 0;
-        //theta_param << 4,4,4,4;
-        //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
-        
-        /*
-        if(MPI_rank == 0){
-            std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }*/
-
+            //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
+            theta_param << 4, 0, 0, 0;
+            //theta_param << 4,4,4,4;
+            //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
+        } else {
+            // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
+            theta_original     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
+            //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
+            theta_prior_param  << -log(0.01)/5, -log(0.01)*pow(0.1, 0.5*dim_spatial_domain), -log(0.01)*pow(1, 0.5), -log(0.01)/1,-log(0.01)*pow(3000.0/6371.0, 0.5*dim_spatial_domain), -log(0.01)/5;
+            if(MPI_rank == 0){
+                std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
+            }
+            // same order as above
+            //theta_param << 3, 0.5, 0.5, 2, -1, 2;
+            //theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
+            theta_param <<  4, 1, 3, 2, -1, 0;
+        }
 
         if(constr == true){
 
@@ -1388,10 +762,7 @@ exit(1);
 
         // =========== temperature data set =============== //
         data_type = "temperature";
-
-               // constant in conversion between parametrisations changes dep. on spatial dim
-        // assuming sphere -> assuming R^3
-        dim_spatial_domain = 3;
+        dim_spatial_domain = 2;
 
         if(MPI_rank == 0){
             std::cout << "using TEMPERATURE DATASET assuming dim spatial domain : " << dim_spatial_domain << std::endl; 
@@ -1415,11 +786,12 @@ exit(1);
         //theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 	// NEW ORDER sigma.e, range s, range t, sigma.u
 	// -log(p)/u where c(u, p)
+    // CORRECTED PRIOR
 	theta_prior_param[0] = -log(0.01)/5; 	      //prior.sigma obs : 5, 0.01
-	//theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
-	theta_prior_param[1] = -log(0.01)/500;        
-    //theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
-	theta_prior_param[2] = -log(0.01)/1;
+	//theta_prior_param[1] = -log(0.5)*1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
+	theta_prior_param[1] = -log(0.01)*pow(500, 0.5*dim_spatial_domain);        
+    //theta_prior_param[2] = -log(0.5)*20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
+	theta_prior_param[2] = -log(0.01)*pow(1, 0.5);
     //theta_prior_param[3] = -log(0.5)/10;          //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
     theta_prior_param[3] = -log(0.01)/3;	    
 
@@ -1651,24 +1023,34 @@ exit(1);
     //std::optional<PostTheta> fun;
     PostTheta* fun;
 
-    if(ns == 0){
+    if(ns == 0 && nss == 0){
         // fun.emplace(nb, no, B, y);
         if(MPI_rank == 0){
             std::cout << "Call constructor for regression model." << std::endl;
         }
         fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type, constr, Dxy, validate, w);
-    } else if(ns > 0 && nt == 1) {
+    } else if(ns > 0 && nt == 1 && nss == 0) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
-    } else {
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+    } else if(ns > 0 && nt > 1 && nss == 0){
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+    } else if(ns > 0 && nt > 1 && nss > 0){
+         if(MPI_rank == 0){
+            std::cout << "\ncall spatial-temporal constructor with add. spatial field." << std::endl;
+        }       
+        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+    } else {
+        printf("invalid combination of parameters!\n");
+        printf("ns = %ld, nt = %ld, nss = %ld\n", ns, nt, nss);
+        exit(1);
     }
+
 
     if(MPI_rank == 0)
         printf("\n======================= HYPERPARAMETERS =====================\n");
@@ -1679,25 +1061,28 @@ exit(1);
     }
 
     // convert from interpretable parametrisation to internal one
-    if(dim_th == 4){
+    if(dim_th >= 4){
 	   theta[0] = theta_param[0];
-        fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+        fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+        if(dim_th == 6){
+            fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+        }
 
         if(MPI_rank == 0){
             Vect theta_interpret_initial(dim_th);
             theta_interpret_initial[0] = theta[0];
-            fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
-            std::cout << "theta interpret. param. : " << theta_param.transpose() << std::endl;
-	    std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+            fun->convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
+            if(dim_th == 6){
+                fun->convert_theta2interpret_spat(theta[4], theta[5], theta_interpret_initial[4], theta_interpret_initial[5]);
+            }
+            std::cout << "theta interpret. param.         : " << theta_param.transpose() << std::endl;
+	        std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;
             std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
         }
     }
 
-    //exit(1);
-
 #ifdef WRITE_RESULTS
-   //string results_folder = base_path + "/results_param_fixed_inverse";
-    string results_folder = base_path + "/results_param_INLAmode";
+   string results_folder = base_path + "/results_param_INLAmode";
    if(MPI_rank == 0){
     	create_folder(results_folder);
    }
@@ -1716,7 +1101,7 @@ if(MPI_rank == 0){
 
     std::cout << "theta param : " << theta_param.transpose() << std::endl;
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     std::cout << "theta       : " << theta.transpose() << std::endl;
 
     // includes prior fixed effects
@@ -1753,6 +1138,58 @@ if(MPI_rank == 0){
 
 #endif
 
+
+#if 0
+
+    if(MPI_rank == 0){
+
+    double estLogDetQst;
+    int nt_approx;
+    SpMat Qst_approx;
+
+    //theta << 1, -3, 2, 4;
+    //theta = theta_original;
+
+    // construct Qst_approx 
+    nt_approx = 5; //floor(nt/10.0); //nt-2;
+    fun->eval_log_prior_lat_approx(theta, nt_approx, estLogDetQst);
+    std::cout << "\nnt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+
+    /*
+    nt_approx = 10; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+
+    nt_approx = 20; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+    
+    nt_approx = 50; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+    */
+
+    /*
+    nt_approx = 200; //floor(nt/10.0); //nt-2;
+    Qst_approx.resize(nt_approx*ns, nt_approx*ns);
+    fun->construct_Q_spat_temp_approx(theta, nt_approx, Qst_approx, estLogDetQst);
+    std::cout << "nt : " << nt_approx << ", estLogDetQst   : " << estLogDetQst << std::endl;
+    */
+
+    double val;
+    fun->eval_log_prior_lat(theta, val);
+    std::cout << "nt : " << nt << ", true LogDet    : " << 2*val << std::endl;
+
+    //std::cout << "\nnorm(Qst - Qst_approx) : " << (Qst - Qst_approx).norm() << std::endl;
+
+    }
+
+#endif // #if true/false
+
+
     double fx;
 
 #if 0
@@ -1760,7 +1197,7 @@ if(MPI_rank == 0){
     //theta_param << -2.152, 9.534, 11.927, 3.245;
    
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
 
     if(MPI_rank == 0){
         std::cout << "theta param : " << theta_param.transpose() << std::endl;
@@ -1782,13 +1219,13 @@ if(MPI_rank == 0){
         for(int i=0; i<5; i++){
 
             Vect mu_dummy(n);
-        double t_temp = -omp_get_wtime();
+            double t_temp = -omp_get_wtime();
             fx = fun->eval_post_theta(theta, mu_dummy);
             //fx = fun->eval_post_theta(theta_original, mu_dummy);
-        t_temp += omp_get_wtime();
+             t_temp += omp_get_wtime();
 
                 if(MPI_rank == fact_to_rank_list[0])
-            std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
+                    std::cout <<  "f(x) = " << fx << ", time : " << t_temp << " sec. " << std::endl;
 
         }
     }
@@ -1797,7 +1234,7 @@ if(MPI_rank == 0){
     if(MPI_rank == fact_to_rank_list[0])
         std::cout << "time in f eval loop : " << t_f_eval << std::endl;
 
-#endif 
+#endif
 
 double time_bfgs = 0.0;
 
@@ -1815,11 +1252,24 @@ double time_bfgs = 0.0;
     //theta_param << -2.15, 9.57, 11.83, 3.24;
 
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    if(dim_th == 6){
+        fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+    }
+
 
     if(MPI_rank == 0){    
         std::cout << "theta param : " << theta_param.transpose() << std::endl;
         std::cout << "theta       : " << theta.transpose() << std::endl;
+    }
+
+    if(dim_th == 6){
+        fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
+    }
+
+    if(MPI_rank == 0){    
+        std::cout << "theta param : " << theta_param.transpose() << std::endl;
+        //std::cout << "theta       : " << theta.transpose() << std::endl;
     }
 
     time_bfgs = -omp_get_wtime();
@@ -1846,6 +1296,8 @@ double time_bfgs = 0.0;
     if(MPI_rank == 0){
         std::cout << "grad                         : " << grad.transpose() << std::endl;
     }
+
+    //exit(1);
 
 
 #ifdef WRITE_RESULTS
@@ -1876,24 +1328,40 @@ double time_bfgs = 0.0;
     // convert between different theta parametrisations
     if(dim_th == 4 && MPI_rank == 0){
         theta_original_param[0] = theta_original[0];
-        fun->convert_theta2interpret(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
+        fun->convert_theta2interpret_spatTemp(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
         //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
         std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
 
         double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
         double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret(lgamE, lgamS, lgamT, ranS, ranT, sigU);
+        fun->convert_theta2interpret_spatTemp(lgamE, lgamS, lgamT, ranS, ranT, sigU);
         std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
     }
 
-#endif // end BFGS optimize
+        // convert between different theta parametrisations
+    if(dim_th == 6 && MPI_rank == 0){
+        theta_original_param[0] = theta_original[0];
+        fun->convert_theta2interpret_spatTemp(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
+        fun->convert_theta2interpret_spat(theta_original[4], theta_original[5], theta_original_param[4], theta_original_param[5]);
+        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+        std::cout << "\norig. mean interpret. param. : " << theta_original_param.transpose() << std::endl;
+
+        double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
+        double sigU; double ranS; double ranT;
+        fun->convert_theta2interpret_spatTemp(lgamE, lgamS, lgamT, ranS, ranT, sigU);
+        fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
+        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << " " << theta_param[4] << " " << theta_param[5] << std::endl;
+    }
+
+#endif
 
  double t_get_covariance = 0.0;
 
 #if 1
     Vect theta_max(dim_th);
     //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
-    //theta_max = theta_prior;
+    //theta_max << 1.377415, -4.522942, 0.6501593, 1.710503, -4.603187, 2.243890;
+    //theta_max << 1.374504, -4.442819,  0.672056,  1.592387, -4.366334,  2.014707;
     theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
@@ -1901,7 +1369,7 @@ double time_bfgs = 0.0;
     MatrixXd cov(dim_th,dim_th);
 
 #if 0
-    double t_get_covariance = -omp_get_wtime();
+    t_get_covariance = -omp_get_wtime();
 
     eps = 0.005;
     //cov = fun->get_Covariance(theta_max, sqrt(eps));
@@ -1919,14 +1387,16 @@ double time_bfgs = 0.0;
 #if 1
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
-    Vect interpret_theta(4);
+    Vect interpret_theta(dim_th);
     interpret_theta[0] = theta_max[0];
-    fun->convert_theta2interpret(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
-   
+    fun->convert_theta2interpret_spatTemp(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
+    if(nss > 0){
+        fun->convert_theta2interpret_spat(theta_max[4], theta_max[5], interpret_theta[4], interpret_theta[5]);
+    }
     //interpret_theta << -2.152, 9.679, 12.015, 3.382;
 #ifdef PRINT_MSG 
     if(MPI_rank == 0){
-        std::cout << "est. Hessian at theta param : " << interpret_theta[0] << " " << interpret_theta[1] << " " << interpret_theta[2] << " " << interpret_theta[3] << std::endl;
+        std::cout << "est. Hessian at theta param : " << interpret_theta.transpose() << std::endl;
     }
 #endif
 
@@ -1955,20 +1425,17 @@ double time_bfgs = 0.0;
 #if 1
 
     /*
-    theta_param << -1.407132, 8.847758, 9.986088, 3.783090;
-    //theta_param << -1.40687802, 9.34301129, 11.00926400, 4.28259598;
     //theta_param << -1.407039,  8.841431,  9.956879,  3.770581;
-    // theta_param << -1.40701328482976, 9.34039748237832, 11.0020161941741, 4.27820007271347;
+    theta_param << -1.40701328482976, 9.34039748237832, 11.0020161941741, 4.27820007271347;
     theta[0] = theta_param[0];
-    fun->convert_interpret2theta(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
     //theta << -1.407039, -7.801710, -6.339689, 5.588888;
 
     if(MPI_rank == 0){
         std::cout << "Computing mean latent parameters using theta interpret : " << theta_param.transpose() << std::endl;
     }
     */
-    theta << -1.99803915, -9.82895738,  1.98118689,  8.288427241;
-    
+
     double t_get_fixed_eff;
     Vect mu(n);
 
@@ -2008,34 +1475,34 @@ double time_bfgs = 0.0;
 
 // write matrix to file for debugging ... 
 #if 0
-        SpMat Qprior(ns*nt,ns*nt);
-        fun->construct_Q_spat_temp(theta, Qprior);
-        
-        std::cout << "Qprior(1:10,1:10):\n" << Qprior.block(0,0,20,20) << std::endl;
-        std::string Qprior_file = base_path + "/Qprior_" + n_s + "_" + n_s + ".dat";
-        write_sym_CSC_matrix(Qprior_file, Qprior); 
-         
-        
-        // write to file first time step
-        SpMat Qprior_1stTs =  Qprior.block(0,0,ns,ns);
-        std::cout << "dim(Qprior_1stTs) = " << Qprior_1stTs.rows() << "_" << Qprior_1stTs.cols() << std::endl;
-        std::string Qprior_1stTs_file = base_path + "/Qprior_1stTs_" + ns_s + "_" + ns_s + ".dat";
-        write_sym_CSC_matrix(Qprior_1stTs_file, Qprior_1stTs);  
 
-        
-        SpMat Q(n,n);
-        fun->construct_Q(theta, Q);
-        std::cout << "Q(1:10,1:10):\n" << Q.block(0,0,20,20) << std::endl;
-        std::string Q_file = base_path + "/Qxy_" + n_s + "_" + n_s + ".dat";
-        write_sym_CSC_matrix(Q_file, Q);  
+    SpMat Qprior(ns*nt,ns*nt);
+    fun->construct_Q_spat_temp(theta, Qprior);
+    
+    std::cout << "Qprior(1:10,1:10):\n" << Qprior.block(0,0,20,20) << std::endl;
+    std::string Qprior_file = base_path + "/Qprior_" + n_s + "_" + n_s + ".dat";
+    write_sym_CSC_matrix(Qprior_file, Qprior); 
+     
+    // write to file first time step
+    SpMat Qprior_1stTs =  Qprior.block(0,0,ns,ns);
+    std::cout << "dim(Qprior_1stTs) = " << Qprior_1stTs.rows() << "_" << Qprior_1stTs.cols() << std::endl;
+    std::string Qprior_1stTs_file = base_path + "/Qprior_1stTs_" + ns_s + "_" + ns_s + ".dat";
+    write_sym_CSC_matrix(Qprior_1stTs_file, Qprior_1stTs);  
 
-        std::cout << "Q(1:10,1:10)-Qprior(1:10,1:10):\n" << Q.block(0,0,20,20) -  Qprior.block(0,0,20,20) << std::endl;
+    
+    SpMat Q(n,n);
+    fun->construct_Q(theta, Q);
+    std::cout << "Q(1:10,1:10):\n" << Q.block(0,0,20,20) << std::endl;
+    std::string Q_file = base_path + "/Qxy_" + n_s + "_" + n_s + ".dat";
+    write_sym_CSC_matrix(Q_file, Q);  
 
-        Vect b(n);
-        fun->construct_b(theta, b);
-        std::cout << "b(1:10): " << b.head(10).transpose() << std::endl;
-        std::string b_file = base_path + "/b_xy_" + n_s + "_1.dat";
-        write_vector(b_file, b, n);
+    std::cout << "Q(1:10,1:10)-Qprior(1:10,1:10):\n" << Q.block(0,0,20,20) -  Qprior.block(0,0,20,20) << std::endl;
+
+    Vect b(n);
+    fun->construct_b(theta, b);
+    std::cout << "b(1:10): " << b.head(10).transpose() << std::endl;
+    std::string b_file = base_path + "/b_xy_" + n_s + "_1.dat";
+    write_vector(b_file, b, n);
     
 
 #endif
@@ -2057,12 +1524,39 @@ double time_bfgs = 0.0;
 
 #endif // end predict
 
-
     } // end if(MPI_rank == fact_to_rank_list[1]), get_mu()
+
+    // ============================================ validate ============================================= //
+    if(validate && MPI_rank == 0){
+        // compute 1/n*||(y - Ax*mu))|| for all w_i = 0 and w_i = 1 respectively
+        std::cout << "sum(y) = " << y.sum() << std::endl;
+
+        Vect diff_pred = y - Ax*mu;
+        std::cout << "diff_pred(1:10) = " << diff_pred.head(10).transpose() << std::endl;
+
+        double diff_temp_w1 = 0;
+        double diff_temp_w0 = 0;
+
+        for(int i=0; i<no; i++){
+            if(w(i) == 1){
+                diff_temp_w1 += diff_pred[i]*diff_pred[i];
+            } else {
+                diff_temp_w0 += diff_pred[i]*diff_pred[i];
+            }
+        }
+
+        double diff_w1 = 1/w.sum()*sqrt(diff_temp_w1);
+        double diff_w0 = 1/(no - w.sum())*sqrt(diff_temp_w0);
+
+        std::cout << "difference w_i = 1 : " << diff_w1 << std::endl;
+        std::cout << "difference w_i = 0 : " << diff_w0 << std::endl;
+    }
+
   
     // =================================== compute marginal variances =================================== //
+    double t_get_marginals = 0.0;
+
 #if 1
-    double t_get_marginals;
     Vect marg(n);
 
     // when the range of u is large the variance of b0 is large.
@@ -2108,7 +1602,7 @@ double time_bfgs = 0.0;
             std::cout << "There was an error writing " << full_file_name << " to file." << std::endl;
             exit(1);
         }
-       
+
       std::cout << "QinvSp: est. standard dev fixed eff  : " << QinvSp.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
       std::cout << "QinvSp: est. std dev random eff      : " << QinvSp.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
 
@@ -2130,27 +1624,27 @@ double time_bfgs = 0.0;
        for (int k=0; k<temp.outerSize(); ++k){
             //printf("number of threads %d\n", omp_get_thread_num());
             for (SparseMatrix<double, RowMajor>::InnerIterator it(temp,k); it; ++it)
-            {   
+      {
                 it.valueRef() = 0.0;
                 for (SparseMatrix<double, RowMajor>::InnerIterator it_A(Ax_all,k); it_A; ++it_A)
                 {     
                     //printf("A(%ld, %ld) = %f\n", it_A.row(), it_A.col(), it_A.value());
                     it.valueRef() += it_A.value()* QinvSp.coeff(it_A.col(), it.col());
-                }    
+      }
                     //temp2.coeffRef(it.row(), it.col()) = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
-            }
+    }
 
         } // end outer for loop
 
         } // end parallel region
-    
+
        t_firstMult += omp_get_wtime();
        printf("time 1st Mult innerIter : %f\n", t_firstMult);
 
        //printf("norm(temp - temp2) = %f\n", (temp-temp2).norm());
 
        Vect projMargVar(Ax_all.rows());
-
+        
        double t_secondMult = - omp_get_wtime();
        for(int i=0; i<Ax_all.rows(); i++){
             projMargVar(i) = (temp.row(i)).dot(Ax_all.row(i));
@@ -2222,8 +1716,7 @@ double time_bfgs = 0.0;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
         std::cout << "total time                   : " << t_total << " sec" << std::endl;
     }
-
-#endif
+    #endif
 
     delete fun;
 
