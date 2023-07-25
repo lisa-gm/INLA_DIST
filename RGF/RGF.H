@@ -150,7 +150,7 @@ private:
     inline void extract_nnzA(T *M_dev, size_t supernode); // new to extract nnzQ(Qinv)
     inline void copy_supernode_to_host_write(T *M_dev, size_t supernode); // debugging ...
 
-    inline void copy_supernode_to_device(T *M_dev, size_t supernode);
+    inline void copy_supernode_to_device(T *M_dev, size_t supernode, cudaStream_t stream);
     //inline void copy_supernode_diag(T *src, size_t supernode, cudaStream_t stream);
     inline void copy_supernode_diag(T *src, size_t supernode);
     inline void swap_pointers(T **ptr1, T **ptr2);
@@ -1398,7 +1398,6 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       // redirect to magma_queue_1
 
 #ifdef CUDA_POTRF
-     // factorization first block -> set buffer flag to zero!
      cuda_buffer_flag_trtri[0] = 0;
      ttrtri_dev_cuda('L', 'N', NR, G_LastDense_dev, NR, info_cuda, cuda_buffer_flag_trtri, 
                handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
@@ -1465,7 +1464,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
       // initialize identity matrix temp1_dev of size NR = ns (now)
       // redirect to magma_queue_1 -> potentially later in copy stream, but careful need tmp1_dev before
-      init_eye_on_dev(tmp1_dev,NR,0);
+      init_eye_on_dev(tmp1_dev,NR,magma_cudaStream_1);
       // temp2_dev = L_Fn^T*Gn+1
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), blockDense_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NP * NP;
@@ -1634,7 +1633,10 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       file.close();
       cudaFreeHost(tmp_host);
       */
-   
+
+      // -> already copy next block to device
+      cudaDeviceSynchronize();
+      copy_supernode_to_device(blockP_dev, matrix_nt-2, copyStream);
 
    //second-last non-dense block .. 0-block
    for (int IBi = matrix_nt-2; IBi > -1; IBi--)
@@ -1643,6 +1645,9 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       NR = Bmax[IB]-Bmin[IB];
       NP = Bmax[IB+1]-Bmin[IB+1];
 
+      // don't swap pointers before copy_supernode_to_device() isn't done
+      cudaDeviceSynchronize();
+      // before swap: blockR_dev: Sigma_IBi+1, blockP_dev: CholeskyFactor IBi, then swap
       swap_pointers(&blockR_dev, &blockP_dev);
       cudaDeviceSynchronize();
 
@@ -1661,9 +1666,12 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          extract_nnzA(blockP_dev, IB+1);
          //exit(1);
       }
+
+      /*
       cudaDeviceSynchronize();
       copy_supernode_to_device(blockR_dev, IB);
       cudaDeviceSynchronize();
+      */
 
       // tril(blockR_dev)
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR);
@@ -1683,17 +1691,30 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
 
       // initialize eye(NR, NR)
-      init_eye_on_dev(tmp1_dev,NR,0);
-      cudaDeviceSynchronize();
+      init_eye_on_dev(tmp1_dev,NR,magma_cudaStream_1);
+      //cudaDeviceSynchronize();
 
       // tmp2_dev = blockR_dev^T*blockP_dev => L_Ei^T*Gi+1
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockP_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NP * NP;
+
       // temp1_dev = tmp2_dev*blockR_dev + I => tmp2_dev*L_Ei + I
       tgemm_dev('N', 'N', NR, NR, NP, ONE, tmp2_dev, NR, &blockR_dev[NR], mf_block_lda(IB+1, IB), ONE, tmp1_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NR * NP;
-      cudaDeviceSynchronize();
-      
+      //cudaDeviceSynchronize(); //
+
+      // blockP_dev not in use anymore until next iter where pointers are swapped 
+      // -> already copy next block to device 
+      // use cuda Events
+      if(IB > 0){
+         //cudaDeviceSynchronize();
+         gpuErrchk(cudaEventRecord(potrf_dev_ev, magma_cudaStream_1)); 
+         gpuErrchk(cudaStreamWaitEvent(copyStream, potrf_dev_ev, 0));
+
+         copy_supernode_to_device(blockP_dev, IB-1, copyStream);
+         //cudaDeviceSynchronize();     
+      }
+
       if (matrix_nd > 0)
       {
          // tmp3_dev = L_Fi^T*Gn+1n+1 // 
@@ -2695,7 +2716,7 @@ inline void RGF<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode)
+inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode, cudaStream_t stream)
 {
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
@@ -2703,7 +2724,7 @@ inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode)
    size_t rows = mf_block_lda(supernode, supernode);
    size_t cols = supernode_lc - supernode_fc;
 
-    memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T), NULL );
+    memcpy_to_device(&MF[ind], M_dev, rows*cols*sizeof(T), stream);
 
 }
 
