@@ -104,7 +104,6 @@ private:
     T *inv_a;
     T *blockR_dev;
     T *blockM_dev;
-    T *blockP_dev;
     T *blockDense_dev;
     T *rhs;
 
@@ -323,7 +322,6 @@ RGF<T>::~RGF()
       size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
       deallocate_data_on_dev(blockR_dev,max_supernode_nnz_dense*sizeof(T));
       deallocate_data_on_dev(blockM_dev,max_supernode_nnz_dense*sizeof(T));
-      deallocate_data_on_dev(blockP_dev,max_supernode_nnz_dense*sizeof(T));
       deallocate_data_on_dev(blockDense_dev,final_supernode_nnz_dense*sizeof(T));
    }
 
@@ -1631,7 +1629,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
       // -> already copy next block to device
       cudaDeviceSynchronize();
-      copy_supernode_to_device(blockP_dev, matrix_nt-2, copyStream);
+      copy_supernode_to_device(blockM_dev, matrix_nt-2, copyStream);
+
 
    //second-last non-dense block .. 0-block
    for (int IBi = matrix_nt-2; IBi > -1; IBi--)
@@ -1642,23 +1641,23 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
       // don't swap pointers before copy_supernode_to_device() isn't done
       cudaDeviceSynchronize();
-      // before swap: blockR_dev: Sigma_IBi+1, blockP_dev: CholeskyFactor IBi, then swap
-      swap_pointers(&blockR_dev, &blockP_dev);
+      // before swap: blockR_dev: Sigma_IBi+1, blockM_dev: CholeskyFactor IBi, then swap
+      swap_pointers(&blockR_dev, &blockM_dev);
       cudaDeviceSynchronize();
 
       // copy diagonal from previous iteration into buffer on device
       // redirect to copy stream
       if(cpy_indicator == 0){
-         copy_supernode_diag(blockP_dev, IB+1);
+         copy_supernode_diag(blockM_dev, IB+1);
       } else if(cpy_indicator == 1){
-         //copy_supernode_diag(blockP_dev, IB+1);
-         // write G_dense_i_dev into "correct spot in blockP_dev"
+         //copy_supernode_diag(blockM_dev, IB+1);
+         // write G_dense_i_dev into "correct spot in blockM_dev"
          if(matrix_nd > 0){
             //printf("ND = %ld\n", ND);
-            tlacpy_dev('F', ND, NR, G_dense_i_dev, ND, &blockP_dev[mf_dense_block_offset(IB+1)], mf_dense_block_lda(IB+1), magma_queue_1);
+            tlacpy_dev('F', ND, NR, G_dense_i_dev, ND, &blockM_dev[mf_dense_block_offset(IB+1)], mf_dense_block_lda(IB+1), magma_queue_1);
          }
          cudaDeviceSynchronize();
-         extract_nnzA(blockP_dev, IB+1);
+         extract_nnzA(blockM_dev, IB+1);
          //exit(1);
       }
 
@@ -1689,8 +1688,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       init_eye_on_dev(tmp1_dev,NR,magma_cudaStream_1);
       //cudaDeviceSynchronize();
 
-      // tmp2_dev = blockR_dev^T*blockP_dev => L_Ei^T*Gi+1
-      tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockP_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue_1);
+      // tmp2_dev = blockR_dev^T*blockM_dev => L_Ei^T*Gi+1
+      tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockM_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NP * NP;
 
       // temp1_dev = tmp2_dev*blockR_dev + I => tmp2_dev*L_Ei + I
@@ -1698,7 +1697,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 2.0 * NR * NR * NP;
       //cudaDeviceSynchronize(); //
 
-      // blockP_dev not in use anymore until next iter where pointers are swapped 
+      // blockM_dev not in use anymore until next iter where pointers are swapped 
       // -> already copy next block to device 
       // use cuda Events
       if(IB > 0){
@@ -1706,7 +1705,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          gpuErrchk(cudaEventRecord(potrf_dev_ev, magma_cudaStream_1)); 
          gpuErrchk(cudaStreamWaitEvent(copyStream, potrf_dev_ev, 0));
 
-         copy_supernode_to_device(blockP_dev, IB-1, copyStream);
+         copy_supernode_to_device(blockM_dev, IB-1, copyStream);
          //cudaDeviceSynchronize();     
       }
 
@@ -2052,7 +2051,6 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
        size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
        allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz_dense*sizeof(T));
        allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
-       allocate_data_on_device((void**)&blockP_dev,max_supernode_nnz_dense*sizeof(T));
        allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
        MF_dev_allocated = true;
     }
@@ -2128,7 +2126,6 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
        size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
        allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz_dense*sizeof(T));
        allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
-       allocate_data_on_device((void**)&blockP_dev,max_supernode_nnz_dense*sizeof(T));
        allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
        MF_dev_allocated = true; // otherwise stuff never gets deleted ...
     }
