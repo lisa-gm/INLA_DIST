@@ -1397,6 +1397,57 @@ void PostTheta::compute_fullInverseQ(Vect& theta, MatrixXd& Qinv){
 }
 
 
+void PostTheta::compute_marginals_y(SpMat& Qinv, SpRmMat& Ax_all, Vect& projMargVar){
+	   
+	if(projMargVar.size() != Ax_all.rows()){
+		printf("In compute marginals y. Dimensions don't match! dim(projMargVar) = %d, nrows(Ax) = %d\n", projMargVar.size(), Ax_all.rows());
+		exit(1);
+	}
+	//SpRmMat Ax_all = Ax;
+	SpRmMat temp = Ax_all;
+
+	std::cout << "nnz(Ax_all) = " << Ax_all.nonZeros() << ", nnz(Qinv) = " << Qinv.nonZeros();
+	std::cout << ", dim(Qinv) = " << Qinv.rows() << " " << Qinv.cols() << ", dim(Ax_all) = " << Ax_all.rows() << " " << Ax_all.cols() << std::endl;
+
+	// write my own multiplication
+	// for each row in Ax_all iterate through the columns of QinvSp -> only consider nonzero entries of Ax_all
+	double t_firstMult = - omp_get_wtime();
+
+	#pragma omp parallel 
+	{
+
+	#pragma omp parallel for default(shared)
+	for (int k=0; k<temp.outerSize(); ++k){
+		//printf("number of threads %d\n", omp_get_thread_num());
+		for (SparseMatrix<double, RowMajor>::InnerIterator it(temp,k); it; ++it)
+	{
+			it.valueRef() = 0.0;
+			for (SparseMatrix<double, RowMajor>::InnerIterator it_A(Ax_all,k); it_A; ++it_A)
+			{     
+				//printf("A(%ld, %ld) = %f\n", it_A.row(), it_A.col(), it_A.value());
+				it.valueRef() += it_A.value()* Qinv.coeff(it_A.col(), it.col());
+	}
+				//temp2.coeffRef(it.row(), it.col()) = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
+}
+
+	} // end outer for loop
+
+	} // end parallel region
+
+	t_firstMult += omp_get_wtime();
+	printf("time 1st Mult innerIter : %f\n", t_firstMult);
+
+	//printf("norm(temp - temp2) = %f\n", (temp-temp2).norm());        
+	double t_secondMult = - omp_get_wtime();
+	for(int i=0; i<Ax_all.rows(); i++){
+		projMargVar(i) = (temp.row(i)).dot(Ax_all.row(i));
+	}
+	t_secondMult += omp_get_wtime();
+	printf("time 2nd Mult: %f\n", t_secondMult);
+}
+
+
+
 double PostTheta::f_eval(Vect& theta){
 	// x[1]^3*x[2]^2*x[3]
 
@@ -2114,15 +2165,15 @@ void PostTheta::eval_log_gaussian_prior_hp(double& log_prior, double* thetai, do
 void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interpret_theta){
 
   double prior_se = log(lambda[0]) - lambda[0] * exp(interpret_theta[0]) + interpret_theta[0];
-  //printf("prior se = %f\n", prior_se);
+  printf("prior se = %f\n", prior_se);
   double prior_su = log(lambda[3]) - lambda[3] * exp(interpret_theta[3]) + interpret_theta[3];
-  //printf("sigma : %f, prior su = %f\n", interpret_theta[3], prior_su);
+  printf("sigma : %f, prior su = %f\n", interpret_theta[3], prior_su);
 
   double prior_rs = log(lambda[1]) - lambda[1] * exp(-interpret_theta[1]) - interpret_theta[1];
-  //printf("range s: %f, prior rs = %f\n", interpret_theta[1], prior_rs);
+  printf("range s: %f, prior rs = %f\n", interpret_theta[1], prior_rs);
   
   double prior_rt = log(lambda[2]) - lambda[2] * exp(-0.5*interpret_theta[2]) + log(0.5) - 0.5*interpret_theta[2];
-  //printf("range t: %f, prior rt = %f\n", interpret_theta[2], prior_rt);
+  printf("range t: %f, prior rt = %f\n", interpret_theta[2], prior_rt);
 
   log_sum = prior_rt + prior_rs + prior_su + prior_se;
 
@@ -2131,12 +2182,12 @@ void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interp
 		// prior range s for add. spatial field
 		log_sum += log(dHalf * lambda[4]) - lambda[4] * exp(- dHalf * interpret_theta[4]) - dHalf * interpret_theta[4];
 		//log_sum += log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]);
-		//printf("prior range s for add. s: %f",log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]));
+		printf("prior range s for add. s: %f",log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]));
 
 		// prior sigma u for add. spatial field
  		log_sum += log(lambda[5]) - lambda[5] * exp(interpret_theta[5]) + interpret_theta[5];
 		//log_sum += log(lambda[5]) - lambda[5]*exp(interpret_theta[5]);
-		//printf(", prior sigma u for add. s: %f", log(lambda[5]) - lambda[5]*exp(interpret_theta[5]));
+		printf(", prior sigma u for add. s: %f", log(lambda[5]) - lambda[5]*exp(interpret_theta[5]));
   }
 
   		//std::cout << ", total log prior sum hyperparam " << log_sum << std::endl;
@@ -2475,6 +2526,51 @@ void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V,
 }
 */
 
+void PostTheta::construct_Qprior(Vect& theta, SpMat& Qprior){
+
+	if(ns > 0){
+		//SpMat Qu(nu, nu);
+		// TODO: find good way to assemble Qx
+
+		if(nt > 1){
+			construct_Q_spat_temp(theta, Qu);
+		} else {	
+			construct_Q_spatial(theta, Qu);
+		}	
+
+		// ovewrite value ptr of Qst part -> Q_fe stays the same 
+		// ATTENTION: needs to be adapted when additional spatial field is there. 
+		//t_Qcomp = - omp_get_wtime();
+	    for(int i=0; i<Qu.nonZeros(); i++){
+            Qx.valuePtr()[i] = Qu.valuePtr()[i];
+            //Qx_new.valuePtr()[i] = 0.0;
+        }
+
+		if(nss > 0){
+			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
+			Vect theta_sub = theta(seq(3,5));
+			construct_Q_spatial(theta_sub, Qs);
+			nnz_Qs = Qs.nonZeros();
+
+			// insert entries of Qs
+			for (int k=0; k<Qs.outerSize(); ++k){
+				for (SparseMatrix<double>::InnerIterator it(Qs,k); it; ++it)
+				{
+				Qx.coeffRef(it.row()+nst,it.col()+nst) = it.value();  
+				}
+			}
+
+			//instead go over valuePtr as before
+			// Qx.valuePtr()[i]               
+		}
+
+		Qprior = Qx;
+	}
+
+	// as prior hyperparam constant -> already added in constructor
+
+}
+
 void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 
 	double exp_theta0 = exp(theta[0]);
@@ -2514,6 +2610,8 @@ void PostTheta::construct_Q(Vect& theta, SpMat& Q){
 			//instead go over valuePtr as before
 			// Qx.valuePtr()[i]               
 		}
+
+
 
 		//t_Qcomp += omp_get_wtime();
 

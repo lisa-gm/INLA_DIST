@@ -1,17 +1,17 @@
 #!/bin/bash
 
 #SBATCH --job-name=call_INLA_RGF           #Your Job Name
-#SBATCH --nodes=3                   #Number of Nodes desired e.g 1 nodea
-#SBATCH --time=19:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
+#SBATCH --nodes=1                   #Number of Nodes desired e.g 1 nodea
+#SBATCH --time=00:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
 #SBATCH --gres=gpu:a100:8
 #SBATCH --partition=a100
 ###SBATCH --constraint=a100_80
-#SBATCH --qos=a100multi
+###SBATCH --qos=a100multi
 #SBATCH --exclusive
 #SBATCH --error=%x.err          #The .error file name
 #SBATCH --output=%x.out         #The .output file name
 
-num_ranks=9
+num_ranks=1
 
 #ns=2252
 #nt=0
@@ -30,20 +30,24 @@ num_ranks=9
 
 #ns=4002
 #ns=20252
-ns=16002
+#ns=16002
 #nt=500
 #ns=10242
-#ns=492
-nt=30
+ns=4002
+ntFit=50
+ntPred=0
+nt=$((${ntFit}+${ntPred}))
+nss=0
 #nt=30
 #nb=2
 nb=6
 #no=7872
-no=$((2*${ns}*${nt}))
+no=$((2*${ns}*${ntFit}))
+noPerTs=$((2*${ns}))
 
 #solver_type=$1
 #solver_type=PARDISO
-solver_type=RGF
+solver_type=BTA
 
 data_type=synthetic
 
@@ -72,14 +76,15 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 #export MKL_NUM_THREADS=1
 #echo "OMP_NUM_THREADS = ${omp_threads}"
 
+#folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_ntFit${ntFit}_ntPred0_noPerTs${noPerTs}_nss${nss}_nb${nb}
 folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 #folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}
 
 source ~/.profile
 
 # CAREFUL : needs to be AT LEAST 11 (main + 10 workers, 10 because of hessian, for BFGS only 9 are required)
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_newRGFClass_nestedOMP_singleCopyV_properPin_relBFGSdelta_delta1e-7_ModelParamScale.txt
+echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${noPerTs} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${num_ranks}_${l1t}_${l2t}_test_wSpatF.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 

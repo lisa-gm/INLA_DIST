@@ -778,7 +778,7 @@ double RGF<T>::FirstStageFactor()
        //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag_potrf[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
@@ -1146,7 +1146,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
        //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #ifdef CUDA_POTRF
        if(NR != NM){
-         printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
          cuda_buffer_flag_potrf[0] = 0;
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 

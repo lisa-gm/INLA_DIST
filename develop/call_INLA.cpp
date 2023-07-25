@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
     if(argc != 1 + 7 && MPI_rank == 0){
         std::cout << "wrong number of input parameters. " << std::endl;
 
-        std::cerr << "INLA Call : ns nt nb no path/to/files solver_type" << std::endl;
+        std::cerr << "INLA Call : ns nt nss nb no path/to/files solver_type" << std::endl;
 
         std::cerr << "[integer:ns]                number of spatial grid points " << std::endl;
         std::cerr << "[integer:nt]                number of temporal grid points " << std::endl;
@@ -209,7 +209,7 @@ int main(int argc, char* argv[])
 
     // check if solver type is neither PARDISO nor RGF :
     if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
-        std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
+        std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
         exit(1);
     }
 
@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
     }
 
     // we have two cholesky factors ...
-    if(MPI_rank == 0 && solver_type.compare("RGF") == 0){
+    if(MPI_rank == 0 && solver_type.compare("BTA") == 0){
         // required memory on CPU to store Cholesky factor
         double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(double) / pow(10.0,9.0);
         printf("Memory Usage of each Cholesky factor on CPU = %f GB\n\n", mem_gb);
@@ -570,7 +570,7 @@ int main(int argc, char* argv[])
             //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
             // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
             //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
-            theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1,-log(0.01)*(3000.0/6371.0), -log(0.01)/5;
+            theta_prior_param  << -log(0.01)/5, -log(0.01)*pow(0.1, 0.5*dim_spatial_domain), -log(0.01)*pow(1, 0.5), -log(0.01)/1,-log(0.01)*pow(3000.0/6371.0, 0.5*dim_spatial_domain), -log(0.01)/5;
             if(MPI_rank == 0){
                 std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
             }
@@ -876,7 +876,7 @@ int main(int argc, char* argv[])
     // set convergence criteria
     // stop if norm of gradient smaller than :
     // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
-    param.epsilon = 1e-2;
+    param.epsilon = 1e-1;
     // param.epsilon = 1e-2; // ref sol
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
@@ -889,8 +889,8 @@ int main(int argc, char* argv[])
     // TODO: stepsize too small? seems like it almost always accepts step first step.    
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
-    //param.delta = 1e-3;
-    param.delta = 1e-7;
+    param.delta = 1e-3;
+    //param.delta = 1e-7;
     //param.delta = 1e-9; // ref sol
     // maximum line search iterations
     param.max_iterations = 200; //200;

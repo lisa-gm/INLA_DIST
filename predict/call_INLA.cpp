@@ -106,6 +106,48 @@ void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& 
 
 }
 
+// y_predict_var expects: diag(A*Qinv*A^T) + 1/precision_obs -> need to do exp() of theta[0]
+// returns: 1st column: DS, 2nd column: CRPS, 3rd column: SCRPS
+MatrixXd scoreFunction(Vect& y_observed, Vect& y_predict_mean, Vect& y_predict_var){
+
+    int dimy = y_observed.size();
+    MatrixXd M(dimy, 3);
+    M.setZero();
+
+    // we can leave NA's -> it's ok, they will be taken out during post processing
+
+    Vect y_diff = y_observed - y_predict_mean;
+    // need to work with arrays
+    // ds = y_diff.^2 ./ y_predict_var + log(v)
+    M.col(0) = y_diff.array() * y_diff.array() / y_predict_var.array() + y_predict_var.array().log();
+
+    // crps.g = y_predict_var / sqrt(pi) - 2*y_predict_var*dnorm(y_diff/s) + y_diff*(1-2*pnorm(y_diff/s))
+    // dnorm -> evaluate standard normal distr. with zero mean, sd = 1, at x = y_diff/s
+    Vect y_diffbyVar = y_diff.array() / y_predict_var.array();
+    // dnorm: 1/sqrt(2*M_PI) exp(x^2 / 2)
+    Vect dnorm_ydiffVar(dimy);
+    dnorm_ydiffVar = 1 / sqrt(2*M_PI) * exp(-y_diffbyVar.array()*y_diffbyVar.array()/2);
+    // pnorm: 1/2 (1 + erf(x / sqrt(2))) -> erf(x)
+    Vect pnorm_yDiffvar(dimy);
+    for(int i=0; i<dimy; i++){
+      pnorm_yDiffvar[i] = 0.5 * (1 + erf(y_diffbyVar[i]/sqrt(2)));
+    }
+    printf("y/s = %f, dnorm = %f, pnorm = %f\n", y_diffbyVar[0], dnorm_ydiffVar[0], pnorm_yDiffvar[0]);
+
+    M.col(1) =1/sqrt(M_PI) * y_predict_var.array() 
+               - 2*y_predict_var.array() * dnorm_ydiffVar.array()
+               + y_diff.array()*(ArrayXd::Ones(dimy) - 2*pnorm_yDiffvar.array());
+
+    // scrps.g 
+    // md = y_obs - y_pred
+    //  -0.5 * log(2 * s/sqrt(pi)) - sqrt(pi) * (s * dnorm(md/s) -  md/2 + md * pnorm(md/s))/s
+    M.col(2) = - 0.5*(2*y_predict_var.array()/sqrt(M_PI)).log()
+               - sqrt(M_PI)/y_predict_var.array()*(y_predict_var.array()*dnorm_ydiffVar.array() - 0.5*y_diff.array() + y_diff.array() * pnorm_yDiffvar.array());
+
+    return M;
+}
+
+
 /* ===================================================================== */
 
 int main(int argc, char* argv[])
@@ -168,6 +210,7 @@ int main(int argc, char* argv[])
         std::cout << "wrong number of input parameters. " << std::endl;
 
         std::cerr << "INLA Call : ns nss nt_fit nt_pred nt_total no_per_ts nb path/to/files solver_type" << std::endl;
+        //std::cerr << "INLA Call : ns nss nt_fit nt_pred nt_total no nb path/to/files solver_type" << std::endl;
 
         std::cerr << "[integer:ns]                number of spatial grid points " << std::endl;
         std::cerr << "[integer:nss]               number of spatial grid points add. spatial field" << std::endl;
@@ -177,6 +220,7 @@ int main(int argc, char* argv[])
         std::cerr << "[integer:nt_total]          number of days for which we have data" << std::endl;
 
         std::cerr << "[integer:no_per_ts]         number of data samples per ts (includes NA)" << std::endl;
+        //std::cerr << "[integer:no]                total number of data samples per ts (includes NA)" << std::endl;
         std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
 
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
@@ -201,6 +245,7 @@ int main(int argc, char* argv[])
     
     size_t no_per_ts = atoi(argv[6]);
     size_t no        = nt*no_per_ts;
+    //size_t no        = atoi(argv[6]);
     size_t nb        = atoi(argv[7]);
 
     // set nt = 1 if ns > 0 & nt = 0
@@ -220,6 +265,7 @@ int main(int argc, char* argv[])
     std::string nt_total_s  = std::to_string(nt_total);
 
     std::string no_per_ts_s = std::to_string(no_per_ts); 
+    //std::string no_s        = std::to_string(no);
     std::string nb_s        = std::to_string(nb);
     std::string n_s         = std::to_string(n);
 
@@ -355,7 +401,7 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0)
             std::cout << "spatial model." << std::endl;
 
-        dim_th = 3;
+        dim_th = 2;
 
         // check spatial FEM matrices
         std::string c0_file       =  base_path + "/c0_" + ns_s + ".dat";
@@ -463,7 +509,7 @@ int main(int argc, char* argv[])
 #ifdef PREDICT
         // check projection matrix for A.st
         // size Ax : no_per_ts*(nt_fit+nt_predict) x (ns*(nt_fit+nt_predict) + nb)
-        std::string Ax_file     =  base_path + "/Ax_wNA_" + to_string(no) + "_" + to_string(n) + ".dat";
+        std::string Ax_file     =  base_path + "/Ax_all_" + to_string(no) + "_" + to_string(n) + ".dat";
         file_exists(Ax_file); 
 
         // keep complete matrix as Ax_all in column major
@@ -483,8 +529,9 @@ int main(int argc, char* argv[])
         // doesnt work for B
 
         // data y
-        size_t no_all = nt_total*no_per_ts;
-        std::string y_file        =  base_path + "/y_wNA_" + to_string(no_all) + "_1" + ".dat";
+        //size_t no_all = nt_total*no_per_ts;
+        size_t no_all = no;
+        std::string y_file        =  base_path + "/y_all_" + to_string(no_all) + "_1" + ".dat";
         file_exists(y_file);
         // at this point no is set ... 
         // not a pretty solution. 
@@ -634,18 +681,19 @@ int main(int argc, char* argv[])
             //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
         } else {
             // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
-            theta_original     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            //theta_original     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            theta_original << 0,0,0,0,0,0;
             //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
             // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
             //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
-            theta_prior_param  << -log(0.01)/5, -log(0.01)*pow(0.1, 0.5*dim_spatial_domain), -log(0.01)*pow(1, 0.5), -log(0.01)/1,-log(0.01)*pow(3000.0/6371.0, 0.5*dim_spatial_domain), -log(0.01)/5;
+            theta_prior_param  << -log(0.01)/5, -log(0.01)*pow(0.1, 0.5*dim_spatial_domain), -log(0.01)*pow(1, 0.5), -log(0.01)/3,-log(0.01)*pow(3000.0/6371.0, 0.5*dim_spatial_domain), -log(0.01)/5;
             if(MPI_rank == 0){
                 std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
             }
             // same order as above
-            //theta_param << 3, 0.5, 0.5, 2, -1, 2;
             //theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
-            theta_param <<  4, 1, 3, 2, -1, 0;
+            theta_param <<  -2.137, -1.350, 2.713, 1.337, -0.088, 2.476;
+            //theta_param << 4.000, 1.000, 1.000, 0.000, -0.852, 0.609; // temperature dataset!
         }
 
         if(constr == true){
@@ -940,7 +988,7 @@ int main(int argc, char* argv[])
     // set convergence criteria
     // stop if norm of gradient smaller than :
     // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
-    param.epsilon = 1e-1;
+    param.epsilon = 1e-2;
     // param.epsilon = 1e-2; // ref sol
     // or if objective function has not decreased by more than  
     // cant find epsilon_rel in documentation ...
@@ -992,11 +1040,13 @@ int main(int argc, char* argv[])
     // extract appropriate columns from y
     y = y_all(Eigen::seq(nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1));
     Vect y_ind_sub = y_ind(Eigen::seq(nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1));
+    //y = y_all;
+    //Vect y_ind_sub = y_ind;
 
     no = y_ind_sub.sum();
     if(MPI_rank == 0){
-        printf("first index: %ld, last index: %ld\n", nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1);
-        printf("length(y) = %ld, no(w/out NA) = %ld, rows(Ax) = %ld\n", y.size(), no, Ax.rows());
+       printf("first index: %ld, last index: %ld\n", nt_init_fit*no_per_ts, (nt_last_pred+1)*no_per_ts-1);
+        printf("length(y) = %ld, length(y_ind_sub) = %ld, no(w/out NA) = %ld, rows(Ax) = %ld\n", y.size(), y_ind_sub.size(), no, Ax.rows());
     }
 
     // set A matrix values to zero according to y_ind vector
@@ -1086,6 +1136,56 @@ int main(int argc, char* argv[])
    if(MPI_rank == 0){
     	create_folder(results_folder);
    }
+#endif
+
+
+
+
+#if 1 
+    if(MPI_rank == 0){
+        printf("Constructing Q matrices for testing.\n");
+        //theta_param <<  -2.14715194, -1.35357150, 2.70798981, 1.36344400, -0.08755905, 2.47428186;
+        //theta = -1.350436 2.712842 1.331847 gamma = -8.755903 2.390157 6.800008
+        theta_param << -2.136686, -1.350436, 2.712842, 1.331847, -0.088195, 2.405772;
+
+        if(dim_th >= 4){
+            theta[0] = theta_param[0];
+            fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
+            if(dim_th == 6){
+                fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
+            }
+        } 
+
+        std::cout << "theta param: " << theta_param.transpose() << std::endl;
+        std::cout << "theta      : " << theta.transpose()       << std::endl; 
+
+        SpMat Q(n,n);
+        fun->construct_Q(theta, Q);
+        std::cout << "Q(1:10,1:10):\n" << Q.block(0,0,20,20) << std::endl;
+        std::cout << "Q(-20:end,-20:end):\n" << Q.block(n-20,n-20,20,20) << std::endl;
+        std::string Q_file = base_path + "/Qxy_" + n_s + "_" + n_s + ".dat";
+        write_sym_CSC_matrix(Q_file, Q);  
+
+        SpMat Qprior(n,n);
+        fun->construct_Qprior(theta, Qprior);
+        std::cout << "Qprior(1:10,1:10):\n" << Qprior.block(0,0,20,20) << std::endl;
+        std::cout << "Qprior(-20:end,-20:end):\n" << Qprior.block(n-20,n-20,20,20) << std::endl;
+        std::string Qprior_file = base_path + "/Qprior_" + n_s + "_" + n_s + ".dat";
+        write_sym_CSC_matrix(Qprior_file, Qprior);  
+
+        SpMat Q_all = Qprior + exp(theta[0])*Ax_all.transpose()*Ax_all;
+        std::string Q_all_file = base_path + "/Qall_" + n_s + "_" + n_s + ".dat";
+        std::cout << "Q_all(1:10,1:10):\n" << Q_all.block(0,0,20,20) << std::endl;
+        std::cout << "Q_all(-20:end,-20:end):\n" << Q_all.block(n-20,n-20,20,20) << std::endl;
+        write_sym_CSC_matrix(Q_all_file, Q_all);  
+
+        Vect mu(n);
+        fun->eval_post_theta(theta, mu);
+    }
+
+
+    exit(1);
+
 #endif
 
 #if 0
@@ -1362,6 +1462,7 @@ double time_bfgs = 0.0;
     //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
     //theta_max << 1.377415, -4.522942, 0.6501593, 1.710503, -4.603187, 2.243890;
     //theta_max << 1.374504, -4.442819,  0.672056,  1.592387, -4.366334,  2.014707;
+    //theta_max << 1.385280, -4.425210, 0.6328134, 1.592043, -4.604329, 2.234010;
     theta_max = theta;
 
     // in what parametrisation are INLA's results ... ?? 
@@ -1394,11 +1495,11 @@ double time_bfgs = 0.0;
         fun->convert_theta2interpret_spat(theta_max[4], theta_max[5], interpret_theta[4], interpret_theta[5]);
     }
     //interpret_theta << -2.152, 9.679, 12.015, 3.382;
-#ifdef PRINT_MSG 
+//#ifdef PRINT_MSG 
     if(MPI_rank == 0){
         std::cout << "est. Hessian at theta param : " << interpret_theta.transpose() << std::endl;
     }
-#endif
+//#endif
 
     //double t_get_covariance = -omp_get_wtime();
     t_get_covariance = -omp_get_wtime();
@@ -1447,10 +1548,10 @@ double time_bfgs = 0.0;
 
     if(MPI_rank == fact_to_rank_list[0] || MPI_rank == fact_to_rank_list[1]){
         //std::cout << "MPI rank = " << MPI_rank << ", fact_to_rank_list = " << fact_to_rank_list.transpose() << std::endl;
-
+        std::cout << "Computing mu using theta : " << theta_max.transpose() << std::endl;
         t_get_fixed_eff = - omp_get_wtime();
         //fun->get_mu(theta, mu, fact_to_rank_list);
-        fun->get_mu(theta, mu);
+        fun->get_mu(theta_max, mu);
 	t_get_fixed_eff += omp_get_wtime();
     }
 
@@ -1466,10 +1567,11 @@ double time_bfgs = 0.0;
             std::cout << "Dxy*mu : " << (Dxy*mu).transpose() << ", \nshould be : " << e.transpose() << std::endl;
 //#endif
 
-#ifdef WRITE_RESULTS
-    std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
+//#ifdef WRITE_RESULTS
+    //std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
+    std::string file_name_fixed_eff = "mean_latent_parameters.txt";
     write_vector(file_name_fixed_eff, mu, n);
-#endif
+//#endif
 
 #endif // endif get_mu()
 
@@ -1507,22 +1609,68 @@ double time_bfgs = 0.0;
 
 #endif
 
+#if 1 
 
 #ifdef PREDICT
+    if(MPI_rank == 0){
     // =================================== compute prediction =================================== //
 
-    // make prediction for mean at all locations y using Ax * mu
-    Vect y_predict = Ax_all * mu;
+    // read in mu to check if its correct then ...
+    //std::string mu_INLA_file = base_path + "/mu_INLA_" + to_string(n) + "_1.dat";
+    //Vect mu_INLA = read_matrix(mu_INLA_file, n, 1);  
 
-#ifdef WRITE_RESULTS
-        std::string file_name_y_predict_mean = results_folder + "/y_predict_mean_" + to_string(y_predict.size()) + ".txt";
+    // make prediction for mean at all locations y using Ax * mu
+    std::cout << "dim(Ax_all) = " << Ax_all.rows() << " " << Ax_all.cols() << std::endl;
+    std::cout << "mu(1:15) = " << mu.head(15).transpose() << std::endl;
+    std::cout << "mu.tail(1:15) = " << mu.tail(15).transpose() << std::endl;
+    Vect y_predict = Ax_all * mu; // mu_INLA
+    Vect y_diff    = y_predict - y_all;
+
+    int count_zeros = 0;
+    for(int i=0; i<y_diff.size(); i++){
+        // check if NA's in y_diff
+        if(isnan(y_diff[i])){
+            y_diff[i] = 0.0;
+            count_zeros++;
+        }
+    }
+    int nnz_y_diff = y_diff.size() - count_zeros;
+
+    std::cout << "norm(y_diff) = " << 1.0/nnz_y_diff * y_diff.squaredNorm() << std::endl;
+    std::cout << "y_predict(1:15) = " << y_predict.head(15).transpose() << std::endl;
+    std::cout << "y(1:15) = " << y_all.head(15).transpose() << std::endl;
+
+    std::cout << "y_predict.tail(1:15) = " << y_predict.tail(15).transpose() << std::endl;
+    std::cout << "y.tail(1:15) = " << y_all.tail(15).transpose() << std::endl;
+
+    // compute norm(Ax*mu - y) for y_ind = 0 & y_ind = 1 seperately -> check difference -> compare with INLA
+    // consider first ntFit time steps
+    Vect diff_y1(y_predict.size());
+    diff_y1.array() =  y_diff.array() * y_ind.array();
+    diff_y1 = diff_y1(seq(nt_init_fit, nt_last_fit));
+    Vect y_ind_fit = y_ind(seq(nt_init_fit, nt_last_fit));
+    std::cout << "norm(diff_y1) = " << 1.0 / y_ind_fit.sum() * diff_y1.squaredNorm() << std::endl;
+
+    // have to remove NA's -> only consider known indices correponding to observed y's for nt_predict
+    Vect diff_y0(y_predict.size());
+    diff_y0.array() = y_diff.array() * (Vect::Ones(y_predict.size()) - y_ind).array();
+    std::cout << "y_diff.size() - y_ind.sum()  = " << y_diff.size() - y_ind.sum() << std::endl;
+    std::cout << "norm(diff_y0) = " << 1.0 / (y_diff.size() - y_ind.sum() ) * diff_y0.squaredNorm() << std::endl;
+
+//#ifdef WRITE_RESULTS
+        std::string file_name_y_predict_mean = "y_predict_mean_" + to_string(y_predict.size()) + ".txt";
+        //std::string file_name_y_predict_mean = results_folder + "/y_predict_mean_" + to_string(y_predict.size()) + ".txt";
         // contains prediction for all y, not just previously unknown 
         // if only those needed, filter by indicator vector
         //printf("no all : %ld, rows(Ax_all) : %ld\n", no_all, Ax_all.rows());
         write_vector(file_name_y_predict_mean, y_predict, y_predict.size());
-#endif
+//#endif
+
+    }
 
 #endif // end predict
+
+#endif // end #if 0/1
 
     } // end if(MPI_rank == fact_to_rank_list[1]), get_mu()
 
@@ -1563,11 +1711,11 @@ double time_bfgs = 0.0;
     if(MPI_rank == 0){
         std::cout << "\n==================== compute marginal variances ================" << std::endl;
         //theta << -1.269613,  5.424197, -8.734293, -6.026165; // most common solution for temperature dataset
-        std::cout << "\nUSING ESTIMATED THETA : " << theta.transpose() << std::endl;
+        std::cout << "\nUSING THETA : " << theta_max.transpose() << std::endl;
 
 
     	t_get_marginals = -omp_get_wtime();
-    	fun->get_marginals_f(theta, marg);
+    	fun->get_marginals_f(theta_max, marg);
     	t_get_marginals += omp_get_wtime();
 
         //std::cout << "\nest. variances fixed eff.    :  " << marg.tail(10).transpose() << std::endl;
@@ -1575,10 +1723,10 @@ double time_bfgs = 0.0;
         std::cout << "est. std dev random eff      : " << marg.head(10).cwiseSqrt().transpose() << std::endl;
         //std::cout << "diag(Cov) :                     " << Cov.diagonal().transpose() << std::endl;
 
-#ifdef WRITE_RESULTS
-    	std::string file_name_marg = results_folder + "/sd_latent_parameters.txt";
+//#ifdef WRITE_RESULTS
+    	std::string file_name_marg = "sd_latent_parameters.txt";
     	write_vector(file_name_marg, marg.cwiseSqrt(), n);
-#endif
+//#endif
 
 #ifdef PREDICT
 
@@ -1589,7 +1737,7 @@ double time_bfgs = 0.0;
 
         std::cout << "norm(diag(invQ_fullMarg) - diag(marg)) = " << (QinvSp.diagonal() - marg).norm() << std::endl;
 
-
+        /*
         std::string full_file_name = "Qinv_diag_" + to_string(n) + "_" + solver_type + ".txt";
         ofstream sol_file(full_file_name);
         if(sol_file){
@@ -1602,68 +1750,32 @@ double time_bfgs = 0.0;
             std::cout << "There was an error writing " << full_file_name << " to file." << std::endl;
             exit(1);
         }
-
-      std::cout << "QinvSp: est. standard dev fixed eff  : " << QinvSp.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
-      std::cout << "QinvSp: est. std dev random eff      : " << QinvSp.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
+        std::cout << "QinvSp: est. standard dev fixed eff  : " << QinvSp.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
+        std::cout << "QinvSp: est. std dev random eff      : " << QinvSp.diagonal().head(10).cwiseSqrt().transpose() << std::endl;
+        */
 
 #if 1
-       //SpRmMat Ax_all = Ax;
-       SpRmMat temp = Ax_all;
+    Vect projMargVar(Ax_all.rows());
+    fun->compute_marginals_y(QinvSp, Ax_all, projMargVar);
 
-       std::cout << "nnz(Ax_all) = " << Ax_all.nonZeros() << ", nnz(QinvSp) = " << QinvSp.nonZeros();
-       std::cout << ", dim(QinvSp) = " << QinvSp.rows() << " " << QinvSp.cols() << ", dim(Ax_all) = " << Ax_all.rows() << " " << Ax_all.cols() << std::endl;
+    printf("Var theta0 = %f\n", 1/exp(theta_max[0]));
+    printf("got here. nrows(Ax_all) = %d, no = %d,\n", Ax_all.rows(), no);
+    // compute DS, CPRS, DCPRS scores in R ... just save relevant information to file
+    Vect v = projMargVar + 1/exp(theta_max[0])*Vect::Ones(Ax_all.rows());
+    std::cout << "projMargVar(1:10) = " << projMargVar.head(10).transpose() << std::endl;
+    std::cout << "v(1:10) = " << v.head(10).transpose() << std::endl;
+    // save results to file
+    std::string file_name_v = "y_predict_v_" + to_string(v.size()) + ".txt"; //ntFit" + to_string(nt_fit) + "_ntPred" + to_string(nt_pred) + "_tInit" + to_string(nt_init_fit) + ".txt";
+    write_vector(file_name_v, v, v.size());  
 
-       // write my own multiplication
-       // for each row in Ax_all iterate through the columns of QinvSp -> only consider nonzero entries of Ax_all
-       double t_firstMult = - omp_get_wtime();
-
-       #pragma omp parallel 
-       {
-
-       #pragma omp parallel for default(shared)
-       for (int k=0; k<temp.outerSize(); ++k){
-            //printf("number of threads %d\n", omp_get_thread_num());
-            for (SparseMatrix<double, RowMajor>::InnerIterator it(temp,k); it; ++it)
-      {
-                it.valueRef() = 0.0;
-                for (SparseMatrix<double, RowMajor>::InnerIterator it_A(Ax_all,k); it_A; ++it_A)
-                {     
-                    //printf("A(%ld, %ld) = %f\n", it_A.row(), it_A.col(), it_A.value());
-                    it.valueRef() += it_A.value()* QinvSp.coeff(it_A.col(), it.col());
-      }
-                    //temp2.coeffRef(it.row(), it.col()) = (Ax_all.row(it.row())).dot(QinvSp.col(it.col()));
-    }
-
-        } // end outer for loop
-
-        } // end parallel region
-
-       t_firstMult += omp_get_wtime();
-       printf("time 1st Mult innerIter : %f\n", t_firstMult);
-
-       //printf("norm(temp - temp2) = %f\n", (temp-temp2).norm());
-
-       Vect projMargVar(Ax_all.rows());
-        
-       double t_secondMult = - omp_get_wtime();
-       for(int i=0; i<Ax_all.rows(); i++){
-            projMargVar(i) = (temp.row(i)).dot(Ax_all.row(i));
-       }
-       t_secondMult += omp_get_wtime();
-       printf("time 2nd Mult: %f\n", t_secondMult);
-
-       printf("norm(projMargVar) = %f\n", projMargVar.norm());
-       Vect projMargSd(Ax_all.rows());
-       projMargSd = projMargVar.cwiseSqrt();
-
-#ifdef WRITE_RESULTS
-        std::string file_name_y_predict_sd = results_folder + "/y_predict_sd_ntFit" + to_string(nt_fit) + "_ntPred" + to_string(nt_pred) + "_tInit" + to_string(nt_init_fit) + ".txt";
-        write_vector(file_name_y_predict_sd, projMargSd, no_all);
-#endif
+//#ifdef WRITE_RESULTS
+    std::string file_name_sd = "y_predict_sd_" + to_string(projMargVar.size()) + ".txt"; // _ntFit" + to_string(nt_fit) + "_ntPred" + to_string(nt_pred) + "_tInit" + to_string(nt_init_fit) + ".txt";
+    write_vector(file_name_sd, projMargVar.cwiseSqrt(), projMargVar.size());  
+//#endif
 
 #endif
 
-#endif // end predict    
+#endif // end predict 
 
 #if 0
        MatrixXd Qinv_full(n,n);

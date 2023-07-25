@@ -28,7 +28,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb) : ns_t(ns), nt_t(nt), nb_t
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
 
-    /*
+
     // assume max 3 ranks per node
     int max_rank_per_node = 4;
     int MPI_rank_mod = MPI_rank % max_rank_per_node; 
@@ -45,10 +45,10 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb) : ns_t(ns), nt_t(nt), nb_t
        printf("too many MPI ranks per node ...\n");
        exit(1);
     } 
-    */
+
     
-    int max_rank_per_node = 2;
-    int GPU_rank = 0;   // MPI_rank % max_rank_per_node;
+    //int max_rank_per_node = 2;
+    //int GPU_rank = 0;   // MPI_rank % max_rank_per_node;
 
     // allocate devices as numThreads mod noGPUs
     //int counter = threads_level1*MPI_rank + omp_get_thread_num();
