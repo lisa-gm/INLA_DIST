@@ -75,7 +75,6 @@ private:
     magma_queue_t magma_queue_2;
     cudaStream_t stream_c;
     cudaStream_t copyStream = NULL;
-    cudaStream_t copyStreamDtH = NULL;
     cudaStream_t magma_cudaStream_1 = NULL;
     cudaStream_t magma_cudaStream_2 = NULL;
 
@@ -241,7 +240,6 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 
     // initialize cuda copyStream
     gpuErrchk(cudaStreamCreate( &copyStream ));
-    gpuErrchk(cudaStreamCreate( &copyStreamDtH ));
 
     magma_init();
     magma_device_t device;
@@ -334,7 +332,6 @@ RGF<T>::~RGF()
    magma_finalize();
 
    cudaStreamDestroy(copyStream);
-   cudaStreamDestroy(copyStreamDtH);
    cudaStreamDestroy(magma_cudaStream_1);
    cudaStreamDestroy(magma_cudaStream_2);
 
@@ -552,7 +549,7 @@ double RGF<T>::FirstStageFactor()
     t_temp = get_time(0.0);
     cudaDeviceSynchronize();
     // if copy supernode device to host happens while new supernode is being initialized ... memory issues?
-    copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);
+    copy_supernode_to_host(blockR_dev, IB, copyStream);
     //copy_supernode_to_host_write(blockR_dev, IB);
 
     t_temp = get_time(t_temp);
@@ -636,7 +633,7 @@ double RGF<T>::FirstStageFactor()
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
 #else
-      // how can I get the default stream to wait but make an exception for copyStreamDtH ?
+      // how can I get the default stream to wait but make an exception for copyStream ?
        cudaDeviceSynchronize(); // TO BE REPLACED
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
        cudaDeviceSynchronize();
@@ -674,7 +671,7 @@ double RGF<T>::FirstStageFactor()
 
        nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_SN_toHost_inLoop");     
        cudaDeviceSynchronize();
-       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);  
+       copy_supernode_to_host(blockR_dev, IB, copyStream);  
        //copy_supernode_to_host(blockR_dev, IB);
        nvtxRangeEnd(id_Cpy_SN_host);             
        t_copy_DtH += get_time(t_temp);
@@ -749,7 +746,7 @@ double RGF<T>::FirstStageFactor()
 
        cudaDeviceSynchronize();
        nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_LastLarge_SN_toHost");  
-       copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);     
+       copy_supernode_to_host(blockR_dev, IB, copyStream);     
        //copy_supernode_to_host_write(blockR_dev, IB);
        //copy_supernode_to_host(blockR_dev, IB);
        nvtxRangeEnd(id_Cpy_SN_host);
@@ -796,7 +793,7 @@ double RGF<T>::FirstStageFactor()
        t_temp = get_time(0.0);
 
        cudaDeviceSynchronize();
-       copy_supernode_to_host(blockDense_dev, IB, copyStreamDtH);
+       copy_supernode_to_host(blockDense_dev, IB, copyStream);
        //copy_supernode_to_host_write(blockDense_dev, IB);
        
        t_copy_DtH += get_time(t_temp);
@@ -1346,13 +1343,11 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
    // extra buffer allocation
    T *G_LastDense_dev;   // store Sigma_n+1n+1 block
    T *G_dense_i_dev; // store Sigma_n+1i block -> size ns*nb (i.e. b_size*nb)
-   T *tmp_AH_dev;    // temporary buffer only for arrowhead part (necessary if want parallelism)
    T *tmp3_dev;  // extra buffer of size nb*ns (ie. nb*b_size)
    T *tmp4_dev;  // extra buffer of size ns*ns
 
    allocate_data_on_device((void**)&G_LastDense_dev,ND*ND*sizeof(T));   
    allocate_data_on_device((void**)&G_dense_i_dev  ,ND*matrix_ns*sizeof(T));   
-   allocate_data_on_device((void**)&tmp_AH_dev     ,ND*matrix_ns*sizeof(T));
    allocate_data_on_device((void**)&tmp3_dev       ,ND*matrix_ns*sizeof(T));
    mem_alloc_dev = allocate_data_on_device((void**)&tmp4_dev       ,matrix_ns*matrix_ns*sizeof(T));  
 
@@ -1792,8 +1787,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 #endif
          // compute inv Dense rows
          // Gn+1i = - (Gn+1i+1*L_Ei + Gn+1n+1*L_Fi)*L_Di^-1 , dim(Gn+1i+1*L_Ei) = dim(Gn+1i+1) = (nb, ns)
-         // tmp_AH_dev = G_dense_i_dev*(&blockR_dev[NR], mf_block_lda(IB+1, IB))
-         tgemm_dev('N', 'N', ND, NP, NR, ONE, G_dense_i_dev, ND, &blockR_dev[NR], mf_block_lda(IB+1, IB), ZERO, tmp_AH_dev, ND, magma_queue_2);
+         // tmp3_dev = G_dense_i_dev*(&blockR_dev[NR], mf_block_lda(IB+1, IB))
+         tgemm_dev('N', 'N', ND, NP, NR, ONE, G_dense_i_dev, ND, &blockR_dev[NR], mf_block_lda(IB+1, IB), ZERO, tmp3_dev, ND, magma_queue_1);
          flop_count += 2.0 * ND * NP * NR;
 
 #ifdef PRINT_MSG
@@ -1808,8 +1803,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 #endif
 
          // compute inv Dense rows
-         // tmp_AH_dev = Gn+1n+1*L_Fi + tmp_AH_dev 
-         tgemm_dev('N', 'N', ND, NR, ND, ONE, blockDense_dev, ND, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ONE, tmp_AH_dev, ND, magma_queue_2);
+         // tmp3_dev = Gn+1n+1*L_Fi + tmp3_dev 
+         tgemm_dev('N', 'N', ND, NR, ND, ONE, blockDense_dev, ND, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ONE, tmp3_dev, ND, magma_queue_1);
          flop_count += 2.0 * ND * NR * ND;
 
 #ifdef PRINT_MSG    
@@ -1823,8 +1818,8 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          }
 #endif
          // compute inv Dense rows
-         // Gn+1i = tmp_AH_dev*L_Di^-1 => G_dense_i_dev*blockR_dev
-         tgemm_dev('N', 'N', ND, NR, NR, -ONE, tmp_AH_dev, ND, blockR_dev, mf_block_lda(IB, IB), ZERO, G_dense_i_dev, ND, magma_queue_1);
+         // Gn+1i = tmp3_dev*L_Di^-1 => G_dense_i_dev*blockR_dev
+         tgemm_dev('N', 'N', ND, NR, NR, -ONE, tmp3_dev, ND, blockR_dev, mf_block_lda(IB, IB), ZERO, G_dense_i_dev, ND, magma_queue_1);
          flop_count += 2.0 * ND * NR * NR;
 
 #ifdef PRINT_MSG
@@ -1936,7 +1931,6 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
    deallocate_data_on_dev(G_LastDense_dev, ND*ND*sizeof(T));
    deallocate_data_on_dev(eye_dev       ,matrix_ns*matrix_ns*sizeof(T));
    deallocate_data_on_dev(G_dense_i_dev ,ND*matrix_ns*sizeof(T));
-   deallocate_data_on_dev(tmp_AH_dev    ,ND*matrix_ns*sizeof(T));
 
    deallocate_data_on_dev(tmp3_dev,    ND*matrix_ns*sizeof(T));
    mem_alloc_dev = deallocate_data_on_dev(tmp4_dev,    matrix_ns*matrix_ns*sizeof(T));
