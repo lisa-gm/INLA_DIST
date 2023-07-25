@@ -378,6 +378,16 @@ class PostTheta{
 	void compute_fullInverseQ(Vect& theta, MatrixXd& Qinv);
 
 	/**
+	 * @brief Compute the marginal variances at all locations y, (defined through 
+	 * projection matrix), i.e. nrows(y) must equal nrows(Ax)
+	 * computed as marg_var_y = diag(A*Qinv*A^T) 
+	 * function provides optimized matrix multiplications for this use case
+	 * @param[in]     Qinv   must contain relevant inverse elements
+	 * @param[inout]  Vector marg_var_y
+	 */
+	void compute_marginals_y(SpMat& Qinv, SpRmMat& Ax_all, Vect& projMargVar);
+
+	/**
      * @brief computes the hessian at theta using second order finite difference.
  	 * Is used be get_Covariance.
  	 * @param[in] theta hyperparameter vector
@@ -458,6 +468,13 @@ class PostTheta{
  	 * @param[inout] Qst fills spatial-temporal precision matrix
      */
 	void construct_Q_spat_temp(Vect& theta, SpMat& Qst);
+
+	/** @brief construct precision matrix without data
+	 * Calls spatial, spatial-temporal, etc.
+     * @param[in] theta current theta vector
+ 	 * @param[inout] Q fills precision matrix
+     */
+	void construct_Qprior(Vect& theta, SpMat& Qprior);
 
 	/** @brief construct precision matrix. 
 	 * Calls spatial, spatial-temporal, etc.

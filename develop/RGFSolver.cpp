@@ -29,10 +29,10 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
 
-    GPU_rank = 0;
+    /*GPU_rank = 0;
     if(MPI_rank == 0){
         printf("Careful! GPU rank hard coded to machine: kw60890!\n");
-    }
+    }*/
 
     /*if(noGPUs < 8){
         printf("not on Alex! change GPU assignment!");
@@ -40,7 +40,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     }*/
     
     // assume max 3 ranks per node
-    /*int max_rank_per_node = 4;
+    int max_rank_per_node = 4;
     int MPI_rank_mod = MPI_rank % max_rank_per_node; 
 
     if(MPI_rank_mod == 0){
@@ -55,7 +55,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
        printf("too many MPI ranks per node ...\n");
        exit(1);
     }
-    */ 
+    
        
     /*
      int max_rank_per_node = 8;

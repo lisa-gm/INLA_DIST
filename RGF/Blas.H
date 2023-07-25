@@ -6,7 +6,7 @@
 #include "CWC_utility.H"
 #include "magma_v2.h"
 
-//#define CUDA_POTRF
+#define CUDA_POTRF
 
 #ifdef CUDA_POTRF
 #include "cusolverDn.h"

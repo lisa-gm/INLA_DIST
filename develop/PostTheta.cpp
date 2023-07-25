@@ -2,7 +2,6 @@
 
 //#include <likwid-marker.h>
 
-
 PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, Vect theta_prior_param_, string solver_type_, const bool constr_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nb(nb_), no(no_), B(B_), y(y_), theta_prior_param(theta_prior_param_), solver_type(solver_type_), constr(constr_), Dxy(Dxy_), validate(validate_), w(w_) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
@@ -397,7 +396,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 		exit(1);
 	}
 
-	std::cout << "manifold: " << manifold << std::endl;
+    if(MPI_rank==0){
+		std::cout << "manifold: " << manifold << std::endl;
+	}
 	
 	nst         = ns*nt;
 	nu          = nst   + nss;
@@ -522,9 +523,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 
 	//std::string Qprior_fileName = "Q_prior.txt";
 	//SpMat A_lower = Qx.triangularView<Lower>();
-	
-	/*
-	std::string Qprior_fileName = "Q.txt";
+		
+	/*std::string Qprior_fileName = "Qxy_" + to_string(n) + ".txt";
 	Qxy = Qx + exp(theta_dummy[0])*AxTAx;
 	SpMat A_lower = Qxy.triangularView<Lower>();
 
@@ -550,8 +550,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 	sol_file.close();
 	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
 	
-	exit(1);
-	*/
+	exit(1);*/
 	
 	// set prior to be gaussian
 	//prior = "gaussian";
@@ -835,14 +834,14 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif	
 			} else if(dim_th == 6){
 			// assume that we have additional spatial field
-				std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
+				//std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
 				Vect theta_interpret(dim_th);
 				theta_interpret[0] = theta[0];
 				convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 				//theta_interpret << 0.5, 10, 1, 4; 
 				convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
 
-				std::cout << "theta param: " << theta_interpret.transpose() << std::endl;
+				std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 			}		
 		}
 	}
