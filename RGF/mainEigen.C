@@ -172,7 +172,20 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
     SpMat Qx(n,n);
 
     if(nss == 0){
-        construct_Q_spat_temp(Qx, theta, c0, g1, g2, g3, M0, M1, M2);
+        SpMat Qst(ns*nt, ns*nt);
+        construct_Q_spat_temp(Qst, theta, c0, g1, g2, g3, M0, M1, M2);
+		
+		int nnz = Qst.nonZeros();
+		Qx.reserve(nnz);
+
+		for (int k=0; k<Qst.outerSize(); ++k){
+		  for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
+		  {
+		    Qx.insert(it.row(),it.col()) = it.value();                 
+		  }
+        }
+
+        printf("here.\n");
     } else {
         SpMat Qst(ns*nt, ns*nt);
         std::cout << "theta:           " << theta.transpose() << std::endl;
@@ -205,13 +218,22 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
 
     }
 
+    std::cout << "dim(Ax) = " << Ax.rows() << " " << Ax.cols() << ", dim(Qx) = " << Qx.rows() << " " << Qx.cols() << std::endl;
+
+    printf("here now. nb = %d, n = %d\n", nb, n);
+
     for(int i=ns*nt+nss; i < n; i++){
+        printf("i = %d\n", i);
 		// CAREFUL 1e-3 is arbitrary choice!!
 		Qx.insert(i,i) = 1e-3;
 	}	
 
+    Qx.makeCompressed();
+
     double exp_theta0 = exp(theta[0]);
     Q = Qx + exp_theta0 * Ax.transpose()*Ax;
+
+    printf("after Q\n");
 
 }
 
@@ -531,8 +553,9 @@ size_t i; // iteration variable
     std::cout << "Q: \n" << Q << std::endl;
     */
 
-    int ns=3;
-    int nt=4;
+    int ns=2;
+    int nss=0;
+    int nt=3;
     int nb=2;
     int n = ns*nt + nb;
 
@@ -770,7 +793,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 //if(omp_get_thread_num() == 0) // instead of #pragma omp task -> want always the same thread to do same task
 //{
 
-#if 1
+#if 0
 
     int nx = ns*nt + nss;
 
@@ -926,7 +949,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 #endif // end construct Qx
 
 
-#endif
+#endif // end dummy example or reading in matrices
 
 //} // end omp if(thread 0)
 
@@ -936,25 +959,22 @@ printf("# threads: %d\n", omp_get_max_threads());
 
 #if 1
 
+    
     int n = ns*nt + nss + nb;
-
     SpMat Q(n,n);
     Vect rhs(n);
     double exp_theta = exp(theta[0]);
     rhs = exp_theta*Ax.transpose()*y;
-
-
     std::cout << "\nConstructing precision matrix Qxy. " << std::endl;
     //std::cout << "Setting Ax to zero." << std::endl;
     //Ax.makeCompressed();
     //Ax.setZero();
-
     //for(int c=0; c<1; c++){
         //theta = theta + Vect::Random(theta.size());
         //std::cout << "\niter = " << c << ". Constructing precision matrix Qxy. theta : " << theta.transpose() << std::endl;   
-
         construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);
-        //std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+        
+        std::cout << "Q : \n" << Q.block(0,0,8,8) << std::endl;
 
         //SpMat epsId(n,n);
         //epsId.setIdentity();
@@ -971,14 +991,17 @@ printf("# threads: %d\n", omp_get_max_threads());
 
         printf("nnz(Q_lower) = %ld\n", nnz);
 
-        /*SpMat Q_lower_fstB = Q_lower.block(0,0,ns,ns);
-        std::string filename =  "Qst_firstBlock_lower_" + to_string(ns) + "_" + to_string(ns) + ".mtx";
-        Eigen::saveMarket(Q_lower_fstB, filename);
-        exit(1);*/
+        /*
+        //SpMat Q_lower_fstB = Q_lower.block(0,0,ns,ns);
+        //std::string filename =  "Qst_firstBlock_lower_" + to_string(ns) + "_" + to_string(ns) + ".mtx";
+        std::string filename =  "Q_lower_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + ".mtx";
+        Eigen::saveMarket(Q_lower, filename);
+        exit(1);
+        */
 
         //std::string Q_fileName = "Q_" + to_string(n) + ".txt";
         //write_sym_CSC_matrix(Q_fileName, Q_lower);
-
+        
         size_t* ia; 
         size_t* ja;
         T* a; 
@@ -1027,6 +1050,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 
         int m = 1;
         Vect t_factorize_vec(m-1);
+        double log_det;
 
         for(int i=0; i<m; i++){
 
@@ -1034,7 +1058,6 @@ printf("# threads: %d\n", omp_get_max_threads());
             t_factorise = get_time(0.0);
             //solver->solve_equation(GR);
             double flops_factorize = solver->factorize(ia, ja, a);
-            double log_det;
             log_det = solver->logDet(ia, ja, a);
             printf("logdet: %f\n", log_det);
             t_factorise = get_time(t_factorise);
@@ -1118,8 +1141,10 @@ printf("# threads: %d\n", omp_get_max_threads());
    std::cout << "diff Log Dets : " << logDetEigen - log_det << std::endl;
 
    SpMat inv_Q = solverQ.solve(eye);
-   //MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
-   //std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
+   if(n < 25){
+    MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
+    std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
+   }
 
 #endif
 
@@ -1168,21 +1193,25 @@ printf("# threads: %d\n", omp_get_max_threads());
     SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
                                Q_lower.innerIndexPtr(),invQa);
 
-  // TODO: more efficient way to do this?
-    SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
 
     if(n < 25){
-        std::cout << "invQ_new : \n" << MatrixXd(invQ_new) << std::endl;
+        std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
     }
+
+  // TODO: more efficient way to do this?
+    SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
 
     Vect invDiag_vec(n);
     for(int i=0; i<n; i++){
         invDiag_vec[i] = invDiag[i];
     }
 
+    std::cout << "norm(diag(invQ_new)) = " << invQ_new.diagonal().norm() << std::endl;
+    std::cout << "norm(invDiag))       = " << invDiag_vec.norm() << std::endl;    
     std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
+    //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
 
-    std::string invQ_fileName = "invQ_magmaTRTRI_" + to_string(n) + ".txt";
+    std::string invQ_fileName = "invQ_new_" + to_string(n) + ".txt";
     write_sym_CSC_matrix(invQ_fileName, invQ_new_lower);
 
     /*
@@ -1318,7 +1347,7 @@ printf("# threads: %d\n", omp_get_max_threads());
     */
 
     if(n < 20){
-        cout << "\ninvDiag BTA            : " << invDiag_vec.transpose() << std::endl;
+        //cout << "\ninvDiag BTA            : " << invDiag_vec.transpose() << std::endl;
         //cout << "invDiag from blks BTA  : "   << invDiagfBlks.transpose() << std::endl;
         //cout << "Eigen diag(inv_Q)      : "   << inv_Q.diagonal().transpose() << endl;
     } else {
