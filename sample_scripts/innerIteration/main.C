@@ -179,68 +179,7 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect theta, SpMat& c
 
 }
 
-// naive FIRST ORDER CENTRAL DIFFERENCE (to be improved ...?)
-// will simplify once we have this inside class ... only beta will be a variable ...
-// expects as input
-void FD_gradient(Vect& eta, Vect& y, Vect& grad, function<double(Vect&, Vect&)> func){
-    int m = eta.size();
-    double h = 1e-5;
-
-    // probably better way to do this ...
-    SpMat epsId(m,m);
-    epsId.setIdentity();
-    epsId = h * epsId;
-
-    for(int i=0; i<m; i++){
-        Vect eta_forward      = eta + epsId.col(i);
-        double f_eta_forward  = func(eta_forward, y);
-
-        Vect eta_backward     = eta - epsId.col(i);
-        double f_eta_backward = func(eta_backward, y);
-
-        grad(i) = (f_eta_forward - f_eta_backward) / (2*h);
-    }
-}
-
-// naive SECOND ORDER DIFFERENCE: DIAGONAL of Hessian
-// expects as input cond_LogPois (generalize ... )
-void FD_diag_hessian(Vect& eta, Vect& y, Vect& diag_hess, function<double(Vect&, Vect&)> func){
-    int m = eta.size();
-    double h = 1e-5;
-
-    // probably better way to do this ...
-    SpMat epsId(m,m);
-    epsId.setIdentity();
-    epsId = h * epsId;
-
-    double f_eta = func(eta, y);
-    for(int i=0; i<m; i++){
-        Vect eta_forward    = eta + epsId.col(i);
-        double f_eta_forward  = func(eta_forward, y);
-
-        Vect eta_backward     = eta - epsId.col(i);
-        double f_eta_backward = func(eta_backward, y);
-
-        diag_hess(i) = (f_eta_forward - 2*f_eta + f_eta_backward) / (h*h);
-    }
-
-}
-
-///////////
-int sum(int a, int b)
-{
-  return a + b;
-}
-// Function that accepts an object of
-// type std::function<> as a parameter
-int std_invoke(int a, int b,
-    function<int(int, int)> func)
-{
-  return func(a, b);
-}
-///////////////
-
-
+/////////////////// Prior /////////////////
 double cond_LogPriorLat(SpMat& Q, Vect& beta){
     Vect mu = Vect::Zero(beta.size());
 
@@ -248,12 +187,22 @@ double cond_LogPriorLat(SpMat& Q, Vect& beta){
     return f_val;
 }
 
+/////////////////// Likelihoods /////////////////
+// Poisson
 double cond_LogPoisLik(Vect& eta, Vect& y){
     double f_val = eta.dot(y) - eta.array().exp().sum();
     return f_val;
 }
 
-double cond_LogPois(SpMat& Q, SpMat& A, Vect& beta, Vect& y){
+// TODO: include scaling constant E for each eta -> will also be required in input ...
+// 
+double cond_negLogPoisLik(Vect& eta, Vect& y, Vect& E){
+    // actually link function fixed here but to make input the same ...
+    double f_val = eta.dot(y) - (E.array()*(eta.array().exp())).sum();
+    return -1*f_val;
+}
+
+double cond_LogPois(SpMat& Q, SpMat& A, Vect& E, Vect& beta, Vect& y){
 
     double f_val_prior = cond_LogPriorLat(Q, beta);
 
@@ -265,6 +214,164 @@ double cond_LogPois(SpMat& Q, SpMat& A, Vect& beta, Vect& y){
     return f_val;
 }
 
+// LINK FUNCTIONS
+void link_f_sigmoid(Vect& x, Vect& sigmoidX){
+    //  1/(1 + e^-x)
+    sigmoidX = 1.0 /(1.0 + (-1*x).array().exp());
+}
+
+// Binomial
+double cond_negLogBinomLik(Vect& eta, Vect& y, Vect& ntrials){
+    int m = eta.size();
+
+    Vect linkEta(m);
+    // hardcode sigmoid for now
+    link_f_sigmoid(eta, linkEta);    
+    Vect logLinkEta = linkEta.array().log();
+    Vect tmpLinkEta = (Vect::Ones(m) - linkEta).array().log();
+
+    double f_val = y.dot(logLinkEta) + (ntrials - y).dot(tmpLinkEta);
+    return -f_val;
+}
+
+double cond_logBinom(SpMat& Q, SpMat& A, Vect& ntrials, Vect& beta, Vect& y){
+    double f_val_prior = cond_LogPriorLat(Q, beta);
+
+    Vect eta = A * beta;
+    double f_val_neg_lik = cond_negLogBinomLik(eta, y, ntrials);
+
+    double f_val = -1 * f_val_prior + f_val_neg_lik;
+
+    return f_val;
+}
+
+// general formulation for evaluating log conditional distribution
+// pass likelihood & link function as an argument
+// later fix these things in class constructor ...
+double cond_logDist(SpMat &Q, SpMat& A, Vect& beta, Vect& y, 
+                    function<double(Vect&, Vect&, Vect&)> lik_func){
+
+    double f_val = 0;
+    return f_val;
+}
+
+
+// naive FIRST ORDER CENTRAL DIFFERENCE (to be improved ...?)
+// will simplify once we have this inside class ... only beta will be a variable ...
+// expects as input
+void FD_gradient(Vect& eta, Vect& y, Vect& E, Vect& grad, function<double(Vect&, Vect&, Vect&)> lik_func){
+    int m = eta.size();
+    double h = 1e-5;
+
+    // probably better way to do this ...
+    SpMat epsId(m,m);
+    epsId.setIdentity();
+    epsId = h * epsId;
+
+    for(int i=0; i<m; i++){
+        Vect eta_forward      = eta + epsId.col(i);
+        double f_eta_forward  = lik_func(eta_forward, y, E);
+
+        Vect eta_backward     = eta - epsId.col(i);
+        double f_eta_backward = lik_func(eta_backward, y, E);
+
+        grad(i) = (f_eta_forward - f_eta_backward) / (2*h);
+    }
+}
+
+// naive SECOND ORDER DIFFERENCE: DIAGONAL of Hessian
+// expects as input cond_LogPois (generalize ... )
+void FD_diag_hessian(Vect& eta, Vect& y, Vect& E, Vect& diag_hess, function<double(Vect&, Vect&, Vect&)> lik_func){
+    int m = eta.size();
+    double h = 1e-5;
+
+    // probably better way to do this ...
+    SpMat epsId(m,m);
+    epsId.setIdentity();
+    epsId = h * epsId;
+
+    double f_eta = lik_func(eta, y, E);
+    for(int i=0; i<m; i++){
+        Vect eta_forward    = eta + epsId.col(i);
+        double f_eta_forward  = lik_func(eta_forward, y, E);
+
+        Vect eta_backward     = eta - epsId.col(i);
+        double f_eta_backward = lik_func(eta_backward, y, E);
+
+        diag_hess(i) = (f_eta_forward - 2*f_eta + f_eta_backward) / (h*h);
+    }
+
+}
+
+
+// within class less inputs required
+void NewtonIter(SpMat& Qprior, SpMat& A, Vect& E, Vect& y, Vect& beta, function<double(Vect&, Vect&, Vect&)> lik_func){
+
+    int n = beta.size();
+    int m = y.size();
+
+    // prepare for iteration
+    Vect beta_new = beta;
+    Vect beta_old = Vect::Random(n);
+
+    Vect eta(m);
+    Vect gradLik(m);
+    Vect diag_hess_eta(m);
+
+    SpMat hess_eta(m,m);
+    hess_eta.setIdentity();
+
+    Vect beta_update(n);
+
+    Vect FoD(n);
+    SpMat SoD(n,n);
+
+    // Eigen solver for now
+    SimplicialLLT<SpMat> solverQ;
+
+    // iteration
+    int counter = 0;
+    while((beta_new - beta_old).norm() > 1e-5){
+        beta_old = beta_new;
+        counter += 1;
+
+        if(counter > 20){
+            printf("max number of iterations reached in inner Iteration!\n");
+            exit(1);
+        }
+
+        eta = A * beta_new;
+
+        // compute gradient
+        FD_gradient(eta, y, E, gradLik, lik_func);
+        // gradient of negative Log conditional  (minimization)
+        FoD = Qprior * beta_new + A.transpose() * gradLik;
+
+        // compute hessian
+        std::cout << "beta: " << beta_new.transpose() << std::endl;
+        FD_diag_hessian(eta, y, E, diag_hess_eta, lik_func);
+        hess_eta.diagonal() = diag_hess_eta;
+        // hessian of negative log conditional (minimization)
+        SpMat hess = Qprior + A.transpose() * hess_eta * A;
+
+        solverQ.compute(hess);
+
+        if(solverQ.info()!=Success) {
+            cout << "Oh: Very bad. Hessian not pos. definite." << endl;
+            exit(1);
+        }
+
+        // Newton step hess(x_k)*(x_k+1 - x_k) = - grad(x_k)
+        // beta_update = beta_new - beta_old
+        beta_update = solverQ.solve(-FoD);
+        beta_new    = beta_update + beta_old;
+
+    }
+
+    beta = beta_new;
+
+}
+
 /* ===================================================================== */
 
 int main(int argc, char* argv[])
@@ -273,11 +380,6 @@ int main(int argc, char* argv[])
 size_t i; // iteration variable
 
 #if 1
-
-  // Pass the required function as parameter
-  cout << "Sum of 30 and 20 = ";
-  cout << std_invoke(30, 20, &sum) << endl;
-
     // generate dummy test case for Poisson distributed data
     /*
     int ns=3;
@@ -291,11 +393,12 @@ size_t i; // iteration variable
     //SpMat Q = gen_test_mat_base4_prior(ns, nt, nss);
     //std::cout << "Q : \n" << MatrixXd(Q) << std::endl;
 
-    if(argc != 1 + 3){
+    if(argc != 1 + 4){
         std::cout << "wrong number of input parameters. " << std::endl;
 
         std::cerr << "[integer: n]                number of latent variables " << std::endl;
         std::cerr << "[integer: m]                number of observations " << std::endl;
+        std::cout << "[string:likelihood]         assumed distribution data " << std::endl;
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
 
         exit(1);
@@ -303,23 +406,42 @@ size_t i; // iteration variable
 
     size_t n              = atoi(argv[1]);
     size_t m              = atoi(argv[2]);
-    std::string base_path = argv[3];    
-    std::cout << "n = " << n << ", m = " << m << ", base path: " << base_path << std::endl;
+    std::string likelihood = argv[3];
+
+    if(likelihood.compare("Poisson") || likelihood.compare("poisson")){
+        likelihood = "Poisson";
+    } else if(likelihood.compare("Binomial") || likelihood.compare("binomial")) {
+        likelihood = "Binomial";
+    } else {
+        std::cout << "unknown likelihood: " << likelihood << std::endl;
+        exit(1);
+    }
+
+    std::string base_path = argv[4];    
+    std::cout << "n = " << n << ", m = " << m << ", likelihood: " << likelihood << ", base path: " << base_path << std::endl;
 
     std::string A_file        =  base_path + "/A_" + to_string(m) + "_" + to_string(n) + ".dat";
     file_exists(A_file); 
     SpMat A = readCSC(A_file);
-    std::cout << "A: \n" << MatrixXd(A) << std::endl;
+    //std::cout << "A: \n" << MatrixXd(A) << std::endl;
 
     std::string y_file        =  base_path + "/y_" + to_string(m) + "_1" + ".dat";
     file_exists(y_file);
     Vect y = read_matrix(y_file, m, 1);
-    std::cout << "y: " << y.transpose() << std::endl;
+    //std::cout << "y: " << y.transpose() << std::endl;
+
+    //Vect E = Vect::Ones(m);
+    std::string extraCoeff_file        =  base_path + "/extraCoeff_" + to_string(m) + "_1" + ".dat";
+    file_exists(extraCoeff_file);
+    Vect E = read_matrix(extraCoeff_file, m, 1);
+    std::cout << "E: " << E.transpose() << std::endl;
 
     std::string beta_file        =  base_path + "/beta_original_" + to_string(n) + "_1" + ".dat";
     file_exists(beta_file);
     Vect beta_original = read_matrix(beta_file, n, 1);
     std::cout << "beta original: " << beta_original.transpose() << std::endl;
+
+
 
 #if 0
     // number of regression coefficients
@@ -353,37 +475,79 @@ size_t i; // iteration variable
 #endif
 
 #if 1
+    Vect sigmoidBeta(n);
+    link_f_sigmoid(beta_original, sigmoidBeta);
+    std::cout << "sigmoid(beta) = " << sigmoidBeta.transpose() << std::endl;
+
     // define prior Q
     SpMat Qprior(n,n);
     Qprior.setIdentity();
-    Qprior = 0.01 * Qprior;
+    Qprior = 0.001 * Qprior;
 
     double f_val_prior = cond_LogPriorLat(Qprior, beta_original);
     printf("val LogPriorLat : %f\n", f_val_prior);
 
     Vect eta = A * beta_original;
-    double f_val_lik = cond_LogPoisLik(eta, y);
-    printf("val LogPoisLik : %f\n", f_val_lik);
 
-    double f_val = cond_LogPois(Qprior, A, beta_original, y);
-    printf("val LogPois : %f\n", f_val);
+    if(likelihood.compare("Poisson")){
+        double f_val_lik = cond_negLogPoisLik(eta, y, E);
+        printf("val negLogPoisLik : %f\n", f_val_lik);
 
-    Vect gradLik(m);
-    FD_gradient(eta, y, gradLik, &cond_LogPoisLik);
-    Vect grad = Qprior * beta_original + A.transpose() * gradLik;
-    cout << "gradient: " << grad.transpose() << std::endl;
+        double f_val = cond_LogPois(Qprior, A, E, beta_original, y);
+        printf("val LogPois : %f\n", f_val);
 
-    //Vect eta = A * beta_original;
-    Vect diag_hess_eta(m);
-    FD_diag_hessian(eta, y, diag_hess_eta, &cond_LogPoisLik);
-    cout << "diag hessian: " << diag_hess_eta.transpose() << std::endl;
+        Vect gradLik(m);
+        FD_gradient(eta, y, E, gradLik, &cond_negLogPoisLik);
+        Vect grad = Qprior * beta_original + A.transpose() * gradLik;
+        cout << "gradient: " << grad.transpose() << std::endl;
 
-    SpMat hess_eta(m,m);
-    hess_eta.setIdentity();
-    hess_eta.diagonal() = diag_hess_eta;
+        //Vect eta = A * beta_original;
+        Vect diag_hess_eta(m);
+        FD_diag_hessian(eta, y, E, diag_hess_eta, &cond_negLogPoisLik);
+        //cout << "diag hessian: " << diag_hess_eta.transpose() << std::endl;
 
-    SpMat hess = Qprior + A.transpose() * hess_eta * A;
-    cout << "Hessian: \n" << MatrixXd(hess) << std::endl;
+        SpMat hess_eta(m,m);
+        hess_eta.setIdentity();
+        hess_eta.diagonal() = diag_hess_eta;
+
+        SpMat hess = Qprior + A.transpose() * hess_eta * A;
+        cout << "Hessian: \n" << MatrixXd(hess) << std::endl;
+
+        Vect beta = beta_original + 0.5*Vect::Random(n);
+        NewtonIter(Qprior, A, E, y, beta, &cond_negLogPoisLik);
+        std::cout << "final beta estimate: " << beta.transpose() << std::endl;
+
+    } else if(likelihood.compare("Binomial")){
+
+        double f_val_lik = cond_negLogBinomLik(eta, y, E);
+        printf("val negLogBinomLik : %f\n", f_val_lik);
+
+        double f_val = cond_logBinom(Qprior, A, E, beta_original, y);
+        printf("val LogBinom : %f\n", f_val);
+
+        Vect gradLik(m);
+        FD_gradient(eta, y, E, gradLik, &cond_negLogBinomLik);
+        Vect grad = Qprior * beta_original + A.transpose() * gradLik;
+        cout << "gradient: " << grad.transpose() << std::endl;
+
+        //Vect eta = A * beta_original;
+        Vect diag_hess_eta(m);
+        FD_diag_hessian(eta, y, E, diag_hess_eta, &cond_negLogBinomLik);
+        //cout << "diag hessian: " << diag_hess_eta.transpose() << std::endl;
+
+        SpMat hess_eta(m,m);
+        hess_eta.setIdentity();
+        hess_eta.diagonal() = diag_hess_eta;
+
+        SpMat hess = Qprior + A.transpose() * hess_eta * A;
+        cout << "Hessian: \n" << MatrixXd(hess) << std::endl;
+
+        Vect beta = beta_original + 0.5*Vect::Random(n);
+        NewtonIter(Qprior, A, E, y, beta, &cond_negLogBinomLik);
+        std::cout << "final beta estimate: " << beta.transpose() << std::endl;
+
+    }
+
 
 #endif
 
