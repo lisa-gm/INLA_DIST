@@ -243,10 +243,12 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol)
         for(i = 0; i < nnz; i++){
             if(isnan(a[i])){
                 std::cout << "In factorize!Found NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
+                exit(1);
             }
 
             if(isinf(a[i])){
                 std::cout << "In factorize!Found Inf value in *a. a[" << i << "] = " << a[i] << std::endl;
+                exit(1);
             }
         }
 
