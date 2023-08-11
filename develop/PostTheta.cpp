@@ -15,6 +15,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	yTy    = y.dot(y);
 	BTy    = B.transpose()*y;
 
+	// inefficient but simplifies things later in the code 
+	Ax = B.sparseView();
+
 	// careful! Not the same Hyperparameter object ...
 	// this apparently works somehow
 	dimList.setZero();
@@ -78,7 +81,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	}
 
 	// doesn't change throughout the algorithm. just set once
-	Qb = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
+	Qb = 1e-3*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
 
 	prior = "gaussian";
 	//std::cout << "Likelihood: " << likelihood << std::endl;
@@ -115,7 +118,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);  
 	MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
-	dim_th      = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
 	nss         = 0;
 	nu          = ns;
 	n           = nb + ns;
@@ -137,6 +139,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	dimList.setZero();
 	if(likelihood.compare("gaussian") == 0){
 		dimList(0) = 1;
+		dim_th     = 3;   			// 3 hyperparameters, precision for the observations, 2 for the spatial model
+	} else {
+		dim_th     = 2;
 	}
 	dimList(2) = 2;
 
@@ -440,7 +445,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 // assume that Ax_ contains A.st, A.s, B (in that order)
 // use c0, g1, g2 to construct spatial field (order 2)
 // neglegt constraint case for now -> later add constraints for spatial-temporal and spatial field separately
-PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string likelihood_, Vect extraCoeffVecLik_, string solver_type_, int dim_spatial_domain_, string manifold_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nss(nss_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), likelihood(likelihood_), extraCoeffVecLik(extraCoeffVecLik_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), manifold(manifold_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
+PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, SpMat M0_, SpMat M1_, SpMat M2_, Vect theta_prior_param_, string likelihood_, Vect extraCoeffVecLik_, string solver_type_, int dim_spatial_domain_, string manifold_, const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, const bool validate_, const Vect w_) : ns(ns_), nt(nt_), nss(nss_), nb(nb_), no(no_), Ax(Ax_), y(y_), c0(c0_), g1(g1_), g2(g2_), g3(g3_), M0(M0_), M1(M1_), M2(M2_), theta_prior_param(theta_prior_param_), likelihood(likelihood_), extraCoeffVecLik(extraCoeffVecLik_), solver_type(solver_type_), dim_spatial_domain(dim_spatial_domain_), manifold(manifold_), constr(constr_), Dx(Dx_), Dxy(Dxy_), validate(validate_), w(w_)  {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -1287,13 +1292,9 @@ Vect PostTheta::get_grad(){
 
 void PostTheta::get_Qprior(Vect theta, SpMat& Qprior){
 	
-	//if(theta_test->dimList(seq(1,2)).sum() == 0){ 
-	if(dimList(seq(1,2)).sum() == 0){
-		Qprior = Qb;
-	} else {
-		printf("dummy. not working yet. lets see how to do it\n");
-		exit(1);
-	}
+	// TODO: not very clean ... Qprior <-> Qx
+	construct_Qprior(theta, Qx);
+	Qprior = Qx;
 }
 
 
@@ -2464,8 +2465,17 @@ void PostTheta::construct_Q_spatial(Vect& theta, SpMat& Qs){
 
 	// Qs <- g[1]^2*Qgk.fun(sfem, g[2], order)
 	// return(g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2)
-	double exp_theta1 = exp(theta[1]);
-	double exp_theta2 = exp(theta[2]);
+	double exp_theta1; 
+	double exp_theta2;
+	
+	if(dim_th == 2){
+		exp_theta1 = exp(theta[0]);
+		exp_theta2 = exp(theta[1]);
+	} else if(dim_th == 3) {
+		exp_theta1 = exp(theta[1]);
+		exp_theta2 = exp(theta[2]);	
+	}
+
 	//double exp_theta1 = -3;
 	//double exp_theta2 = 1.5;
 
@@ -2582,6 +2592,48 @@ void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V,
 
 }
 */
+
+void PostTheta::construct_Qprior(Vect& theta, SpMat& Qx){
+	
+	if(dimList(seq(1,2)).sum() == 0){
+		Qx = Qb;
+	} else {
+		if(dimList(1) == 3){
+			construct_Q_spat_temp(theta, Qu);
+		} else if(dimList(2) == 2) {	
+			construct_Q_spatial(theta, Qu);
+		} else {
+			std::cout << "in construct_Qprior. nvalid dimList: " << dimList.transpose() << std::endl;
+		}	
+
+		// ovewrite value ptr of Qst part -> Q_fe stays the same 
+		// ATTENTION: needs to be adapted when additional spatial field is there. 
+		//t_Qcomp = - omp_get_wtime();
+	    for(int i=0; i<Qu.nonZeros(); i++){
+            Qx.valuePtr()[i] = Qu.valuePtr()[i];
+            //Qx_new.valuePtr()[i] = 0.0;
+        }
+
+		if(nss > 0){
+			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
+			Vect theta_sub = theta(seq(3,5));
+			construct_Q_spatial(theta_sub, Qs);
+			nnz_Qs = Qs.nonZeros();
+
+			// insert entries of Qs
+			for (int k=0; k<Qs.outerSize(); ++k){
+				for (SparseMatrix<double>::InnerIterator it(Qs,k); it; ++it)
+				{
+				Qx.coeffRef(it.row()+nst,it.col()+nst) = it.value();  
+				}
+			}
+
+			//instead go over valuePtr as before
+			// Qx.valuePtr()[i]               
+		}
+	}
+
+}
 
 void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 	
@@ -2827,6 +2879,7 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 	} else if(likelihood.compare("poisson") == 0 || likelihood.compare("binomial") == 0){
 		printf("dummy not working!");
 		exit(1);
+
 		//NewtonIter(SpMat& Qprior, Vect& x)
 
 
@@ -2865,15 +2918,26 @@ double PostTheta::cond_LogPoisLik(Vect& eta){
 double PostTheta::cond_negLogPoisLik(Vect& eta){
     // actually link function fixed here but to make input the same ...
 	//printf("in cond_negLogPoisLik. dim(y) = %ld, dim(extraCoeffVecLik) = %ld, dim(eta) = %ld\n", y.size(), extraCoeffVecLik.size(), eta.size());
+	//std::cout << "eta.dot(y) = " << eta.dot(y) << ", sum(E*exp(eta)) = " << (extraCoeffVecLik.array()*(eta.array().exp())).sum() << std::endl;
     double f_val = eta.dot(y) - (extraCoeffVecLik.array()*(eta.array().exp())).sum();
     return -1*f_val;
+}
+
+Vect PostTheta::grad_cond_negLogPoisLik(Vect& eta){
+	Vect grad = y.array() - extraCoeffVecLik.array()*(eta.array().exp());
+	return -1*grad;
+}
+
+Vect PostTheta::diagHess_cond_negLogPoisLik(Vect& eta){
+	Vect diagHess = - extraCoeffVecLik.array()*(eta.array().exp());
+	return -1*diagHess;
 }
 
 double PostTheta::cond_negLogPois(SpMat& Qprior, Vect& x){
 
     double f_val_prior = cond_LogPriorLat(Qprior, x);
 
-    Vect eta = B * x;
+    Vect eta = Ax * x;
     double f_val_lik = cond_LogPoisLik(eta);
 
     // times -1: want to minimize
@@ -2945,16 +3009,21 @@ void PostTheta::FD_gradient(Vect& eta, Vect& grad){
 		double f_eta_forward;
 		double f_eta_backward;
 
-		if(likelihood.compare("poisson")){
+		if(likelihood.compare("poisson") == 0){
         	f_eta_forward  = cond_negLogPoisLik(eta_forward);
 			f_eta_backward = cond_negLogPoisLik(eta_backward);
 
-		} else if(likelihood.compare("binomial")){
+		} else if(likelihood.compare("binomial") == 0){
         	f_eta_forward  = cond_negLogBinomLik(eta_forward);
 			f_eta_backward = cond_negLogBinomLik(eta_backward);
 		} else {
 			printf("invalid likelihood!\n");
 			exit(1);
+		}
+
+		if(i == 0){
+			std::cout << "f(eta_forward)  = " << std::fixed << std::setprecision(15) << f_eta_forward << std::endl;
+			std::cout << "f(eta_backward) = " << std::fixed << std::setprecision(15) << f_eta_backward << std::endl;
 		}
 
         grad(i) = (f_eta_forward - f_eta_backward) / (2*h);
@@ -2983,7 +3052,7 @@ void PostTheta::FD_diag_hessian(Vect& eta, Vect& diag_hess){
 	}
 	
 	//printf("f(eta) = %f\n", f_eta);
-	std::cout << "f(eta) = " << std::fixed << std::setprecision(15) << f_eta << std::endl;
+	//std::cout << "f(eta) = " << std::fixed << std::setprecision(15) << f_eta << std::endl;
 
     for(int i=0; i<m; i++){
         Vect eta_forward    = eta + epsId.col(i);
@@ -3000,10 +3069,10 @@ void PostTheta::FD_diag_hessian(Vect& eta, Vect& diag_hess){
         	f_eta_forward  = cond_negLogBinomLik(eta_forward);
 			f_eta_backward = cond_negLogBinomLik(eta_backward);
 		}
-		if(i == 0){
+		/*if(i == 0){
 			std::cout << "f(eta_forward)  = " << std::fixed << std::setprecision(15) << f_eta_forward << std::endl;
 			std::cout << "f(eta_backward) = " << std::fixed << std::setprecision(15) << f_eta_backward << std::endl;
-		}
+		}*/
         diag_hess(i) = (f_eta_forward - 2*f_eta + f_eta_backward) / (h*h);
     }
 
@@ -3029,52 +3098,84 @@ void PostTheta::NewtonIter(SpMat& Qprior, Vect& x){
 
     Vect x_update(n);
 
-    Vect FoD(n);
+	//Vect negFoD(n);
+	//SpMat hess(n,n);
+
+    //Vect FoD(n);
     SpMat SoD(n,n);
 
     // Eigen solver for now
-    SimplicialLLT<SpMat> solverNewton;
+    //SimplicialLLT<SpMat> solverNewton;
 
     // iteration
     int counter = 0;
     while((x_new - x_old).norm() > 1e-3){
         x_old = x_new;
         counter += 1;
+		printf("\ncounter = %d\n", counter);
 
         if(counter > 50){
             printf("max number of iterations reached in inner Iteration!\n");
             exit(1);
         }
 
-        eta = B * x_new;
+		if(dimList(seq(1,2)).sum() == 0){
+       		eta = B * x_new;
+		} else {
+			eta = Ax * x_new;
+		}
 
         // compute gradient
-        FD_gradient(eta, gradLik);
-        // gradient of negative Log conditional  (minimization)
-        FoD = Qprior * x_new + B.transpose() * gradLik;
+        //FD_gradient(eta, gradLik);
+		gradLik = grad_cond_negLogPoisLik(eta);
 
-        // compute hessian
-        std::cout << "x: " << x_new.transpose() << std::endl;
-        FD_diag_hessian(eta, diag_hess_eta);
+		// compute hessian
+        //std::cout << "x: " << x_new.head(min(10, (int) n)).transpose() << std::endl;
+        //FD_diag_hessian(eta, diag_hess_eta);
+		diag_hess_eta = diagHess_cond_negLogPoisLik(eta);
         hess_eta.diagonal() = diag_hess_eta;
-        // hessian of negative log conditional (minimization)
-        SpMat hess = Qprior + B.transpose() * hess_eta * B;
+		//std::cout << "diagHessEta = " << diag_hess_eta.head(min(10, (int) n)).transpose() << std::endl;
 
-        solverNewton.compute(hess);
+		if(dimList(seq(1,2)).sum() == 0){
+        	//FoD = Qprior * x_new + B.transpose() * gradLik;
+        	negFoD = -1* (Qprior * x_new + B.transpose() * gradLik);
+
+			// hessian of negative log conditional (minimization)
+       		hess = Qprior + B.transpose() * hess_eta * B;
+		} else {
+        	//FoD = Qprior * x_new + Ax.transpose() * gradLik;
+        	negFoD = -1* (Qprior * x_new + Ax.transpose() * gradLik);	
+
+			Qxy = Qprior + Ax.transpose() * hess_eta * Ax;
+			//std::cout << "hess(1:10,1:10) = \n" << hess.block(0,0,10,10) << std::endl;
+			//std::cout << "hess(-10:end, -10:end) = \n" << hess.block(n-10, n-10, 10,10) << std::endl;
+		}
+
+        /*
+		solverNewton.compute(hess);
 
         if(solverNewton.info()!=Success) {
             cout << "Oh: Very bad. Hessian not pos. definite." << endl;
             exit(1);
         }
-
         // Newton step hess(x_k)*(x_k+1 - x_k) = - grad(x_k)
         // x_update = x_new - x_old
        	x_update = solverNewton.solve(-FoD);
+		*/
+
+		double t_condLatChol, t_condLatSolver;
+		double log_det;
+		//Vect x_update_new(x_update.size());
+		solverQ->factorize_solve(hess, negFoD, x_update, log_det, t_condLatChol, t_condLatSolve);
+		//std::cout << "norm(x_update - x_update_new) = " << (x_update - x_update_new).norm() << std::endl;
+
         x_new    = x_update + x_old;
 
     }
 
     x = x_new;
+	std::cout << "converged after " << counter << " iterations." << std::endl;
+
 
 }
 

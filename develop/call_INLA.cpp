@@ -346,6 +346,7 @@ int main(int argc, char* argv[])
         }
 
         B = read_matrix(B_file, no, nb);
+        Ax = B.sparseView(); // so that I can use Ax for regression case as well
 
         //std::cout << "y : \n"  << y << std::endl;    
         //std::cout << "B : \n" << B << std::endl;
@@ -1108,15 +1109,20 @@ int main(int argc, char* argv[])
 #endif
 
 
-#if 0
+#if 1
     if(MPI_rank == 0){
     std::cout << "\n================== Testing inner Iteration. =====================\n" << std::endl;
 
-    // read in beta original 
-    std::string beta_file        =  base_path + "/beta_original_" + to_string(n) + "_1" + ".dat";
+    // read in original latent parameters
+    /*std::string beta_file        =  base_path + "/beta_original_" + to_string(nb) + "_1" + ".dat";
     file_exists(beta_file);
-    Vect beta_original = read_matrix(beta_file, n, 1);  
-    std::cout << "beta original: " << beta_original.transpose() << std::endl;
+    Vect beta_original = read_matrix(beta_file, nb, 1);  
+    std::cout << "beta original: " << beta_original.transpose() << std::endl;*/
+
+    std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
+    file_exists(mean_latent_file);
+    Vect mean_latent_original = read_matrix(mean_latent_file, n, 1);  
+    std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;
 
     std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
     file_exists(extraCoeffVecLik_file);
@@ -1125,13 +1131,15 @@ int main(int argc, char* argv[])
 
     // no separate function to construct Qprior
     SpMat Qprior(n,n);
-    Qprior.setIdentity();
-    Qprior = 1e-3 * Qprior;
+    fun->get_Qprior(theta_original, Qprior);
+    std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(0, 0, min(10, (int) n), min(10, (int) n)) << std::endl;
+    //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(399, 399, 30, 30) << std::endl;
 
-    double val_logPriorLat = fun->cond_LogPriorLat(Qprior, beta_original);
+
+    double val_logPriorLat = fun->cond_LogPriorLat(Qprior, mean_latent_original);
     printf("val_logPriorLat:   %f\n", val_logPriorLat);
 
-    Vect eta = B * beta_original;
+    Vect eta = Ax * mean_latent_original;
     std::cout << "eta(1:10) = " << eta.head(10).transpose() << std::endl;
     double val_logPoisLik  = fun->cond_LogPoisLik(eta);
     printf("val_logPoisLik:    %f\n", val_logPoisLik);
@@ -1139,7 +1147,7 @@ int main(int argc, char* argv[])
     double val_negLogPoisLik  = fun->cond_negLogPoisLik(eta);
     printf("val_negLogPoisLik: %f\n", val_negLogPoisLik);
 
-    double val_negLogPois  = fun->cond_negLogPois(Qprior, beta_original);
+    double val_negLogPois  = fun->cond_negLogPois(Qprior, mean_latent_original);
     printf("val_negLogPois:    %f\n", val_negLogPois);
 
     /*
@@ -1151,37 +1159,45 @@ int main(int argc, char* argv[])
     printf("val_negLogBinomLik: %f\n", val_negLogBinomLik);
     */
 
+#if 1
     Vect gradEta(no);
     fun->FD_gradient(eta, gradEta);
-    std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
-    std::cout << "grad    = " << (B.transpose() * gradEta).transpose() << std::endl;
+    //std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
+    //std::cout << "grad    = " << (Ax.transpose() * gradEta).head(min(10, (int) n)).transpose() << std::endl;
 
     Vect diagHessEta(no);
     fun->FD_diag_hessian(eta, diagHessEta);
-    std::cout << "diagHessEta = " << diagHessEta.head(10).transpose() << std::endl;
+    //std::cout << "diagHessEta = " << diagHessEta.head(10).transpose() << std::endl;
     SpMat hess_eta(no,no);
     hess_eta.setIdentity();
     hess_eta.diagonal() = diagHessEta;
-    std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
+    //std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
 
-    Vect beta = beta_original + Vect::Random(n);
-    std::cout << "initial   beta : " << beta.transpose() << std::endl;
-    fun->NewtonIter(Qprior, beta);
-    std::cout << "estimated beta : " << beta.transpose() << std::endl;
-    std::cout << "original  beta : " << beta_original.transpose() << std::endl;
+    Vect mu = mean_latent_original + Vect::Random(n);
+    std::cout << "initial  x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
+    fun->NewtonIter(Qprior, mu);
+    std::cout << "estimated x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
+    std::cout << "original  x : " << mean_latent_original.head(min(10, (int) n)).transpose() << "\n" << std::endl;
 
-    Vect eta_est = B * beta;
+    std::cout << "estimated fixed effects : " << mu.tail(nb).transpose() << std::endl;
+    std::cout << "original  fixed effects : " << mean_latent_original.tail(nb).transpose() << std::endl;
+
+
+    Vect eta_est = Ax * mean_latent_original;
     fun->FD_diag_hessian(eta_est, diagHessEta);
-    MatrixXd hessModeCond = Qprior + B.transpose() * hess_eta * B;
-    std::cout << "hessModeCond = \n" << hessModeCond << std::endl;
-    MatrixXd invHessModeCond = hessModeCond.inverse();
-    std::cout << "invHessModeCond = \n" << invHessModeCond << std::endl;
-    std::cout << "\nsd fixed effects = " << invHessModeCond.diagonal().cwiseSqrt().transpose() << std::endl; 
+    MatrixXd hessModeCond = Qprior + Ax.transpose() * hess_eta * Ax;
 
+    if(n < 25){
+        std::cout << "hessModeCond = \n" << hessModeCond << std::endl;
+        MatrixXd invHessModeCond = hessModeCond.inverse();
+        std::cout << "invHessModeCond = \n" << invHessModeCond << std::endl;
+        std::cout << "\nsd fixed effects = " << invHessModeCond.diagonal().cwiseSqrt().transpose() << std::endl; 
     }
 #endif
+ }
+#endif
 
-//exit(1);
+exit(1);
 
 #if 0
 
@@ -1333,7 +1349,7 @@ if(MPI_rank == 0){
 
 double time_bfgs = 0.0;
 
-#if 1
+#if 0
 
     if(dim_th > 0){
         if(MPI_rank == 0){

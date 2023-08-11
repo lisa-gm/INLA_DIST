@@ -100,7 +100,7 @@ class PostTheta{
 	//Hyperparameters theta_prior_test = new Hyperparameters(dim_spatial_domain, manifold, dimList, theta_prior_param, theta_prior_param);
 
     // either Ax or B used
-    SpRmMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
+    SpMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
     						 observation locations onto FEM mesh and 
     						 includes covariates at the end.                */
     MatrixXd B; 		/**< if space (-time) model included in last 
@@ -272,7 +272,7 @@ class PostTheta{
      * @param[in] M2_ stiffness matrix time.
      */
 	PostTheta(int ns, int nt, int nss, int nb, int no, 
-		SpRmMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
+		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
 		SpMat M0, SpMat M1, SpMat M2, 
 		Vect theta_prior_param, 
 		string likelihood, Vect extraCoeffVecLik,
@@ -492,6 +492,8 @@ class PostTheta{
      */
 	void construct_Q_spat_temp(Vect& theta, SpMat& Qst);
 
+	void construct_Qprior(Vect& theta, SpMat& Qx);
+
 	/** @brief construct precision matrix. 
 	 * Calls spatial, spatial-temporal, etc.
      * @param[in] theta current theta vector
@@ -540,6 +542,19 @@ class PostTheta{
 	 * @param[out] f_val double. evaluated negative log density
 	 */
 	double cond_negLogPoisLik(Vect& eta);
+
+	/** @brief evaluate analytical negative gradient log Poisson likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+	 * @param[out] grad Vect. gradient.
+	 */
+	Vect grad_cond_negLogPoisLik(Vect& eta);
+
+	/** @brief evaluate analytical negative diagonal Hessian of log Poisson likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+	 * @param[out] diagHess Vect. diagonal of Hessian (off-diagonal entries are zero)
+	 */
+	Vect diagHess_cond_negLogPoisLik(Vect& eta);
+
 
 	/** @brief evaluate negative condiational log Poisson + Gaussian prior
      * @param[in] Qprior SpMat. precision matrix.
