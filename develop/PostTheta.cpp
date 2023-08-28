@@ -14,6 +14,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	yTy    = y.dot(y);
 	BTy    = B.transpose()*y;
 
+	likelihood = "gaussian";
+
 
 #ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -104,6 +106,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	yTy         = y.dot(y);
 	AxTy		= Ax.transpose()*y;	
 	AxTAx       = Ax.transpose()*Ax;
+
+	likelihood = "gaussian";
 
 	#ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -273,6 +277,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
     }
 	//threads_level2 = 1;
 
+	likelihood = "gaussian";
+
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
@@ -414,6 +420,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 		AxTy		= Ax.transpose()*y;
 		AxTAx       = Ax.transpose()*Ax;
 	}
+
+	likelihood = "gaussian";
 
 #ifdef PRINT_MSG
 		printf("yTy : %f\n", yTy);
@@ -811,38 +819,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		iter_acc += 1;
 		double t_bfgs_iter_temp = omp_get_wtime() + t_bfgs_iter; 
 		if(MPI_rank == 0){
-
-			if(dim_th == 1){
-				std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
-			} else if(dim_th == 3){
-				std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
-			} else if(dim_th == 4){
-				//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-				//std::cout << "theta: " << std::right << std::fixed << theta.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
-				//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
-				//std::cout << "grad : " << grad.transpose() << std::endl;
-				Vect theta_interpret(4); theta_interpret[0] = theta[0];
-				convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-				std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
-				//std::cout << "iter: " << std::right << std::fixed << iter_acc << "   time: " << t_bfgs_iter_temp <<  "   theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta; // << std::endl;
-#ifdef DATA_SYNTHETIC
-				// compute error = norm(theta - theta_original)
-				double err = compute_error_bfgs(theta);
-				std::cout << std::right << std::fixed << "    error: " << err << std::endl;
-#else
-				std::cout << std::endl;
-#endif	
-			} else if(dim_th == 6){
-			// assume that we have additional spatial field
-				//std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
-				Vect theta_interpret(dim_th);
-				theta_interpret[0] = theta[0];
-				convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-				//theta_interpret << 0.5, 10, 1, 4; 
-				convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
-
-				std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
-			}		
+			Vect theta_interpret(dim_th);
+			convert_theta2interpret(theta, theta_interpret);
+			std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 		}
 	}
 
@@ -963,6 +942,85 @@ int PostTheta::get_fct_count(){
 
 // ============================================================================================ //
 // CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
+void PostTheta::convert_theta2interpret(Vect& theta, Vect& theta_interpret){
+
+	int count = 0;
+	if(likelihood.compare("gaussian") == 0){
+		theta_interpret[count] = theta[count];
+		count++;
+	}
+
+	if(ns == 0){
+#ifdef PRINT_MSG
+		if(MPI_rank == 0){
+			printf("No conversion needed!\n");
+		}
+#endif
+	}else if(ns > 0 && nt <= 1){
+		convert_theta2interpret_spat(theta[count], theta[count+1], theta_interpret[count], theta_interpret[count+1]);
+		count = count + 2;
+
+	} else if(ns > 0 && nt > 1){
+		convert_theta2interpret_spatTemp(theta[count], theta[count+1], theta[count+2], theta_interpret[count], theta_interpret[count+1], theta_interpret[count+2]);
+		count = count + 3;
+		
+		if(nss > 0){
+			convert_theta2interpret_spat(theta[count], theta[count+1], theta_interpret[count], theta_interpret[count+1]);
+			count = count + 2;
+		}
+	}
+
+	if(count != dim_th){
+		printf("count = %d, dim(theta) = %d. Not matching!\n", count, dim_th);
+		exit(1);
+	}
+
+	//std::cout << "theta           = " << theta.transpose() << std::endl;
+	//std::cout << "theta interpret = " << theta_interpret.transpose() << std::endl;
+
+}
+
+// umbrella function that calls respective sub functions 
+// by assumption ns > 0 -> otherwise nothing to convert but check anyway
+void PostTheta::convert_interpret2theta(Vect& theta_interpret, Vect& theta){
+
+	int count = 0;
+	if(likelihood.compare("gaussian") == 0){
+		theta[count] = theta_interpret[count];
+		count++;
+	}
+
+	if(ns == 0){
+#ifdef PRINT_MSG
+		if(MPI_rank == 0){
+			printf("No conversion needed!\n");
+		}
+#endif
+	}else if(ns > 0 && nt <= 1){
+		convert_interpret2theta_spat(theta_interpret[count], theta_interpret[count+1], theta[count], theta[count+1]);
+		count = count + 2;
+
+	} else if(ns > 0 && nt > 1){
+		convert_interpret2theta_spatTemp(theta_interpret[count], theta_interpret[count+1], theta_interpret[count+2], theta[count], theta[count+1], theta[count+2]);
+		count = count + 3;
+		
+		if(nss > 0){
+			convert_interpret2theta_spat(theta_interpret[count], theta_interpret[count+1], theta[count], theta[count+1]);
+			count = count + 2;
+		}
+	}
+
+	if(count != dim_th){
+		printf("count = %d, dim(theta) = %d. Not matching!\n", count, dim_th);
+		exit(1);
+	}
+
+	//std::cout << "theta           = " << theta.transpose() << std::endl;
+	//std::cout << "theta interpret = " << theta_interpret.transpose() << std::endl;
+
+}
+
+
 
 void PostTheta::convert_theta2interpret_spatTemp(double lgamE, double lgamS, double lgamT, double& ranS, double& ranT, double& sigU){
 	double alpha_t = 1; 
@@ -1605,11 +1663,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 		Vect mu_tmp(n); 
 		// convert interpret_theta to theta
 		Vect theta(dim_th);
-		theta[0] = interpret_theta[0];
-		convert_interpret2theta_spatTemp(interpret_theta[1], interpret_theta[2], interpret_theta[3], theta[1], theta[2], theta[3]);
-		if(nss > 0){
-			convert_interpret2theta_spat(interpret_theta[4], interpret_theta[5], theta[4], theta[5]);
-		}
+		convert_interpret2theta(interpret_theta, theta);
+
 		double f_theta = eval_post_theta(theta, mu_tmp);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
     }
@@ -1630,11 +1685,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 	            Vect mu_tmp(n);
             	Vect interpret_theta_forw_i = interpret_theta+epsG.col(i);
             	Vect theta_forw_i(dim_th);
-				theta_forw_i[0] = interpret_theta_forw_i[0];
-				convert_interpret2theta_spatTemp(interpret_theta_forw_i[1], interpret_theta_forw_i[2], interpret_theta_forw_i[3], theta_forw_i[1], theta_forw_i[2], theta_forw_i[3]);
-	            if(nss > 0){
-					convert_interpret2theta_spat(interpret_theta_forw_i[4], interpret_theta_forw_i[5], theta_forw_i[4], theta_forw_i[5]);
-				}
+				convert_interpret2theta(interpret_theta_forw_i, theta_forw_i);
+
 				f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
             }
             counter++;
@@ -1644,11 +1696,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 	            Vect mu_tmp(n);
 				Vect interpret_theta_back_i = interpret_theta-epsG.col(i);
             	Vect theta_back_i(dim_th);
-				theta_back_i[0] = interpret_theta_back_i[0];
-				convert_interpret2theta_spatTemp(interpret_theta_back_i[1], interpret_theta_back_i[2], interpret_theta_back_i[3], theta_back_i[1], theta_back_i[2], theta_back_i[3]);
-	        	if(nss > 0){
-					convert_interpret2theta_spat(interpret_theta_back_i[4], interpret_theta_back_i[5], theta_back_i[4], theta_back_i[5]);
-				}
+				convert_interpret2theta(interpret_theta_back_i, theta_back_i);
+
 				f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp);
             }
             counter++;
@@ -1662,11 +1711,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 	            Vect mu_tmp(n);
 				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsG.col(i)+epsG.col(j);
             	Vect theta_forw_i_j(dim_th);
-				theta_forw_i_j[0] = interpret_theta_forw_i_j[0];
-				convert_interpret2theta_spatTemp(interpret_theta_forw_i_j[1], interpret_theta_forw_i_j[2], interpret_theta_forw_i_j[3], theta_forw_i_j[1], theta_forw_i_j[2], theta_forw_i_j[3]);
-	        	if(nss > 0){
-					convert_interpret2theta_spat(interpret_theta_forw_i_j[4], interpret_theta_forw_i_j[5], theta_forw_i_j[4], theta_forw_i_j[5]);
-				}
+				convert_interpret2theta(interpret_theta_forw_i_j, theta_forw_i_j);
+
 				f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
             }
             counter++;
@@ -1676,11 +1722,15 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsG.col(i)-epsG.col(j);
             	Vect theta_forw_i_back_j(dim_th);
+				convert_interpret2theta(interpret_theta_forw_i_back_j, theta_forw_i_back_j);
+
+				/*
 				theta_forw_i_back_j[0] = interpret_theta_forw_i_back_j[0];
 				convert_interpret2theta_spatTemp(interpret_theta_forw_i_back_j[1], interpret_theta_forw_i_back_j[2], interpret_theta_forw_i_back_j[3], theta_forw_i_back_j[1], theta_forw_i_back_j[2], theta_forw_i_back_j[3]);
 				if(nss > 0){
 					convert_interpret2theta_spat(interpret_theta_forw_i_back_j[4], interpret_theta_forw_i_back_j[5], theta_forw_i_back_j[4], theta_forw_i_back_j[5]);
 				}
+				*/
 				f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
             }
             counter++;
@@ -1690,11 +1740,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsG.col(i)+epsG.col(j);
             	Vect theta_back_i_forw_j(dim_th);
-				theta_back_i_forw_j[0] = interpret_theta_back_i_forw_j[0];
-				convert_interpret2theta_spatTemp(interpret_theta_back_i_forw_j[1], interpret_theta_back_i_forw_j[2], interpret_theta_back_i_forw_j[3], theta_back_i_forw_j[1], theta_back_i_forw_j[2], theta_back_i_forw_j[3]);
-	        	if(nss > 0){
-					convert_interpret2theta_spat(interpret_theta_back_i_forw_j[4], interpret_theta_back_i_forw_j[5], theta_back_i_forw_j[4], theta_back_i_forw_j[5]);
-				}
+				convert_interpret2theta(interpret_theta_back_i_forw_j, theta_back_i_forw_j);
+
 				f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
             }
             counter++;
@@ -1704,11 +1751,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps)
 	            Vect mu_tmp(n);
             	Vect interpret_theta_back_i_j 	   = interpret_theta-epsG.col(i)-epsG.col(j);
             	Vect theta_back_i_j(dim_th);
-				theta_back_i_j[0] = interpret_theta_back_i_j[0];
-				convert_interpret2theta_spatTemp(interpret_theta_back_i_j[1], interpret_theta_back_i_j[2], interpret_theta_back_i_j[3], theta_back_i_j[1], theta_back_i_j[2], theta_back_i_j[3]);
-	        	if(nss > 0){
-					convert_interpret2theta_spat(interpret_theta_back_i_j[4], interpret_theta_back_i_j[5], theta_back_i_j[4], theta_back_i_j[5]);
-				}
+				convert_interpret2theta(interpret_theta_back_i_j, theta_back_i_j);
+
 				f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
             }
             counter++;            
@@ -1868,22 +1912,23 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	if(prior == "gaussian"){   // || dim_th != 4
 		// evaluate gaussian prior
-		Vect log_prior_vec(dim_th);
-		for( int i=0; i<dim_th; i++ ){
-			eval_log_gaussian_prior_hp(log_prior_vec[i], &theta[i], &theta_prior_param[i]);
-		}
-	    
-		log_prior_sum = log_prior_vec.sum();
+		Vect theta_interpret(dim_th);
+		convert_theta2interpret(theta, theta_interpret);
+		eval_log_gaussian_prior_hp(theta_interpret, theta_prior_param, log_prior_sum);
 
 	} else if(prior == "pc"){
 		// pc prior
 		Vect theta_interpret(dim_th); 
+		convert_theta2interpret(theta, theta_interpret);
+
+		/*
 		theta_interpret[0] = theta[0];
 		convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 		//theta_interpret << 0.5, 10, 1, 4; 
 		if(nss > 0){
 			convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
 		}
+		*/
 
 		//Vect lambda(4);
 		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
@@ -2007,13 +2052,13 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 }
 
 
-void PostTheta::eval_log_gaussian_prior_hp(double& log_prior, double* thetai, double* thetai_original){
+void PostTheta::eval_log_gaussian_prior_hp(Vect& theta_interpret, Vect& theta_prior_param, double& log_prior){
 
-	log_prior = -0.5 * (*thetai - *thetai_original) * (*thetai - *thetai_original);
+	log_prior = -0.5 * (theta_interpret - theta_prior_param).transpose() * (theta_interpret - theta_prior_param);
 
-	#ifdef PRINT_MSG
-		std::cout << "log prior for theta_i " << (*thetai) << " : " << (log_prior) << std::endl;
-	#endif
+#ifdef PRINT_MSG
+		std::cout << "theta param : " << theta_interpret.transpose() << ", log prior sum : " << log_prior << std::endl;
+#endif
 }
 
 // NEW ORDER sigma.e, range s, range t, sigma.u + range s spat, sigma u spat

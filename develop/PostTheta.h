@@ -77,6 +77,7 @@ class PostTheta{
 	Solver* solverQst;
 
 	string solver_type;
+	string likelihood;
 
 	std::string prior;  /**<  type of pripr to be used                      */
 
@@ -284,6 +285,10 @@ class PostTheta{
 	// ============================================================================================ //
 	// CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
 
+	void convert_theta2interpret(Vect& theta, Vect& theta_interpret);
+
+	void convert_interpret2theta(Vect& theta_interpret, Vect& theta);
+	
 	/**
 	 * @brief convert hyperparameters theta from the model parametrisation to the interpretable
 	 * parametrisation ie. from log(gamma_E, gamma_s, gamma_t) to log(sigma.u, rangeS, rangeT)
@@ -413,7 +418,7 @@ class PostTheta{
  	 * @details variance / precision of 1 : no normalising constant. 
  	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
      */	
-	void eval_log_gaussian_prior_hp(double& log_prior, double* thetai, double* thetai_original);
+	void eval_log_gaussian_prior_hp(Vect& theta_param, Vect& theta_prior_param, double& log_prior);
 
 	/**
      * @brief evaluate log prior using PC prior 

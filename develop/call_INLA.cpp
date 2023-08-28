@@ -190,7 +190,7 @@ int main(int argc, char* argv[])
     // to be filled later
 
     // set nt = 1 if ns > 0 & nt = 0
-    if(ns > 0 && nt == 0){
+    if(nt == 0){
         nt = 1;
     } 
 
@@ -273,12 +273,13 @@ int main(int argc, char* argv[])
     if(MPI_rank == 0)
         printf("\n==================== MODEL SPECIFICATIONS ===================\n");
 
-    if(ns == 0 && nt == 0){
+    if(ns == 0 && nt == 1){
 
         dim_th = 1;
-
-        // #include "generate_regression_data.cpp"
         tau = 0.5;   // is log(precision)
+
+#if 0
+        // #include "generate_regression_data.cpp"
 
         Dxy.resize(num_constr, nb);
         Dxy << MatrixXd::Ones(num_constr, nb);
@@ -305,10 +306,10 @@ int main(int argc, char* argv[])
         MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
         if(MPI_rank == 0)
             std::cout << "constrained variances fixed eff   : " << constraint_Cov_xy_true.diagonal().transpose() << std::endl;
-    
+#endif
         // read in design matrix 
         // files containing B
-        /*std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
+        std::string B_file        =  base_path + "/A_" + no_s + "_" + nb_s + ".dat";
         file_exists(B_file); 
 
         // casting no_s as integer
@@ -317,7 +318,7 @@ int main(int argc, char* argv[])
             std::cout << "total number of observations : " << no << std::endl;
         }
 
-        B = read_matrix(B_file, no, nb);*/
+        B = read_matrix(B_file, no, nb);
 
         //std::cout << "y : \n"  << y << std::endl;    
         //std::cout << "B : \n" << B << std::endl;
@@ -502,13 +503,14 @@ int main(int argc, char* argv[])
     std::string data_type;
 
     // initialise theta
-    if(ns == 0 && nt == 0){
+    if(ns == 0 && nt == 1){
 
         theta_original[0] = tau;
 
         // Initial guess
         theta[0] = 3;
-        theta_prior_param[0] = theta[0];
+        theta_param[0] = theta[0];
+        theta_prior_param[0] = theta_original[0];
 
 
         if(MPI_rank == 0){
@@ -566,7 +568,7 @@ int main(int argc, char* argv[])
             //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
         } else {
             // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
-            theta_original     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+            theta_original     << 1.386294, -3.870213, 0.6342557, 1.961659, -1.206621, -0.05889152;
             //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
             // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
             //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
@@ -575,9 +577,10 @@ int main(int argc, char* argv[])
                 std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
             }
             // same order as above
-            //theta_param << 3, 0.5, 0.5, 2, -1, 2;
-            //theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
-            theta_param <<  4, 1, 3, 2, -1, 0;
+            theta_param << 1.386294, 0.4054651, 1.386294,  0.6931472, 1.098612,  0.000000;
+            //theta_param        << 1.033, 0.431, 0.756, 0.247, 1.608, -0.495;
+            //theta_param <<  4, 1, 3, 2, -1, 0;
+
         }
 
         if(constr == true){
@@ -912,6 +915,7 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "Call constructor for regression model." << std::endl;
         }
+        printf("nt = %ld\n", nt);
         fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, solver_type, constr, Dxy, validate, w);
     } else if(ns > 0 && nt == 1 && nss == 0) {
         if(MPI_rank == 0){
@@ -945,24 +949,10 @@ int main(int argc, char* argv[])
     }
 
     // convert from interpretable parametrisation to internal one
-    if(dim_th >= 4){
-	   theta[0] = theta_param[0];
-        fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-        if(dim_th == 6){
-            fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
-        }
-
-        if(MPI_rank == 0){
-            Vect theta_interpret_initial(dim_th);
-            theta_interpret_initial[0] = theta[0];
-            fun->convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret_initial[1], theta_interpret_initial[2], theta_interpret_initial[3]);
-            if(dim_th == 6){
-                fun->convert_theta2interpret_spat(theta[4], theta[5], theta_interpret_initial[4], theta_interpret_initial[5]);
-            }
-            std::cout << "theta interpret. param.         : " << theta_param.transpose() << std::endl;
-	        std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;
-            std::cout << "initial theta interpret. param. : " << theta_interpret_initial.transpose() << std::endl;
-        }
+    fun->convert_interpret2theta(theta_param, theta);
+    if(MPI_rank == 0){
+        std::cout << "theta interpret. param.         : "  << std::right << std::fixed << theta_param.transpose() << std::endl;
+	    std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;       
     }
 
 #ifdef WRITE_RESULTS
@@ -1126,34 +1116,12 @@ double time_bfgs = 0.0;
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 
-    //LIKWID_MARKER_INIT;
-    //LIKWID_MARKER_THREADINIT;
-
-    //theta_param << -1.5, 7, 7, 3;
-    //theta_param << -2.484481  7.836006  7.023295  2.504872
-    //theta_param << -1.5, 8, 8, 3;
-
     //theta_param << -2.15, 9.57, 11.83, 3.24;
-
-    theta[0] = theta_param[0];
-    fun->convert_interpret2theta_spatTemp(theta_param[1], theta_param[2], theta_param[3], theta[1], theta[2], theta[3]);
-    if(dim_th == 6){
-        fun->convert_interpret2theta_spat(theta_param[4], theta_param[5], theta[4], theta[5]);
-    }
-
+    fun->convert_interpret2theta(theta_param, theta);
 
     if(MPI_rank == 0){    
         std::cout << "theta param : " << theta_param.transpose() << std::endl;
         std::cout << "theta       : " << theta.transpose() << std::endl;
-    }
-
-    if(dim_th == 6){
-        fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
-    }
-
-    if(MPI_rank == 0){    
-        std::cout << "theta param : " << theta_param.transpose() << std::endl;
-        //std::cout << "theta       : " << theta.transpose() << std::endl;
     }
 
     time_bfgs = -omp_get_wtime();
@@ -1187,8 +1155,7 @@ double time_bfgs = 0.0;
 #ifdef WRITE_RESULTS
     if(MPI_rank == 0){
     	std::string file_name_theta = results_folder + "/mode_theta_interpret_param.txt";
-    	theta_param[0] = theta[0];
-    	fun->convert_theta2interpret(theta[1], theta[2], theta[3], theta_param[1], theta_param[2], theta_param[3]);
+        fun->convert_theta2interpret(theta, theta_param);
     	write_vector(file_name_theta, theta_param, dim_th);
     }
 #endif
@@ -1209,32 +1176,12 @@ double time_bfgs = 0.0;
         std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
     }
 
-    // convert between different theta parametrisations
-    if(dim_th == 4 && MPI_rank == 0){
-        theta_original_param[0] = theta_original[0];
-        fun->convert_theta2interpret_spatTemp(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
-        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
-        std::cout << "\norig. mean interpret. param. : " << theta_original_param[0] << " " << theta_original_param[1] << " " << theta_original_param[2] << " " << theta_original_param[3] << std::endl;
-
-        double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
-        double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret_spatTemp(lgamE, lgamS, lgamT, ranS, ranT, sigU);
-        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << std::endl;
-    }
-
-        // convert between different theta parametrisations
-    if(dim_th == 6 && MPI_rank == 0){
-        theta_original_param[0] = theta_original[0];
-        fun->convert_theta2interpret_spatTemp(theta_original[1], theta_original[2], theta_original[3], theta_original_param[1], theta_original_param[2], theta_original_param[3]);
-        fun->convert_theta2interpret_spat(theta_original[4], theta_original[5], theta_original_param[4], theta_original_param[5]);
-        //std::cout << "\norig. mean interpret. param. : " << theta_original[0] << " " << prior_ranT << " " << prior_ranS << " " << prior_sigU << std::endl;
+    if(MPI_rank == 0){
+        fun->convert_theta2interpret(theta_original, theta_original_param);
         std::cout << "\norig. mean interpret. param. : " << theta_original_param.transpose() << std::endl;
 
-        double lgamE = theta[1]; double lgamS = theta[2]; double lgamT = theta[3];
-        double sigU; double ranS; double ranT;
-        fun->convert_theta2interpret_spatTemp(lgamE, lgamS, lgamT, ranS, ranT, sigU);
-        fun->convert_theta2interpret_spat(theta[4], theta[5], theta_param[4], theta_param[5]);
-        std::cout << "est.  mean interpret. param. : " << theta[0] << " " << ranS << " " << ranT << " " << sigU << " " << theta_param[4] << " " << theta_param[5] << std::endl;
+        fun->convert_theta2interpret(theta, theta_param);
+        std::cout << "est.  mean interpret. param. : " << theta_param.transpose() << std::endl;
     }
 
 #endif
@@ -1272,12 +1219,8 @@ double time_bfgs = 0.0;
     //convert to interpretable parameters
     // order of variables : gaussian obs, range t, range s, sigma u
     Vect interpret_theta(dim_th);
-    interpret_theta[0] = theta_max[0];
-    fun->convert_theta2interpret_spatTemp(theta_max[1], theta_max[2], theta_max[3], interpret_theta[1], interpret_theta[2], interpret_theta[3]);
-    if(nss > 0){
-        fun->convert_theta2interpret_spat(theta_max[4], theta_max[5], interpret_theta[4], interpret_theta[5]);
-    }
-    //interpret_theta << -2.152, 9.679, 12.015, 3.382;
+    fun->convert_theta2interpret(theta_max, interpret_theta);
+
 #ifdef PRINT_MSG 
     if(MPI_rank == 0){
         std::cout << "est. Hessian at theta param : " << interpret_theta.transpose() << std::endl;
@@ -1342,7 +1285,7 @@ double time_bfgs = 0.0;
     if(MPI_rank == fact_to_rank_list[1]){
 
         std::cout << "\nestimated mean fixed effects : " << mu.tail(nb).transpose() << std::endl;
-        std::cout << "estimated mean random effects: " << mu.head(10).transpose() << std::endl;
+        std::cout << "estimated mean random effects: " << mu.head(min(10, (int) n)).transpose() << std::endl;
         //std::cout << "time get fixed effects       : " << t_get_fixed_eff << " sec\n" << std::endl;
 
 //#ifdef PRINT_MSG
