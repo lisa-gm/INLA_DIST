@@ -493,7 +493,7 @@ double RGF<T>::FirstStageFactor()
     //gpuErrchk(cudaStreamWaitEvent(compute_stream, copy_gpu, 0));
 
 #ifdef PRINT_MSG
-    std::cout << "calling first Cholesky factorization now" << std::endl;
+    std::cout << "calling first Cholesky factorization now. NR = " << NR << ", mf_block_lda(IB, IB) = " << mf_block_lda(IB, IB) << std::endl;
 #endif
 
     t_init_supernode = get_time(t_init_supernode);
@@ -578,10 +578,10 @@ double RGF<T>::FirstStageFactor()
        // 
        swap_pointers(&blockR_dev, &blockM_dev);
 
-       nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
+       //nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
        init_supernode(blockR_dev, IB, magma_cudaStream_1);
        //init_supernode(blockR_dev, IB);
-       nvtxRangeEnd(id_initSN);
+       //nvtxRangeEnd(id_initSN);
 
        // UPDATE NEXT DIAGONAL BLOCK 
        //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
@@ -672,11 +672,11 @@ double RGF<T>::FirstStageFactor()
 
        t_temp = get_time(0.0);
 
-       nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_SN_toHost_inLoop");     
+       //nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_SN_toHost_inLoop");     
        cudaDeviceSynchronize();
        copy_supernode_to_host(blockR_dev, IB, copyStreamDtH);  
        //copy_supernode_to_host(blockR_dev, IB);
-       nvtxRangeEnd(id_Cpy_SN_host);             
+       //nvtxRangeEnd(id_Cpy_SN_host);             
        t_copy_DtH += get_time(t_temp);
    
     }  // end for loop IB
