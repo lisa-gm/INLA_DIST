@@ -17,6 +17,8 @@
 #include <iomanip>
 
 #include <Eigen/Dense>
+#include <Eigen/Core>
+#include <Eigen/SparseCholesky>
 //#include <Eigen/CholmodSupport>
 #include <unsupported/Eigen/KroneckerProduct>
 
@@ -24,6 +26,8 @@
 #include "PardisoSolver.h"
 #include "RGFSolver.h"
 //#include "RGFSolver_dummy.h"
+
+#include "Hyperparameters.h"
 
 //#define SMART_GRAD
 
@@ -76,6 +80,9 @@ class PostTheta{
 	Solver* solverQ;
 	Solver* solverQst;
 
+	string likelihood;  /**< assumed likelihood of the observations         */
+	Vect extraCoeffVecLik;
+
 	string solver_type;
 	string likelihood;
 
@@ -87,9 +94,14 @@ class PostTheta{
     Vect y; 		/**<  vector of observations y. has length no. 		*/
     Vect theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */
+	
+	Vector3i dimList;
+	Hyperparameters* theta_prior_test;
+	Hyperparameters* theta_test;
+	//Hyperparameters theta_prior_test = new Hyperparameters(dim_spatial_domain, manifold, dimList, theta_prior_param, theta_prior_param);
 
     // either Ax or B used
-    SpRmMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
+    SpMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
     						 observation locations onto FEM mesh and 
     						 includes covariates at the end.                */
     MatrixXd B; 		/**< if space (-time) model included in last 
@@ -183,7 +195,10 @@ class PostTheta{
      */	
 	PostTheta(int ns, int nt, int nb, int no, 
 		MatrixXd B, Vect y, 
-		Vect theta_prior, string solver_type,
+		Vect theta_prior, 
+		//Hyperparameters* theta_prior_test,
+		string likelihood, Vect extraCoeffVecLik,
+		string solver_type,
 		const bool constr, const MatrixXd Dxy,
 		const bool validate, const Vect w);
 	/**
@@ -200,7 +215,9 @@ class PostTheta{
      */	
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2,
-		Vect theta_prior, string solver_type, 
+		Vect theta_prior, 
+		string likelihood, Vect extraCoeffVecLik,
+		string solver_type, 
 		int dim_spatial_domain, string manifold,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w);
@@ -230,7 +247,9 @@ class PostTheta{
 	PostTheta(int ns, int nt, int nb, int no, 
 		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
 		SpMat M0, SpMat M1, SpMat M2, 
-		Vect theta_prior, string solver_type, 
+		Vect theta_prior, 
+		string likelihood, Vect extraCoeffVecLik,
+		string solver_type, 
 		int dim_spatial_domain, string manifold,
 		const bool constr, const MatrixXd Dx, const MatrixXd Dxy,
 		const bool validate, const Vect w); 
@@ -253,13 +272,15 @@ class PostTheta{
      * @param[in] M1_ diagonal matrix with diag(0.5, 0, ..., 0, 0.5) -> account for boundary
      * @param[in] M2_ stiffness matrix time.
      */
-	PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, 
-		SpRmMat Ax_, Vect y_, SpMat c0_, SpMat g1_, SpMat g2_, SpMat g3_, 
-		SpMat M0_, SpMat M1_, SpMat M2_, 
-		Vect theta_prior_param_, string solver_type_, 
-		int dim_spatial_domain_, string manifold_,
-		const bool constr_, const MatrixXd Dx_, const MatrixXd Dxy_, 
-		const bool validate_, const Vect w_);
+	PostTheta(int ns, int nt, int nss, int nb, int no, 
+		SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, 
+		SpMat M0, SpMat M1, SpMat M2, 
+		Vect theta_prior_param, 
+		string likelihood, Vect extraCoeffVecLik,
+		string solver_type, 
+		int dim_spatial_domain, string manifold,
+		const bool constr, const MatrixXd Dx, const MatrixXd Dxy, 
+		const bool validate, const Vect w);
 
 
 	/**
@@ -274,6 +295,8 @@ class PostTheta{
 #ifdef DATA_SYNTHETIC
     double compute_error_bfgs(Vect& theta);
 #endif
+
+	Hyperparameters create_hp(Vect param, char scale);
 
 	/**
 	 * @brief overwriting G every time, not explicitly listed, better way to do this? needs to be 
@@ -339,17 +362,28 @@ class PostTheta{
 	// FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED
 
 	/**
-     * @brief get conditional mean mu for theta.
+     * @brief get conditional mean mu for theta -- Gaussian case.
      * @param [in]    theta hyperparameter vector
      * @param [inout] mu vector of the conditional mean
      */	
 	void get_mu(Vect& theta, Vect& mu);
+
+	#if 0
+	/**
+     * @brief get conditional mean mu for non-Gaussian case with no hyperparamters.
+     * @param [in]    extraCoeffVecLik extra coefficients likelihood.
+     * @param [inout] mu vector of the conditional mean
+     */	
+	void get_mu(Vect& mu);
+	#endif
 
 	/**
      * @brief returns current gradient of theta.
      * @return gradient_theta
      */	
 	Vect get_grad();
+
+	void get_Qprior(Vect theta, SpMat& Qprior);
 
 	/**
      * @brief Compute Covariance matrix of hyperparameters theta, at theta.
@@ -358,9 +392,9 @@ class PostTheta{
      * @param [in] theta hyperparameter Vector
      * @return cov covariance matrix of the hyperparameters
      */	
-	MatrixXd get_Covariance(Vect& theta, double eps);
+	MatrixXd get_Covariance(Vect theta, double eps);
 
-	MatrixXd get_Cov_interpret_param(Vect& interpret_theta, double eps);
+	MatrixXd get_Cov_interpret_param(Vect interpret_theta, double eps);
 
 	double f_eval(Vect& theta);
 
@@ -370,7 +404,7 @@ class PostTheta{
  	 * @param[in]  	 Vector theta.
  	 * @param[inout] Vector with marginals of f.
      */	
-	void get_marginals_f(Vect& theta, Vect& vars);
+	void get_marginals_f(Vect& theta, Vect& mu, Vect& vars);
 
 	/**
      * @brief Compute the marginal variances of the latent parameters at theta. 
@@ -389,9 +423,9 @@ class PostTheta{
  	 * @return Dense Matrix with Hessian. 
  	 * \todo not yet parallelised .... 
      */	
-	MatrixXd hess_eval(Vect& theta, double eps);
+	MatrixXd hess_eval(Vect theta, double eps);
 
-	MatrixXd hess_eval_interpret_theta(Vect& interpret_theta, double eps);
+	MatrixXd hess_eval_interpret_theta(Vect interpret_theta, double eps);
 
 	/**
      * @brief check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small)
@@ -433,7 +467,6 @@ class PostTheta{
 
 	void eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det_Q, const MatrixXd& D, MatrixXd& W, double& val_log_dens);
 
-
 	/**
 	 * @brief evaluate log prior of random effects
 	 * @param[in] theta current theta vector
@@ -464,12 +497,15 @@ class PostTheta{
      */
 	void construct_Q_spat_temp(Vect& theta, SpMat& Qst);
 
+	void construct_Qprior(Vect& theta, SpMat& Qx);
+
 	/** @brief construct precision matrix. 
 	 * Calls spatial, spatial-temporal, etc.
      * @param[in] theta current theta vector
+	 * @param[in] mu     mode latent parameters
  	 * @param[inout] Q fills precision matrix
      */
-	void construct_Q(Vect& theta, SpMat& Q);
+	void construct_Q(Vect& theta, Vect& mu, SpMat& Q);
 
 	/** @brief Assemble right-handside. 
      * @param[in] theta current theta vector
@@ -491,16 +527,102 @@ class PostTheta{
 	void eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, Vect& mu);
 
 	// ============================================================================================ //
-	// FINITE DIFFERENCE GRADIENT EVALUATION
+	// INNER ITERATION & everything that is needed for it
 
-	/** @brief Compute gradient using central finite difference stencil. Parallelised with OpenMP 
-     * @param[in] theta current theta vector
- 	 * @param[in] f_theta value of f(theta) 
- 	 * @param[mu] mu 
- 	 * @param[inout] grad inserts gradient 
- 	 * \todo don't actually need gradient?
-     */
-	void eval_gradient(Vect& theta, double f_theta, Vect& mu, Vect& grad);
+	/** @brief evaluate Gaussian log prior (without log determinant!!), mean assumed to be zero
+     * @param[in] Qprior precision matrix
+	 * @param[in] x current x vector
+	 * @param[out] f_val evaluated log density
+	 */
+	double cond_LogPriorLat(SpMat& Qprior, Vect& x);
+
+	/** @brief evaluate log Poisson likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+	 * @param[out] f_val double. evaluated log density
+	 */
+	double cond_LogPoisLik(Vect& eta);
+
+	/** @brief evaluate negative log Poisson likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+	 * @param[out] f_val double. evaluated negative log density
+	 */
+	double cond_negLogPoisLik(Vect& eta);
+
+	/** @brief evaluate analytical negative gradient log Poisson likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+	 * @param[out] grad Vect. gradient.
+	 */
+	Vect grad_cond_negLogPoisLik(Vect& eta);
+
+	/** @brief evaluate analytical negative diagonal Hessian of log Poisson likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+	 * @param[out] diagHess Vect. diagonal of Hessian (off-diagonal entries are zero)
+	 */
+	Vect diagHess_cond_negLogPoisLik(Vect& eta);
+
+
+	/** @brief evaluate negative condiational log Poisson + Gaussian prior
+     * @param[in] Qprior SpMat. precision matrix.
+	 * @param[in] x Vector. current vector x.
+	 * @param[out] f_val double. evaluated negative log density
+	 */
+	double cond_negLogPois(SpMat& Qprior, Vect& x);
+
+	/** @brief link function. vectorized evaluation of sigmoid function for each entry
+     * @param[in] x Vector. current vector x.
+	 * @param[inout] sigmoidX Vector. sigmoid(x) element-wise.
+	 */
+	void link_f_sigmoid(Vect& x, Vect& sigmoidX);
+
+	/** @brief evaluate negative log Binomial likelihood
+	 * @param[in] extraCoeffVecLik Vector. ntrials.
+     * @param[in]  eta Vector. linear predictor eta = A*x.
+	 * @param[out] f_val double. evaluated negative log density.
+	 */
+	double cond_negLogBinomLik(Vect& eta);
+
+	/** @brief evaluate negative condiational log Poisson + Gaussian prior
+	 * @param[in] extraCoeffVecLik Vector. ntrials.
+     * @param[in] Qprior SpMat. precision matrix.
+	 * @param[in] x Vector. current vector x.
+	 * @param[out] f_val double. evaluated negative log density
+	 */
+	double cond_negLogBinom(SpMat& Qprior, Vect& x);
+
+	/** @brief evaluate negative condiational log likelihood + Gaussian prior
+	 * @param[in] extraCoeffVecLik Vector. 
+     * @param[in] Qprior SpMat. precision matrix.
+	 * @param[in] x Vector. current vector x.
+	 * @param[in] lik_func function. defines the likelihood
+	 * @param[out] f_val double. evaluated negative log density
+	 */
+	double cond_negLogDist(SpMat &Qprior, Vect& x, function<double(Vect&, Vect&)> lik_func);
+
+	/** @brief compute finite difference gradient. 1st order central difference. currently stepsize h fixed.
+	 * @param[in] extraCoeffVecLik Vector. 
+     * @param[in] eta Vector. linear predictor eta = A*x.
+	 * @param[in] lik_func function. defines the likelihood
+	 * @param[inout] grad Vector. gradient.
+	*/
+	void FD_gradient(Vect& eta, Vect& grad);
+
+	/** @brief compute finite difference diagonal of hessian. 2nd order central difference. currently stepsize h fixed.
+	 * @param[in] extraCoeffVecLik Vector. 
+     * @param[in] eta Vector. linear predictor eta = A*x.
+	 * @param[in] lik_func function. defines the likelihood
+	 * @param[inout] diag_hess Vector. diagonal of Hessian.
+	*/
+	void FD_diag_hessian(Vect& eta, Vect& diag_hess);
+
+	/**
+	 * @brief Newton iteration to find optimum of conditional distribution latent parameters of prior & likelihood
+	 * @param[in] extraCoeffVecLik Vector. 
+	 * @param[in] Qprior SpMat. precision matrix.
+	 * @param[in] lik_func function. defines the likelihood
+	 * @param[inout] x Vector. current vector x. gets updated in Newton iteration.
+	 */
+	void NewtonIter(SpMat& Qprior, Vect& x);
+
 
 	// measure times within each iterationstd::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
 	void record_times(std::string file_name, int iter_count, double t_Ftheta_ext, double t_thread_nom, double t_priorHyp, 
