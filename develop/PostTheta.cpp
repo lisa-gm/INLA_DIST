@@ -607,8 +607,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 
 	if(nss > 0){
 		// need to be careful about what theta values are accessed!! now dimension larger
-		Vect theta_dummy_spat = theta_dummy(seq(3,5));
-		construct_Q_spatial(theta_dummy_spat, Qs);
+		construct_Q_spatial(theta_dummy, Qs);
 		nnz_Qs = Qs.nonZeros();
 
 		// insert entries of Qs
@@ -2333,21 +2332,20 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		for (int k=0; k<Qst_prior.outerSize(); ++k){
 			for (SparseMatrix<double>::InnerIterator it(Qst_prior,k); it; ++it)
 			{
-			Qu.insert(it.row(),it.col()) = it.value();                 
+				Qu.insert(it.row(),it.col()) = it.value();                 
 			}
 		}
 
 		// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
 		SpMat Qs_prior(nss, nss);
-		Vect theta_sub = theta(seq(3,5));
-		construct_Q_spatial(theta_sub, Qs_prior);
+		construct_Q_spatial(theta, Qs_prior);
 		nnz_Qs = Qs.nonZeros();
 
 		// insert entries of Qs
 		for (int k=0; k<Qs_prior.outerSize(); ++k){
 			for (SparseMatrix<double>::InnerIterator it(Qs_prior,k); it; ++it)
 			{
-			Qu.insert(it.row()+nst,it.col()+nst) = it.value();                 
+				Qu.insert(it.row()+nst,it.col()+nst) = it.value();                 
 			}
 		}
 	} else if(nt == 1 && nss == 0) {
@@ -2356,6 +2354,34 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		printf("invalid parameter combination. In eval_log_prior_lat(). ns = %d, nt = %d, nss = %d\n", ns, nt, nss);
 		exit(1);
 	}
+
+	/*std::string Qprior_fileName = "Q_prior_InEvalPriorLat.txt";
+	SpMat A_lower = Qu.triangularView<Lower>();
+	std::cout << "theta in eval log prior lat : " << theta.transpose() << std::endl;
+
+	int n = A_lower.cols();
+	int nnz = A_lower.nonZeros();
+
+	ofstream sol_file(Qprior_fileName);
+	sol_file << n << "\n";
+	sol_file << n << "\n";
+	sol_file << nnz << "\n";
+
+	for (int i = 0; i < nnz; i++){
+		sol_file << A_lower.innerIndexPtr()[i] << "\n";
+	}   
+	for (int i = 0; i < n+1; i++){
+			sol_file << A_lower.outerIndexPtr()[i] << "\n";
+	}     
+	for (int i = 0; i < nnz; i++){
+		sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
+	}
+
+	sol_file.close();
+	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
+	*/
+
+	//exit(1);
 
 #ifdef RECORD_TIMES
 	t_priorLatAMat += omp_get_wtime();
@@ -2395,36 +2421,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 
 	}
 
-	/*
-	std::string Qprior_fileName = "Q_prior_InEvalPriorLat.txt";
-	SpMat A_lower = Qu.triangularView<Lower>();
-	std::cout << "theta in eval log prior lat : " << theta.transpose() << std::endl;
-
-	int n = A_lower.cols();
-	int nnz = A_lower.nonZeros();
-
-	ofstream sol_file(Qprior_fileName);
-	sol_file << n << "\n";
-	sol_file << n << "\n";
-	sol_file << nnz << "\n";
-
-	for (int i = 0; i < nnz; i++){
-		sol_file << A_lower.innerIndexPtr()[i] << "\n";
-	}   
-	for (int i = 0; i < n+1; i++){
-			sol_file << A_lower.outerIndexPtr()[i] << "\n";
-	}     
-	for (int i = 0; i < nnz; i++){
-		sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
-	}
-
-	sol_file.close();
-	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
-
-	exit(1);
-	*/
-
-	time_factorize_Qst += omp_get_wtime();
+		time_factorize_Qst += omp_get_wtime();
 
 #ifdef PRINT_MSG
 	std::cout << "val log prior lat " << val << std::endl;
@@ -2481,8 +2478,18 @@ void PostTheta::construct_Q_spatial(Vect& theta, SpMat& Qs){
 	} else if(dim_th == 3) {
 		exp_theta1 = exp(theta[1]);
 		exp_theta2 = exp(theta[2]);	
+	} else if(dim_th == 5) {
+		exp_theta1 = exp(theta[3]);
+		exp_theta2 = exp(theta[4]);	
+	} else if(dim_th == 6) {
+		exp_theta1 = exp(theta[4]);
+		exp_theta2 = exp(theta[5]);	
+	} else {
+		printf("inv construct_Q_spatial. unknown dim(theta) option!\n");
+		exit(1);
 	}
 
+	//printf("exp_theta1 = %f, exp_theta2 = %f\n", exp_theta1, exp_theta2);
 	//double exp_theta1 = -3;
 	//double exp_theta2 = 1.5;
 
@@ -2623,8 +2630,7 @@ void PostTheta::construct_Qprior(Vect& theta, SpMat& Qx){
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
-			Vect theta_sub = theta(seq(3,5));
-			construct_Q_spatial(theta_sub, Qs);
+			construct_Q_spatial(theta, Qs);
 			nnz_Qs = Qs.nonZeros();
 
 			// insert entries of Qs
@@ -2669,8 +2675,7 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
-			Vect theta_sub = theta(seq(3,5));
-			construct_Q_spatial(theta_sub, Qs);
+			construct_Q_spatial(theta, Qs);
 			nnz_Qs = Qs.nonZeros();
 
 			// insert entries of Qs

@@ -27,7 +27,7 @@
 #include "RGFSolver.h"
 //#include "RGFSolver_dummy.h"
 
-#include "Hyperparameters.h"
+//#include "Hyperparameters.h"
 
 //#define SMART_GRAD
 
@@ -84,7 +84,6 @@ class PostTheta{
 	Vect extraCoeffVecLik;
 
 	string solver_type;
-	string likelihood;
 
 	std::string prior;  /**<  type of pripr to be used                      */
 
@@ -96,10 +95,11 @@ class PostTheta{
  						      distribution with sd = 1 around these values. */
 	
 	Vector3i dimList;
+#if 0
 	Hyperparameters* theta_prior_test;
 	Hyperparameters* theta_test;
 	//Hyperparameters theta_prior_test = new Hyperparameters(dim_spatial_domain, manifold, dimList, theta_prior_param, theta_prior_param);
-
+#endif
     // either Ax or B used
     SpMat Ax;			/**< sparse matrix of size no x (nu+nb). Projects 
     						 observation locations onto FEM mesh and 
@@ -296,7 +296,7 @@ class PostTheta{
     double compute_error_bfgs(Vect& theta);
 #endif
 
-	Hyperparameters create_hp(Vect param, char scale);
+	//Hyperparameters create_hp(Vect param, char scale);
 
 	/**
 	 * @brief overwriting G every time, not explicitly listed, better way to do this? needs to be 
