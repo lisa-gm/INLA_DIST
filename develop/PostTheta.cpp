@@ -188,7 +188,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	dim_grad_loop      = 2*dim_th;
 	no_f_eval 		   = 2*dim_th + 1;
 
-
 	// one solver per thread, but not more than required
 	//num_solvers        = std::min(threads_level1, dim_grad_loop);
 	// makes sense to create more solvers than dim_grad_loop for hessian computation later.
@@ -355,6 +354,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
     }
 	//threads_level2 = 1;
 
+	likelihood = "gaussian";
+
 	
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
@@ -516,7 +517,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 
 	//mu.setZero(n);
 	//mu.setRandom(n);
-
 	mu = mu_initial;
 
 #ifdef PRINT_MSG
@@ -622,8 +622,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 
 	if(nss > 0){
 		// need to be careful about what theta values are accessed!! now dimension larger
-		Vect theta_dummy_spat = theta_dummy(seq(3,5));
-		construct_Q_spatial(theta_dummy_spat, Qs);
+		construct_Q_spatial(theta_dummy, Qs);
 		nnz_Qs = Qs.nonZeros();
 
 		// insert entries of Qs
@@ -736,7 +735,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
 
 	iter_count += 1; 
-	printf("\nBFGS iter = %d\n", iter_count);
+	//printf("\nBFGS iter = %d\n", iter_count);
 	int dim_th = theta.size();
 
 	// configure finite difference approximation (along coordinate axes or smart gradient)
@@ -801,7 +800,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		t_Ftheta_ext = -omp_get_wtime();
 #endif
 		//printf("\ni = 0. eval f(theta), ");
-		std::cout << "theta = " << theta.transpose() << std::endl;
+		//std::cout << "theta = " << theta.transpose() << std::endl;
 		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
 		//std::cout << "before record times section." << std::endl;
@@ -942,36 +941,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		iter_acc += 1;
 		double t_bfgs_iter_temp = omp_get_wtime() + t_bfgs_iter; 
 		if(MPI_rank == 0){
-
-			if(dim_th < 4){
-				std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
-			} else if(dim_th == 4){
-				//std::cout << "\n>>>>>> theta : " << std::right << std::fixed << theta.transpose() << ",    f_theta : " << std::right << std::fixed << f_theta << "<<<<<<" << std::endl;
-				//std::cout << "theta: " << std::right << std::fixed << theta.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
-				//std::cout << "f_theta : " << std::right << std::fixed << f_theta << std::endl;
-				//std::cout << "grad : " << grad.transpose() << std::endl;
-				Vect theta_interpret(4); theta_interpret[0] = theta[0];
-				convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-				std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta;
-				//std::cout << "iter: " << std::right << std::fixed << iter_acc << "   time: " << t_bfgs_iter_temp <<  "   theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta; // << std::endl;
-#ifdef DATA_SYNTHETIC
-				// compute error = norm(theta - theta_original)
-				double err = compute_error_bfgs(theta);
-				std::cout << std::right << std::fixed << "    error: " << err << std::endl;
-#else
-				std::cout << std::endl;
-#endif	
-			} else if(dim_th == 6){
-			// assume that we have additional spatial field
-				//std::cout << "theta : " << std::right << std::fixed << theta.transpose() << "     f(theta): " << f_theta << std::endl;
-				Vect theta_interpret(dim_th);
-				theta_interpret[0] = theta[0];
-				convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-				//theta_interpret << 0.5, 10, 1, 4; 
-				convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
-
-				std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
-			}		
+			Vect theta_interpret(dim_th);
+			convert_theta2interpret(theta, theta_interpret);
+			std::cout << "theta interpret: " << std::right << std::fixed << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 		}
 
 		// alternatively ...
@@ -1079,6 +1051,8 @@ void PostTheta::computeG(Vect& theta){
 
 #endif // endif ifdef smart gradient
 
+
+#if 0 // reactivate if needed
 // create hyperparameter object
 Hyperparameters PostTheta::create_hp(Vect param, char scale){
 
@@ -1100,7 +1074,7 @@ Hyperparameters PostTheta::create_hp(Vect param, char scale){
 	return theta_param;
 }
 
-
+#endif
 
 // need to write this for MPI ... all gather .. sum.
 int PostTheta::get_fct_count(){
@@ -1198,8 +1172,8 @@ void PostTheta::convert_interpret2theta(Vect& theta_interpret, Vect& theta){
 		exit(1);
 	}
 
-	std::cout << "theta           = " << theta.transpose() << std::endl;
-	std::cout << "theta interpret = " << theta_interpret.transpose() << std::endl;
+	//std::cout << "theta           = " << theta.transpose() << std::endl;
+	//std::cout << "theta interpret = " << theta_interpret.transpose() << std::endl;
 
 }
 
@@ -1860,17 +1834,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 		Vect mu_tmp(n); 
 		// convert interpret_theta to theta
 		Vect theta(dim_th);
-		theta[0] = interpret_theta[0];
-		if(ns > 0 && nt > 1){
-			convert_interpret2theta_spatTemp(interpret_theta[1], interpret_theta[2], interpret_theta[3], theta[1], theta[2], theta[3]);
-			if(nss > 0){
-				convert_interpret2theta_spat(interpret_theta[4], interpret_theta[5], theta[4], theta[5]);
-			}
-		} else if(ns > 0 && nt == 1 && dim_th == 3){
-				convert_interpret2theta_spat(interpret_theta[1], interpret_theta[2], theta[1], theta[2]);
-		} else if(ns > 0 && nt == 1 && dim_th == 2){
-				convert_interpret2theta_spat(interpret_theta[0], interpret_theta[1], theta[0], theta[1]);
-		}
+		convert_interpret2theta(interpret_theta, theta);
+
 		double f_theta = eval_post_theta(theta, mu_tmp);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
     }
@@ -1892,17 +1857,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 	            Vect mu_tmp(n);
             	Vect interpret_theta_forw_i = interpret_theta+epsG.col(i);
             	Vect theta_forw_i(dim_th);
-				theta_forw_i[0] = interpret_theta_forw_i[0];
-				if(ns > 0 && nt > 1){
-					convert_interpret2theta_spatTemp(interpret_theta_forw_i[1], interpret_theta_forw_i[2], interpret_theta_forw_i[3], theta_forw_i[1], theta_forw_i[2], theta_forw_i[3]);
-					if(nss > 0){
-						convert_interpret2theta_spat(interpret_theta_forw_i[4], interpret_theta_forw_i[5], theta_forw_i[4], theta_forw_i[5]);
-					}
-				} else if(ns > 0 && nt == 1 && dim_th == 3){
-					convert_interpret2theta_spat(interpret_theta_forw_i[1], interpret_theta_forw_i[2], theta_forw_i[1], theta_forw_i[2]);
-				} else if(ns > 0 && nt == 1 && dim_th == 2){
-					convert_interpret2theta_spat(interpret_theta_forw_i[0], interpret_theta_forw_i[1], theta_forw_i[0], theta_forw_i[1]);
-				}
+				convert_interpret2theta(interpret_theta_forw_i, theta_forw_i);
+
 				f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu_tmp); 
             }
             counter++;
@@ -1912,17 +1868,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 	            Vect mu_tmp(n);
 				Vect interpret_theta_back_i = interpret_theta-epsG.col(i);
             	Vect theta_back_i(dim_th);
-				theta_back_i[0] = interpret_theta_back_i[0];
-				if(ns > 0 && nt > 1){
-				convert_interpret2theta_spatTemp(interpret_theta_back_i[1], interpret_theta_back_i[2], interpret_theta_back_i[3], theta_back_i[1], theta_back_i[2], theta_back_i[3]);
-					if(nss > 0){
-						convert_interpret2theta_spat(interpret_theta_back_i[4], interpret_theta_back_i[5], theta_back_i[4], theta_back_i[5]);
-					}
-				} else if(ns > 0 && nt == 1 && dim_th == 3){
-					convert_interpret2theta_spat(interpret_theta_back_i[1], interpret_theta_back_i[2], theta_back_i[1], theta_back_i[2]);
-				} else if(ns > 0 && nt == 1 && dim_th == 2){
-					convert_interpret2theta_spat(interpret_theta_back_i[0], interpret_theta_back_i[1], theta_back_i[0], theta_back_i[1]);
-				}
+				convert_interpret2theta(interpret_theta_back_i, theta_back_i);
+
 				f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu_tmp);
             }
             counter++;
@@ -1936,17 +1883,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 	            Vect mu_tmp(n);
 				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsG.col(i)+epsG.col(j);
             	Vect theta_forw_i_j(dim_th);
-				theta_forw_i_j[0] = interpret_theta_forw_i_j[0];
-				if(ns > 0 && nt > 1){
-					convert_interpret2theta_spatTemp(interpret_theta_forw_i_j[1], interpret_theta_forw_i_j[2], interpret_theta_forw_i_j[3], theta_forw_i_j[1], theta_forw_i_j[2], theta_forw_i_j[3]);
-					if(nss > 0){
-						convert_interpret2theta_spat(interpret_theta_forw_i_j[4], interpret_theta_forw_i_j[5], theta_forw_i_j[4], theta_forw_i_j[5]);
-					}
-				} else if(ns > 0 && nt == 1 && dim_th == 3){
-					convert_interpret2theta_spat(interpret_theta_forw_i_j[1], interpret_theta_forw_i_j[2], theta_forw_i_j[1], theta_forw_i_j[2]);
-				} else if(ns > 0 && nt == 1 && dim_th == 2){
-					convert_interpret2theta_spat(interpret_theta_forw_i_j[0], interpret_theta_forw_i_j[1], theta_forw_i_j[0], theta_forw_i_j[1]);
-				}
+				convert_interpret2theta(interpret_theta_forw_i_j, theta_forw_i_j);
+
 				f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu_tmp); 
             }
             counter++;
@@ -1956,6 +1894,9 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsG.col(i)-epsG.col(j);
             	Vect theta_forw_i_back_j(dim_th);
+				convert_interpret2theta(interpret_theta_forw_i_back_j, theta_forw_i_back_j);
+
+				/*
 				theta_forw_i_back_j[0] = interpret_theta_forw_i_back_j[0];
 				if(ns > 0 && nt > 1){
 					convert_interpret2theta_spatTemp(interpret_theta_forw_i_back_j[1], interpret_theta_forw_i_back_j[2], interpret_theta_forw_i_back_j[3], theta_forw_i_back_j[1], theta_forw_i_back_j[2], theta_forw_i_back_j[3]);
@@ -1967,6 +1908,7 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 				} else if(ns > 0 && nt == 1 && dim_th == 2){
 					convert_interpret2theta_spat(interpret_theta_forw_i_back_j[0], interpret_theta_forw_i_back_j[1], theta_forw_i_back_j[0], theta_forw_i_back_j[1]);
 				}
+				*/
 				f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu_tmp); 
             }
             counter++;
@@ -1976,17 +1918,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 	            Vect mu_tmp(n);
 	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsG.col(i)+epsG.col(j);
             	Vect theta_back_i_forw_j(dim_th);
-				theta_back_i_forw_j[0] = interpret_theta_back_i_forw_j[0];
-				if(ns > 0 && nt > 1){
-					convert_interpret2theta_spatTemp(interpret_theta_back_i_forw_j[1], interpret_theta_back_i_forw_j[2], interpret_theta_back_i_forw_j[3], theta_back_i_forw_j[1], theta_back_i_forw_j[2], theta_back_i_forw_j[3]);
-	        		if(nss > 0){
-						convert_interpret2theta_spat(interpret_theta_back_i_forw_j[4], interpret_theta_back_i_forw_j[5], theta_back_i_forw_j[4], theta_back_i_forw_j[5]);
-					}
-				} else if(ns > 0 && nt == 1 && dim_th == 3){
-					convert_interpret2theta_spat(interpret_theta_back_i_forw_j[1], interpret_theta_back_i_forw_j[2], theta_back_i_forw_j[1], theta_back_i_forw_j[2]);
-				} else if(ns > 0 && nt == 1 && dim_th == 2){
-					convert_interpret2theta_spat(interpret_theta_back_i_forw_j[0], interpret_theta_back_i_forw_j[1], theta_back_i_forw_j[0], theta_back_i_forw_j[1]);
-				}	
+				convert_interpret2theta(interpret_theta_back_i_forw_j, theta_back_i_forw_j);
+
 				f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu_tmp); 
             }
             counter++;
@@ -1996,17 +1929,8 @@ MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
 	            Vect mu_tmp(n);
             	Vect interpret_theta_back_i_j 	   = interpret_theta-epsG.col(i)-epsG.col(j);
             	Vect theta_back_i_j(dim_th);
-				theta_back_i_j[0] = interpret_theta_back_i_j[0];
-				if(ns > 0 && nt > 1){
-					convert_interpret2theta_spatTemp(interpret_theta_back_i_j[1], interpret_theta_back_i_j[2], interpret_theta_back_i_j[3], theta_back_i_j[1], theta_back_i_j[2], theta_back_i_j[3]);
-	        		if(nss > 0){
-						convert_interpret2theta_spat(interpret_theta_back_i_j[4], interpret_theta_back_i_j[5], theta_back_i_j[4], theta_back_i_j[5]);
-					}
-				} else if(ns > 0 && nt == 1 && dim_th == 3){
-					convert_interpret2theta_spat(interpret_theta_back_i_j[1], interpret_theta_back_i_j[2], theta_back_i_j[1], theta_back_i_j[2]);
-				} else if(ns > 0 && nt == 1 && dim_th == 2){
-					convert_interpret2theta_spat(interpret_theta_back_i_j[0], interpret_theta_back_i_j[1], theta_back_i_j[0], theta_back_i_j[1]);
-				}
+				convert_interpret2theta(interpret_theta_back_i_j, theta_back_i_j);
+
 				f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu_tmp); 
             }
             counter++;            
@@ -2189,12 +2113,9 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	if(prior == "gaussian"){   // || dim_th != 4
 		// evaluate gaussian prior
-		Vect log_prior_vec(dim_th);
-		for( int i=0; i<dim_th; i++ ){
-			eval_log_gaussian_prior_hp(log_prior_vec[i], &theta[i], &theta_prior_param[i]);
-		}
-	    
-		log_prior_sum = log_prior_vec.sum();
+		Vect theta_interpret(dim_th);
+		convert_theta2interpret(theta, theta_interpret);
+		eval_log_gaussian_prior_hp(theta_interpret, theta_prior_param, log_prior_sum);
 
 	} else if(prior == "pc"){
 		// pc prior
@@ -2344,22 +2265,23 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	if(prior == "gaussian"){   // || dim_th != 4
 		// evaluate gaussian prior
-		Vect log_prior_vec(dim_th);
-		for( int i=0; i<dim_th; i++ ){
-			eval_log_gaussian_prior_hp(log_prior_vec[i], &theta[i], &theta_prior_param[i]);
-		}
-	    
-		log_prior_sum = log_prior_vec.sum();
+		Vect theta_interpret(dim_th);
+		convert_theta2interpret(theta, theta_interpret);
+		eval_log_gaussian_prior_hp(theta_interpret, theta_prior_param, log_prior_sum);
 
 	} else if(prior == "pc"){
 		// pc prior
 		Vect theta_interpret(dim_th); 
+		convert_theta2interpret(theta, theta_interpret);
+
+		/*
 		theta_interpret[0] = theta[0];
 		convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
 		//theta_interpret << 0.5, 10, 1, 4; 
 		if(nss > 0){
 			convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
 		}
+		*/
 
 		//Vect lambda(4);
 		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
@@ -2484,13 +2406,13 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 #endif // old eval_poth_theta_function
 
-void PostTheta::eval_log_gaussian_prior_hp(double& log_prior, double* thetai, double* thetai_original){
+void PostTheta::eval_log_gaussian_prior_hp(Vect& theta_interpret, Vect& theta_prior_param, double& log_prior){
 
-	log_prior = -0.5 * (*thetai - *thetai_original) * (*thetai - *thetai_original);
+	log_prior = -0.5 * (theta_interpret - theta_prior_param).transpose() * (theta_interpret - theta_prior_param);
 
-	#ifdef PRINT_MSG
-		std::cout << "log prior for theta_i " << (*thetai) << " : " << (log_prior) << std::endl;
-	#endif
+#ifdef PRINT_MSG
+		std::cout << "theta param : " << theta_interpret.transpose() << ", log prior sum : " << log_prior << std::endl;
+#endif
 }
 
 // NEW ORDER sigma.e, range s, range t, sigma.u + range s spat, sigma u spat
@@ -2639,27 +2561,54 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 		for (int k=0; k<Qst_prior.outerSize(); ++k){
 			for (SparseMatrix<double>::InnerIterator it(Qst_prior,k); it; ++it)
 			{
-			Qu.insert(it.row(),it.col()) = it.value();                 
+				Qu.insert(it.row(),it.col()) = it.value();                 
 			}
 		}
 
 		// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
 		SpMat Qs_prior(nss, nss);
-		Vect theta_sub = theta(seq(3,5));
-		construct_Q_spatial(theta_sub, Qs_prior);
+		construct_Q_spatial(theta, Qs_prior);
 		nnz_Qs = Qs.nonZeros();
 
 		// insert entries of Qs
 		for (int k=0; k<Qs_prior.outerSize(); ++k){
 			for (SparseMatrix<double>::InnerIterator it(Qs_prior,k); it; ++it)
 			{
-			Qu.insert(it.row()+nst,it.col()+nst) = it.value();                 
+				Qu.insert(it.row()+nst,it.col()+nst) = it.value();                 
 			}
 		}
 	} else {
 		printf("invalid parameter combination. In eval_log_prior_lat(). ns = %d, nt = %d, nss = %d\n", ns, nt, nss);
 		exit(1);
 	}
+
+	/*std::string Qprior_fileName = "Q_prior_InEvalPriorLat.txt";
+	SpMat A_lower = Qu.triangularView<Lower>();
+	std::cout << "theta in eval log prior lat : " << theta.transpose() << std::endl;
+
+	int n = A_lower.cols();
+	int nnz = A_lower.nonZeros();
+
+	ofstream sol_file(Qprior_fileName);
+	sol_file << n << "\n";
+	sol_file << n << "\n";
+	sol_file << nnz << "\n";
+
+	for (int i = 0; i < nnz; i++){
+		sol_file << A_lower.innerIndexPtr()[i] << "\n";
+	}   
+	for (int i = 0; i < n+1; i++){
+			sol_file << A_lower.outerIndexPtr()[i] << "\n";
+	}     
+	for (int i = 0; i < nnz; i++){
+		sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
+	}
+
+	sol_file.close();
+	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
+	*/
+
+	//exit(1);
 
 #ifdef RECORD_TIMES
 	t_priorLatAMat += omp_get_wtime();
@@ -2699,36 +2648,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 
 	}
 
-	/*
-	std::string Qprior_fileName = "Q_prior_InEvalPriorLat.txt";
-	SpMat A_lower = Qu.triangularView<Lower>();
-	std::cout << "theta in eval log prior lat : " << theta.transpose() << std::endl;
-
-	int n = A_lower.cols();
-	int nnz = A_lower.nonZeros();
-
-	ofstream sol_file(Qprior_fileName);
-	sol_file << n << "\n";
-	sol_file << n << "\n";
-	sol_file << nnz << "\n";
-
-	for (int i = 0; i < nnz; i++){
-		sol_file << A_lower.innerIndexPtr()[i] << "\n";
-	}   
-	for (int i = 0; i < n+1; i++){
-			sol_file << A_lower.outerIndexPtr()[i] << "\n";
-	}     
-	for (int i = 0; i < nnz; i++){
-		sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
-	}
-
-	sol_file.close();
-	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
-
-	exit(1);
-	*/
-
-	time_factorize_Qst += omp_get_wtime();
+		time_factorize_Qst += omp_get_wtime();
 
 #ifdef PRINT_MSG
 	std::cout << "val log prior lat " << val << std::endl;
@@ -2804,8 +2724,18 @@ void PostTheta::construct_Q_spatial(Vect& theta, SpMat& Qs){
 	} else if(dim_th == 3) {
 		exp_theta1 = exp(theta[1]);
 		exp_theta2 = exp(theta[2]);	
+	} else if(dim_th == 5) {
+		exp_theta1 = exp(theta[3]);
+		exp_theta2 = exp(theta[4]);	
+	} else if(dim_th == 6) {
+		exp_theta1 = exp(theta[4]);
+		exp_theta2 = exp(theta[5]);	
+	} else {
+		printf("inv construct_Q_spatial. unknown dim(theta) option!\n");
+		exit(1);
 	}
 
+	//printf("exp_theta1 = %f, exp_theta2 = %f\n", exp_theta1, exp_theta2);
 	//double exp_theta1 = -3;
 	//double exp_theta2 = 1.5;
 
@@ -2946,8 +2876,7 @@ void PostTheta::construct_Qprior(Vect& theta, SpMat& Qx){
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
-			Vect theta_sub = theta(seq(3,5));
-			construct_Q_spatial(theta_sub, Qs);
+			construct_Q_spatial(theta, Qs);
 			nnz_Qs = Qs.nonZeros();
 
 			// insert entries of Qs
@@ -2992,8 +2921,7 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
-			Vect theta_sub = theta(seq(3,5));
-			construct_Q_spatial(theta_sub, Qs);
+			construct_Q_spatial(theta, Qs);
 			nnz_Qs = Qs.nonZeros();
 
 			// insert entries of Qs

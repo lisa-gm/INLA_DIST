@@ -27,7 +27,7 @@
 #include "RGFSolver.h"
 //#include "RGFSolver_dummy.h"
 
-#include "Hyperparameters.h"
+//#include "Hyperparameters.h"
 
 //#define SMART_GRAD
 
@@ -92,13 +92,14 @@ class PostTheta{
     int iter_acc;
     Vect y;         /**<  vector of observations y. has length no.      */
     Vect theta_prior_param; /**<  vector with prior values. Constructs normal
-                              distribution with sd = 1 around these values. */
-    
-    Vector3i dimList;
-    Hyperparameters* theta_prior_test;
-    Hyperparameters* theta_test;
-    //Hyperparameters theta_prior_test = new Hyperparameters(dim_spatial_domain, manifold, dimList, theta_prior_param, theta_prior_param);
-
+ 						      distribution with sd = 1 around these values. */
+	
+	Vector3i dimList;
+#if 0
+	Hyperparameters* theta_prior_test;
+	Hyperparameters* theta_test;
+	//Hyperparameters theta_prior_test = new Hyperparameters(dim_spatial_domain, manifold, dimList, theta_prior_param, theta_prior_param);
+#endif
     // either Ax or B used
     SpMat Ax;           /**< sparse matrix of size no x (nu+nb). Projects 
                              observation locations onto FEM mesh and 
@@ -300,7 +301,7 @@ class PostTheta{
     double compute_error_bfgs(Vect& theta);
 #endif
 
-    Hyperparameters create_hp(Vect param, char scale);
+	//Hyperparameters create_hp(Vect param, char scale);
 
     /**
      * @brief overwriting G every time, not explicitly listed, better way to do this? needs to be 
@@ -312,34 +313,33 @@ class PostTheta{
     // ============================================================================================ //
     // CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
 
-    void convert_theta2interpret(Vect& theta, Vect& theta_interpret);
+	void convert_theta2interpret(Vect& theta, Vect& theta_interpret);
 
-    void convert_interpret2theta(Vect& theta_interpret, Vect& theta);
-
-    /**
-     * @brief convert hyperparameters theta from the model parametrisation to the interpretable
-     * parametrisation ie. from log(gamma_E, gamma_s, gamma_t) to log(sigma.u, rangeS, rangeT)
-     * @param [in]      log(gamma_E)
-     * @param [in]      log(gamma_s)
-     * @param [in]      log(gamma_t)
-     * @param [inout]   log(sigma.u) precision of random effects
-     * @param [inout]   log(ranS)    spatial range
-     * @param [inout]   log(ranT)    temporal range
-     */
-    void convert_theta2interpret_spatTemp(double lgamE, double lgamS, double lgamT, double& sigU, double& ranS, double& ranT);
-    
-    /**
-     * @brief convert hyperparameters theta from the interpretable parametrisation to the
-     * model parametrisation ie. from log(sigma.u, rangeS, rangeT) to log(gamma_E, gamma_s, gamma_t)
-     * @param [in]      log(sigma.u) precision of random effects
-     * @param [in]      log(ranS)    spatial range
-     * @param [in]      log(ranT)    temporal range
-     * @param [inout]   log(gamma_E) 
-     * @param [inout]   log(gamma_s)
-     * @param [inout]   log(gamma_t)
-     */
-    void convert_interpret2theta_spatTemp(double sigU, double ranS, double ranT, double& lgamE, double& lgamS, double& lgamT);
-
+	void convert_interpret2theta(Vect& theta_interpret, Vect& theta);
+	
+	/**
+	 * @brief convert hyperparameters theta from the model parametrisation to the interpretable
+	 * parametrisation ie. from log(gamma_E, gamma_s, gamma_t) to log(sigma.u, rangeS, rangeT)
+	 * @param [in]		log(gamma_E)
+	 * @param [in]		log(gamma_s)
+	 * @param [in]		log(gamma_t)
+	 * @param [inout]	log(sigma.u) precision of random effects
+	 * @param [inout]	log(ranS) 	 spatial range
+	 * @param [inout]	log(ranT) 	 temporal range
+	 */
+	void convert_theta2interpret_spatTemp(double lgamE, double lgamS, double lgamT, double& sigU, double& ranS, double& ranT);
+	
+	/**
+	 * @brief convert hyperparameters theta from the interpretable parametrisation to the
+	 * model parametrisation ie. from log(sigma.u, rangeS, rangeT) to log(gamma_E, gamma_s, gamma_t)
+	 * @param [in]		log(sigma.u) precision of random effects
+	 * @param [in]		log(ranS) 	 spatial range
+	 * @param [in]		log(ranT) 	 temporal range
+	 * @param [inout]	log(gamma_E) 
+	 * @param [inout]	log(gamma_s)
+	 * @param [inout]	log(gamma_t)
+	 */
+	void convert_interpret2theta_spatTemp(double sigU, double ranS, double ranT, double& lgamE, double& lgamS, double& lgamT);
 
     /**
      * @brief convert hyperparameters theta from the interpretable parametrisation to the
@@ -452,11 +452,11 @@ class PostTheta{
      * @brief evaluate log prior of the hyperparameters using original theta value
      * @param[in] thetai current theta_i value
      * @param[in] thetai_original original theta_i value
-     * @param[inout] log prior is being updated.
-     * @details variance / precision of 1 : no normalising constant. 
-     * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
-     */ 
-    void eval_log_gaussian_prior_hp(double& log_prior, double* thetai, double* thetai_original);
+ 	 * @param[inout] log prior is being updated.
+ 	 * @details variance / precision of 1 : no normalising constant. 
+ 	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
+     */	
+	void eval_log_gaussian_prior_hp(Vect& theta_param, Vect& theta_prior_param, double& log_prior);
 
     /**
      * @brief evaluate log prior using PC prior 

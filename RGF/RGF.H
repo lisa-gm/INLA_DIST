@@ -162,6 +162,10 @@ private:
 template <class T>
 RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
 {
+   if(ns == 0){
+      printf("ns = %ld, nt = %ld. no spatial field. Just fixed effects. Consider using a different solver!\n", ns, nt);
+      exit(1);
+   }
    // only set up indices etc. no values yet.
 
 #ifdef CUDA_POTRF
@@ -170,9 +174,6 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
    printf("using MAGMA POTRF.\n");
 #endif
    
-    //matrix_ia = ia;
-    //matrix_ja = ja;
-    //matrix_a = a;
     matrix_ns = ns;
     matrix_nt = nt;
     matrix_nd = nd;
@@ -1705,15 +1706,22 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          gpuErrchk(cudaEventRecord(potrf_dev_ev, magma_cudaStream_1)); 
          gpuErrchk(cudaStreamWaitEvent(copyStream, potrf_dev_ev, 0));
 
+         nvtxRangeId_t id_initSN = nvtxRangeStartA("CpySNtoDevice");
          copy_supernode_to_device(blockM_dev, IB-1, copyStream);
+         nvtxRangeEnd(id_initSN);
          //cudaDeviceSynchronize();     
       }
 
       if (matrix_nd > 0)
       {
+         nvtxRangeId_t id_denseGEMMS = nvtxRangeStartA("GEMMsDenseRows");
+
+         nvtxRangeId_t id_firstDenseGEMM = nvtxRangeStartA("FirstDenseGEMM");
          // tmp3_dev = L_Fi^T*Gn+1n+1 // 
          tgemm_dev('T', 'N', NR, ND, ND, ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), blockDense_dev, mf_block_lda(NBlock-1, NBlock-1), ZERO, tmp3_dev, NR, magma_queue_1);
          flop_count += 2.0 * NR * ND * ND;
+
+         nvtxRangeEnd(id_firstDenseGEMM);
 
          // tmp1_dev = tmp3_dev*L_Fi + tmp1_dev
          tgemm_dev('N', 'N', NR, NR, ND, ONE, tmp3_dev, NR, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), ONE, tmp1_dev, NR, magma_queue_1);
@@ -1726,7 +1734,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          // step 1: tmp4_dev = L_Fi^T*Gn+1i+1, dim(tmp2_dev) = (ns,ns)
          tgemm_dev('T', 'N', NP, NR, ND, ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), G_dense_i_dev, ND, ZERO, tmp4_dev, NR, magma_queue_1);
          flop_count += 2.0 * NP * NR * ND;
-
+         
 #ifdef PRINT_MSG
          if(NR*NR < 200){
             cudaMemcpy(tmp4, tmp4_dev,NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
@@ -1850,6 +1858,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
  #endif
          } // end cpy invBlks
 
+         nvtxRangeEnd(id_denseGEMMS); // goes through entire if statement
       } // end if matrix_nd > 0
 
       // tmp2_dev = blockR_dev^T*tmp1_dev => tmp2_dev = L^-T*tmp1_dev
