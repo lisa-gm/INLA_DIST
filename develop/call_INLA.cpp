@@ -104,6 +104,8 @@ void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& 
 
 int main(int argc, char* argv[])
 {
+    int whatever = 2;
+
     // start timer for overall runtime
     double t_total = -omp_get_wtime();
 
@@ -261,6 +263,9 @@ int main(int argc, char* argv[])
     SpMat Ax; 
     Vect y;
 
+    // not needed for Gaussian case. Initialize to zero otherwise ...
+    Vect mu_initial = Vect::Zero(n);
+
     // additional coefficient vector: Poisson / Binomial data
     Vect extraCoeffVecLik;
 
@@ -338,7 +343,8 @@ int main(int argc, char* argv[])
         // read in design matrix 
         // files containing B
         std::cout << "no: " << no_s << ", nb: " << nb_s << std::endl;
-        std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
+        //std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
+        std::string B_file        =  base_path + "/A_" + no_s + "_" + nb_s + ".dat";        
         file_exists(B_file); 
 
         if(MPI_rank == 0){
@@ -506,12 +512,21 @@ int main(int argc, char* argv[])
         std::cout << "sum(y) = " << y.sum() << std::endl;
     }
 
+    Vect mean_latent_original(n);
     if(likelihood.compare("poisson") == 0 || likelihood.compare("binomial") == 0){
         // TODO: something like if does not exist assume all ONES ??
         std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
         file_exists(extraCoeffVecLik_file);
         extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
-        std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;        
+        std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;    
+
+        std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
+        file_exists(mean_latent_file);
+        mean_latent_original = read_matrix(mean_latent_file, n, 1);  
+        std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;    
+        mu_initial = mean_latent_original + Vect::Random(n);
+        std::cout << "mu initial : " << mu_initial.head(min(10, int (n))).transpose() << std::endl;    
+
     }
 
 //#endif
@@ -603,9 +618,9 @@ int main(int argc, char* argv[])
 
         //theta_prior_param << 1, -2.3, 2.1;
         //theta_prior_test.update_modelS(theta_prior_param);
-        theta_param << theta_original + Vect::Random(dim_th);
+        theta_param << theta_original_param; // + Vect::Random(dim_th);
 
-        std::cout << "initial theta : "  << theta.transpose() << std::endl;   
+        std::cout << "initial theta param : "  << theta_param.transpose() << std::endl;   
 
     } else {
 
@@ -669,7 +684,8 @@ int main(int argc, char* argv[])
             // same order as above
             //theta_param << 3, 0.5, 0.5, 2, -1, 2;
             //theta_param        << 1.4228949,     0.4164521,      1.0990791,    1.4407530,  -1.1989102, 1.1071601;
-            theta_param <<  4, 1, 3, 2, -1, 0;
+            //theta_param <<  4, 1, 3, 2, -1, 0;
+            theta_param << 1.033, 0.4312, 0.7562, 0.2422, 1.608, -0.4946;
             //theta_test.update_interpretS(theta_param);
         }
 
@@ -1028,30 +1044,34 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "Call constructor for regression model." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, constr, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, constr, Dxy, validate, w);
     } else if(ns > 0 && nt == 1 && nss == 0) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss == 0){
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss > 0){
          if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor with add. spatial field." << std::endl;
         } 
         std::cout << "theta prior param = " << theta_prior_param.transpose() << std::endl;
-        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else {
         printf("invalid combination of parameters!\n");
         printf("ns = %ld, nt = %ld, nss = %ld\n", ns, nt, nss);
         exit(1);
     }
 
+    Vect theta_test(dim_th);
+    Vect theta_param_test(dim_th);
+    fun->convert_interpret2theta(theta_param, theta_test);
+    fun->convert_theta2interpret(theta_test, theta_param_test);
 
 #if 1
     if(MPI_rank == 0)
@@ -1059,9 +1079,8 @@ int main(int argc, char* argv[])
 
     if(MPI_rank == 0){
         // TO BE deleted later
-        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         std::cout << "theta prior param  : " << theta_prior_param.transpose() << std::endl;
-
+        //std::cout << "theta orig. param  : " << theta_original_param.transpose() << std::endl;
         //std::cout << "theta original     : " << std::right << std::fixed << theta_original_test.flatten_modelS().transpose() << std::endl;
         //std::cout << "theta prior param  : " << theta_prior_test.flatten_modelS().transpose() << std::endl;
     }
@@ -1088,6 +1107,11 @@ int main(int argc, char* argv[])
     } else if(dim_th == 2){
         fun->convert_interpret2theta_spat(theta_param[0], theta_param[1], theta[0], theta[1]);
         fun->convert_interpret2theta_spat(theta_original_param[0], theta_original_param[1], theta_original[0], theta_original[1]);
+        std::cout << "theta original param : " << theta_original_param.transpose() << std::endl;
+        std::cout << "theta initial  param : " << theta_param.transpose() << std::endl;
+
+        std::cout << "\ntheta original       : " << theta_original.transpose() << std::endl;
+        std::cout << "theta initial        : " << theta.transpose() << std::endl;
 
     } else if(dim_th == 3){
         theta[0] = theta_param[0];
@@ -1097,8 +1121,8 @@ int main(int argc, char* argv[])
     }
 
     if(MPI_rank == 0){
-        std::cout << "theta interpret. param.         : " << theta_param.transpose() << std::endl;
-	    std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;
+        //std::cout << "theta interpret. param.         : " << theta_param.transpose() << std::endl;
+	    //std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;
     }
 
 #ifdef WRITE_RESULTS
@@ -1108,8 +1132,9 @@ int main(int argc, char* argv[])
    }
 #endif
 
+//exit(1);
 
-#if 1
+#if 0
     if(MPI_rank == 0){
     std::cout << "\n================== Testing inner Iteration. =====================\n" << std::endl;
 
@@ -1118,11 +1143,6 @@ int main(int argc, char* argv[])
     file_exists(beta_file);
     Vect beta_original = read_matrix(beta_file, nb, 1);  
     std::cout << "beta original: " << beta_original.transpose() << std::endl;*/
-
-    std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
-    file_exists(mean_latent_file);
-    Vect mean_latent_original = read_matrix(mean_latent_file, n, 1);  
-    std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;
 
     std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
     file_exists(extraCoeffVecLik_file);
@@ -1159,7 +1179,7 @@ int main(int argc, char* argv[])
     printf("val_negLogBinomLik: %f\n", val_negLogBinomLik);
     */
 
-#if 1
+#if 0
     Vect gradEta(no);
     fun->FD_gradient(eta, gradEta);
     //std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
@@ -1173,9 +1193,13 @@ int main(int argc, char* argv[])
     hess_eta.diagonal() = diagHessEta;
     //std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
 
-    Vect mu = mean_latent_original + Vect::Random(n);
+    SpMat Qxy(n,n);
+    double log_det;
+
+    Vect mu = mean_latent_original; // + Vect::Random(n);
+    mu_initial = mu;
     std::cout << "initial  x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
-    fun->NewtonIter(Qprior, mu);
+    fun->NewtonIter(theta_original, mu, Qxy, log_det);
     std::cout << "estimated x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
     std::cout << "original  x : " << mean_latent_original.head(min(10, (int) n)).transpose() << "\n" << std::endl;
 
@@ -1197,7 +1221,7 @@ int main(int argc, char* argv[])
  }
 #endif
 
-exit(1);
+//exit(1);
 
 #if 0
 
@@ -1349,7 +1373,7 @@ if(MPI_rank == 0){
 
 double time_bfgs = 0.0;
 
-#if 0
+#if 1
 
     if(dim_th > 0){
         if(MPI_rank == 0){
@@ -1447,8 +1471,8 @@ double time_bfgs = 0.0;
 
         if(dim_th == 2 && MPI_rank == 0){
             fun->convert_theta2interpret_spat(theta[0], theta[1], theta_param[0], theta_param[1]);
-            std::cout << "est.  mean interpret. param. : " << theta_param.transpose() << std::endl;
-            std::cout << "\norig. mean interpret. param. : " << theta_original_param.transpose() << std::endl;
+            std::cout << "\nest.  mean interpret. param. : " << theta_param.transpose() << std::endl;
+            std::cout << "orig. mean interpret. param. : " << theta_original_param.transpose() << std::endl;
 
         }
 
@@ -1493,15 +1517,13 @@ double time_bfgs = 0.0;
             printf("\n====================== NO HYPERPARAMETERS JUST INNER ITERATION =====================\n");
         }
 
-        SpMat Qprior(n,n);
-        fun->get_Qprior(theta, Qprior);
-        //fun->get_Qprior(theta_test.flatten_modelS(), Qprior);
-        std::cout << "Qprior:\n" << MatrixXd(Qprior) << std::endl;
-
+        SpMat Q(n,n);
+        double log_det;
         Vect mu = Vect::Random(n);
 
-        fun->NewtonIter(Qprior, mu);
+        fun->NewtonIter(theta, mu, Q, log_det);
         std::cout << "mean fixed effects : " << mu.transpose() << std::endl;
+        std::cout << "logDet = " << log_det << std::endl;
 
         Vect marg(n);
         fun->get_marginals_f(theta, mu, marg);
@@ -1644,6 +1666,9 @@ double time_bfgs = 0.0;
     std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
     write_vector(file_name_fixed_eff, mu, n);
 #endif
+
+//exit(1);
+
 
 // write matrix to file for debugging ... 
 #if 0
