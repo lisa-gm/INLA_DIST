@@ -660,9 +660,9 @@ int main(int argc, char* argv[])
                 std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
             }
             // same order as above
-            theta_param << 1.386294, 0.4054651, 1.386294,  0.6931472, 1.098612,  0.000000;
+            //theta_param << 1.386294, 0.4054651, 1.386294,  0.6931472, 1.098612,  0.000000;
             //theta_param        << 1.033, 0.431, 0.756, 0.247, 1.608, -0.495;
-            //theta_param <<  4, 1, 3, 2, -1, 0;
+            theta_param <<  4, 1, 3, 2, -1, 0;
         }
 
         if(constr == true){
