@@ -55,69 +55,14 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
        printf("too many MPI ranks per node ...\n");
        exit(1);
     }
-    
-       
-    /*
-     int max_rank_per_node = 8;
-    int GPU_rank = MPI_rank % max_rank_per_node;
-    */
-
-    // allocate devices as numThreads mod noGPUs
-    //int counter = threads_level1*MPI_rank + omp_get_thread_num();
-    //std::cout << "omp get nested : " << omp_get_nested() << std::endl;
-/*
-    if(omp_get_nested() == 1 || threads_level1 == 2){
-	//int counter = 4;
-	// assume that not more than 3 ranks per node ... mod 3
-	// first 3 ranks on first node, second 3 on second, etc
-	int counter = 2*(MPI_rank % 3) + omp_get_thread_num(); // test shift by 1 ... to not be on the same NUMA domains ...
-	GPU_rank = counter % noGPUs;
-	//std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << ", counter : " << counter << ", tid : " << omp_get_thread_num() << std::endl;
-    } else {
-	int counter = 2*(MPI_rank % 3) + omp_get_thread_num();  
-        GPU_rank = counter % noGPUs;
-	//std::cout << "omp nested false. In RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
-    }
-*/    
+      
     //GPU_rank = MPI_rank % noGPUs;
     cudaSetDevice(GPU_rank);
 
     int numa_node = topo_get_numNode(GPU_rank);
     
-    //int numa_node = GPU_rank;
-    /*
-     int numa_node;
-
-    if(GPU_rank == 0){
-	numa_node = 2;
-    } else if(GPU_rank == 1){
-	numa_node = 3;
-    } else if(GPU_rank == 2){
-	numa_node = 0;
-    } else if(GPU_rank == 3){
-	numa_node = 1;
-    } else if(GPU_rank == 4){
-       numa_node = 6;
-    } else if(GPU_rank == 5){
-       numa_node = 7;
-    } else if(GPU_rank == 6){
-       numa_node = 4;
-    } else if(GPU_rank == 7){
-       numa_node = 5;
-    }
-    */
-
     int* hwt = NULL;
     int hwt_count = read_numa_threads(numa_node, &hwt);
-
-    /*pin_hwthreads(hwt_count, hwt);
-    std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
-    std::cout << ", hwthreads:";
-    for(int i=0; i<hwt_count; i++){
-        printf(" %d", hwt[i]);
-    }
-    printf("\n");
-    */
 
     // now they will be directly next to each other ... lets see if this is a problem
     pin_hwthreads(1, &hwt[omp_get_thread_num()]);
@@ -364,11 +309,8 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
     }
 
 #ifdef PRINT_MSG
-	std::cout << "calling solver = new RGF now" << std::endl;
+	std::cout << "calling solver = new RGF now. ns = " << ns_t << ", nt = " << nt_t << ", nb = " << nb_t << std::endl;
 #endif
-
-	//solver = new RGF<double>(ia, ja, a, ns_t, nt_t, nb_t);
-    //solver = new RGF<double>(ns_t, nt_t, nb_t);
 
 
 #ifdef PRINT_MSG

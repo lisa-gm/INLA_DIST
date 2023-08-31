@@ -79,8 +79,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQst = new PardisoSolver(MPI_rank);
 		}
 	} else if(solver_type == "BTA"){
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-		solverQst = new RGFSolver(ns, nt, 0, no);
+		//solverQ   = new RGFSolver(ns, nt, nb, no);
+		//solverQst = new RGFSolver(ns, nt, 0, no);
+		printf("CALLING EIGEN CHOLMOD SOLVER INSTEAD OF BTA!\n");
+		solverQ   = new EigenCholSolver(MPI_rank);
+		solverQst = new EigenCholSolver(MPI_rank);
+	} else if(solver_type == "Eigen"){
+		solverQ   = new EigenCholSolver(MPI_rank);
+		solverQst = new EigenCholSolver(MPI_rank);
 	} else {
 		printf("wrong solver type! \n");
 		exit(1);
@@ -217,6 +223,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		solverQst = new RGFSolver(ns, nt, 0, no);
 		//}
 		//}
+	} else if(solver_type == "Eigen"){
+		solverQ   = new EigenCholSolver(MPI_rank);
+		solverQst = new EigenCholSolver(MPI_rank);
 	} else {
 		printf("wrong solver type! \n");
 		exit(1);
@@ -384,7 +393,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		solverQst = new PardisoSolver(MPI_rank);
 		}
 	} else if(solver_type == "BTA"){
-		#pragma omp parallel
+		/*#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
 			solverQst = new RGFSolver(ns, nt, 0, no);
@@ -392,7 +401,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		if(omp_get_thread_num() == 1 || threads_level1 == 1){
 			solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
 		}
-		}
+		}*/
+		solverQst = new RGFSolver(ns, nt, 0, no);
+		solverQ   = new RGFSolver(ns, nt, nb, no);  
+	} else if(solver_type == "Eigen"){
+		solverQ     = new EigenCholSolver(MPI_rank);
+		solverQst   = new EigenCholSolver(MPI_rank);
 	} else {
 		printf("wrong solver type! \n");
 		exit(1);
@@ -585,7 +599,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 		solverQst = new PardisoSolver(MPI_rank);
 		}
 	} else if(solver_type == "BTA"){
-		#pragma omp parallel
+		/*#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
 			solverQst = new RGFSolver(ns, nt, nss, no);
@@ -593,7 +607,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 		if(omp_get_thread_num() == 1 || threads_level1 == 1){
 			solverQ = new RGFSolver(ns, nt, nb+nss, no);  // solver for prior random effects. best way to handle this? 
 		}
-		}
+		}*/
+		solverQst = new RGFSolver(ns, nt, nss, no);
+		solverQ   = new RGFSolver(ns, nt, nb+nss, no); 
+	} else if(solver_type == "Eigen"){
+		solverQ   = new EigenCholSolver(MPI_rank);
+		solverQst = new EigenCholSolver(MPI_rank);
 	} else {
 		printf("wrong solver type! \n");
 		exit(1);
@@ -1516,13 +1535,15 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& mu, Vect& vars){
 
 	} else {
 		// nested parallelism, want to call this with 1 thread of omp level 1
-		#pragma omp parallel
+		/*#pragma omp parallel
 		{
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			solverQ->selected_inversion(Q, vars);
 		}
-		}
+		}*/
+		solverQ->selected_inversion(Q, vars);
+
 	}
 	
 #ifdef PRINT_TIMES
@@ -2034,6 +2055,7 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 }
 
 
+#if 1
 // ============================================================================================ //
 // new EvalPostTheta function -> can handle non-Gaussian likelihoods as well -> requires different structure
 // it will be evaluated in the mode x^* of the conditional p(x | theta, y) -> which needs to be found first
@@ -2081,7 +2103,15 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 	//std::cout << "mu(1:10) = " << mu.head(10).transpose() << ", norm(mu) = " << mu.norm() << std::endl;
- 	eval_denominator(theta, val_d, Q, rhs, mu);
+
+	eval_denominator(theta, val_d, Q, rhs, mu);
+	/*#pragma omp parallel 
+	{
+	printf("omp get num threads = %d\n", omp_get_num_threads());
+	if(omp_get_thread_num() == 0){
+		eval_denominator(theta, val_d, Q, rhs, mu);
+	}
+	}*/
 
 #ifdef RECORD_TIMES
 	t_condLat += omp_get_wtime();
@@ -2120,14 +2150,6 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 	} else if(prior == "pc"){
 		// pc prior
 		Vect theta_interpret(dim_th); 
-		/*
-		theta_interpret[0] = theta[0];
-		convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
-		//theta_interpret << 0.5, 10, 1, 4; 
-		if(nss > 0){
-			convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
-		}
-		*/
 		convert_theta2interpret(theta, theta_interpret);
 
 		//Vect lambda(4);
@@ -2209,6 +2231,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
   	return val;
 }
+#endif
 
 #if 0 // old post theta function
 // ============================================================================================ //
@@ -2975,14 +2998,13 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 		Q =  Qx + exp_theta0 * AxTAx;
 
 #ifdef PRINT_MSG
-		/*
 		std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
 		std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
 
 		std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
 		std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
 		std::cout << "theta : \n" << theta.transpose() << std::endl;
-		*/
+
 #endif
 	}
 
