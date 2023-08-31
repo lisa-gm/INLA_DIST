@@ -104,6 +104,8 @@ void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& 
 
 int main(int argc, char* argv[])
 {
+    int whatever = 2;
+
     // start timer for overall runtime
     double t_total = -omp_get_wtime();
 
@@ -265,6 +267,9 @@ int main(int argc, char* argv[])
     MatrixXd B;
     SpMat Ax; 
     Vect y;
+
+    // not needed for Gaussian case. Initialize to zero otherwise ...
+    Vect mu_initial = Vect::Zero(n);
 
     // additional coefficient vector: Poisson / Binomial data
     Vect extraCoeffVecLik;
@@ -508,12 +513,21 @@ int main(int argc, char* argv[])
         std::cout << "sum(y) = " << y.sum() << std::endl;
     }
 
+    Vect mean_latent_original(n);
     if(likelihood.compare("poisson") == 0 || likelihood.compare("binomial") == 0){
         // TODO: something like if does not exist assume all ONES ??
         std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
         file_exists(extraCoeffVecLik_file);
         extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
-        std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;        
+        std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;    
+
+        std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
+        file_exists(mean_latent_file);
+        mean_latent_original = read_matrix(mean_latent_file, n, 1);  
+        std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;    
+        mu_initial = mean_latent_original + Vect::Random(n);
+        std::cout << "mu initial : " << mu_initial.head(min(10, int (n))).transpose() << std::endl;    
+
     }
 
 //#endif
@@ -599,8 +613,8 @@ int main(int argc, char* argv[])
 
         //theta_prior_param << 1, -2.3, 2.1;
         //theta_prior_test.update_modelS(theta_prior_param);
-        theta_param << theta_original + Vect::Random(dim_th);
-        std::cout << "initial theta : "  << theta.transpose() << std::endl;   
+        theta_param << theta_original_param; // + Vect::Random(dim_th);
+        std::cout << "initial theta param : "  << theta_param.transpose() << std::endl;   
 
     } else {
 
@@ -1015,40 +1029,44 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "Call constructor for regression model." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, constr, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, B, y, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, constr, Dxy, validate, w);
     } else if(ns > 0 && nt == 1 && nss == 0) {
         if(MPI_rank == 0){
             std::cout << "\ncall spatial constructor." << std::endl;
         }
         // PostTheta fun(nb, no, B, y);
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss == 0){
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
         }
-        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss > 0){
          if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor with add. spatial field." << std::endl;
         } 
         std::cout << "theta prior param = " << theta_prior_param.transpose() << std::endl;
-        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
+        fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else {
         printf("invalid combination of parameters!\n");
         printf("ns = %ld, nt = %ld, nss = %ld\n", ns, nt, nss);
         exit(1);
     }
 
+    Vect theta_test(dim_th);
+    Vect theta_param_test(dim_th);
+    fun->convert_interpret2theta(theta_param, theta_test);
+    fun->convert_theta2interpret(theta_test, theta_param_test);
 
 #if 1
-    if(MPI_rank == 0)
+    if(MPI_rank == 0){
         printf("\n======================= HYPERPARAMETERS =====================\n");
+    }
 
     if(MPI_rank == 0){
         // TO BE deleted later
-        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         std::cout << "theta prior param  : " << theta_prior_param.transpose() << std::endl;
-
+        //std::cout << "theta orig. param  : " << theta_original_param.transpose() << std::endl;
         //std::cout << "theta original     : " << std::right << std::fixed << theta_original_test.flatten_modelS().transpose() << std::endl;
         //std::cout << "theta prior param  : " << theta_prior_test.flatten_modelS().transpose() << std::endl;
     }
@@ -1067,91 +1085,91 @@ int main(int argc, char* argv[])
     }
 #endif
 
+//exit(1);
 
-#if 1
-    if(MPI_rank == 0 && likelihood.compare("gaussian") != 0){
-        std::cout << "\n================== Testing inner Iteration. =====================\n" << std::endl;
+#if 0
+    if(MPI_rank == 0){
+    std::cout << "\n================== Testing inner Iteration. =====================\n" << std::endl;
 
-        // read in original latent parameters
-        /*std::string beta_file        =  base_path + "/beta_original_" + to_string(nb) + "_1" + ".dat";
-        file_exists(beta_file);
-        Vect beta_original = read_matrix(beta_file, nb, 1);  
-        std::cout << "beta original: " << beta_original.transpose() << std::endl;*/
+    // read in original latent parameters
+    /*std::string beta_file        =  base_path + "/beta_original_" + to_string(nb) + "_1" + ".dat";
+    file_exists(beta_file);
+    Vect beta_original = read_matrix(beta_file, nb, 1);  
+    std::cout << "beta original: " << beta_original.transpose() << std::endl;*/
 
-        std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
-        file_exists(mean_latent_file);
-        Vect mean_latent_original = read_matrix(mean_latent_file, n, 1);  
-        std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;
+    std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
+    file_exists(extraCoeffVecLik_file);
+    Vect extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
+    std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;
 
-        std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
-        file_exists(extraCoeffVecLik_file);
-        Vect extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
-        std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;
-
-        // no separate function to construct Qprior
-        SpMat Qprior(n,n);
-        fun->get_Qprior(theta_original, Qprior);
-        std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(0, 0, min(10, (int) n), min(10, (int) n)) << std::endl;
-        //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(399, 399, 30, 30) << std::endl;
+    // no separate function to construct Qprior
+    SpMat Qprior(n,n);
+    fun->get_Qprior(theta_original, Qprior);
+    std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(0, 0, min(10, (int) n), min(10, (int) n)) << std::endl;
+    //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(399, 399, 30, 30) << std::endl;
 
 
-        double val_logPriorLat = fun->cond_LogPriorLat(Qprior, mean_latent_original);
-        printf("val_logPriorLat:   %f\n", val_logPriorLat);
+    double val_logPriorLat = fun->cond_LogPriorLat(Qprior, mean_latent_original);
+    printf("val_logPriorLat:   %f\n", val_logPriorLat);
 
-        Vect eta = Ax * mean_latent_original;
-        std::cout << "eta(1:10) = " << eta.head(10).transpose() << std::endl;
-        double val_logPoisLik  = fun->cond_LogPoisLik(eta);
-        printf("val_logPoisLik:    %f\n", val_logPoisLik);
+    Vect eta = Ax * mean_latent_original;
+    std::cout << "eta(1:10) = " << eta.head(10).transpose() << std::endl;
+    double val_logPoisLik  = fun->cond_LogPoisLik(eta);
+    printf("val_logPoisLik:    %f\n", val_logPoisLik);
 
-        double val_negLogPoisLik  = fun->cond_negLogPoisLik(eta);
-        printf("val_negLogPoisLik: %f\n", val_negLogPoisLik);
+    double val_negLogPoisLik  = fun->cond_negLogPoisLik(eta);
+    printf("val_negLogPoisLik: %f\n", val_negLogPoisLik);
 
-        double val_negLogPois  = fun->cond_negLogPois(Qprior, mean_latent_original);
-        printf("val_negLogPois:    %f\n", val_negLogPois);
+    double val_negLogPois  = fun->cond_negLogPois(Qprior, mean_latent_original);
+    printf("val_negLogPois:    %f\n", val_negLogPois);
 
-        /*
-        Vect sigmoidEta(no);
-        fun->link_f_sigmoid(eta, sigmoidEta);
-        std::cout << "sigmoidEta(1:10): " << sigmoidEta.head(10).transpose() << std::endl;
+    /*
+    Vect sigmoidEta(no);
+    fun->link_f_sigmoid(eta, sigmoidEta);
+    std::cout << "sigmoidEta(1:10): " << sigmoidEta.head(10).transpose() << std::endl;
 
-        double val_negLogBinomLik = fun->cond_negLogBinomLik(eta);
-        printf("val_negLogBinomLik: %f\n", val_negLogBinomLik);
-        */
+    double val_negLogBinomLik = fun->cond_negLogBinomLik(eta);
+    printf("val_negLogBinomLik: %f\n", val_negLogBinomLik);
+    */
 
-#if 1
-        Vect gradEta(no);
-        fun->FD_gradient(eta, gradEta);
-        //std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
-        //std::cout << "grad    = " << (Ax.transpose() * gradEta).head(min(10, (int) n)).transpose() << std::endl;
+#if 0
+    Vect gradEta(no);
+    fun->FD_gradient(eta, gradEta);
+    //std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
+    //std::cout << "grad    = " << (Ax.transpose() * gradEta).head(min(10, (int) n)).transpose() << std::endl;
 
-        Vect diagHessEta(no);
-        fun->FD_diag_hessian(eta, diagHessEta);
-        //std::cout << "diagHessEta = " << diagHessEta.head(10).transpose() << std::endl;
-        SpMat hess_eta(no,no);
-        hess_eta.setIdentity();
-        hess_eta.diagonal() = diagHessEta;
-        //std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
+    Vect diagHessEta(no);
+    fun->FD_diag_hessian(eta, diagHessEta);
+    //std::cout << "diagHessEta = " << diagHessEta.head(10).transpose() << std::endl;
+    SpMat hess_eta(no,no);
+    hess_eta.setIdentity();
+    hess_eta.diagonal() = diagHessEta;
+    //std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
 
-        Vect mu = mean_latent_original + Vect::Random(n);
-        std::cout << "initial  x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
-        fun->NewtonIter(Qprior, mu);
-        std::cout << "estimated x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
-        std::cout << "original  x : " << mean_latent_original.head(min(10, (int) n)).transpose() << "\n" << std::endl;
+    SpMat Qxy(n,n);
+    double log_det;
 
-        std::cout << "estimated fixed effects : " << mu.tail(nb).transpose() << std::endl;
-        std::cout << "original  fixed effects : " << mean_latent_original.tail(nb).transpose() << std::endl;
+    Vect mu = mean_latent_original; // + Vect::Random(n);
+    mu_initial = mu;
+    std::cout << "initial  x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
+    fun->NewtonIter(theta_original, mu, Qxy, log_det);
+    std::cout << "estimated x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
+    std::cout << "original  x : " << mean_latent_original.head(min(10, (int) n)).transpose() << "\n" << std::endl;
+
+    std::cout << "estimated fixed effects : " << mu.tail(nb).transpose() << std::endl;
+    std::cout << "original  fixed effects : " << mean_latent_original.tail(nb).transpose() << std::endl;
 
 
-        Vect eta_est = Ax * mean_latent_original;
-        fun->FD_diag_hessian(eta_est, diagHessEta);
-        MatrixXd hessModeCond = Qprior + Ax.transpose() * hess_eta * Ax;
+    Vect eta_est = Ax * mean_latent_original;
+    fun->FD_diag_hessian(eta_est, diagHessEta);
+    MatrixXd hessModeCond = Qprior + Ax.transpose() * hess_eta * Ax;
 
-        if(n < 25){
-            std::cout << "hessModeCond = \n" << hessModeCond << std::endl;
-            MatrixXd invHessModeCond = hessModeCond.inverse();
-            std::cout << "invHessModeCond = \n" << invHessModeCond << std::endl;
-            std::cout << "\nsd fixed effects = " << invHessModeCond.diagonal().cwiseSqrt().transpose() << std::endl; 
-        }
+    if(n < 25){
+        std::cout << "hessModeCond = \n" << hessModeCond << std::endl;
+        MatrixXd invHessModeCond = hessModeCond.inverse();
+        std::cout << "invHessModeCond = \n" << invHessModeCond << std::endl;
+        std::cout << "\nsd fixed effects = " << invHessModeCond.diagonal().cwiseSqrt().transpose() << std::endl; 
+    }
 #endif
     } // end testing inner iteration
 #endif
@@ -1384,15 +1402,13 @@ double time_bfgs = 0.0;
             printf("\n====================== NO HYPERPARAMETERS JUST INNER ITERATION =====================\n");
         }
 
-        SpMat Qprior(n,n);
-        fun->get_Qprior(theta, Qprior);
-        //fun->get_Qprior(theta_test.flatten_modelS(), Qprior);
-        std::cout << "Qprior:\n" << MatrixXd(Qprior) << std::endl;
-
+        SpMat Q(n,n);
+        double log_det;
         Vect mu = Vect::Random(n);
 
-        fun->NewtonIter(Qprior, mu);
+        fun->NewtonIter(theta, mu, Q, log_det);
         std::cout << "mean fixed effects : " << mu.transpose() << std::endl;
+        std::cout << "logDet = " << log_det << std::endl;
 
         Vect marg(n);
         fun->get_marginals_f(theta, mu, marg);
@@ -1517,6 +1533,9 @@ double time_bfgs = 0.0;
     std::string file_name_fixed_eff = results_folder + "/mean_latent_parameters.txt";
     write_vector(file_name_fixed_eff, mu, n);
 #endif
+
+//exit(1);
+
 
 // write matrix to file for debugging ... 
 #if 0
