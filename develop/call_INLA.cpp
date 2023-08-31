@@ -172,7 +172,7 @@ int main(int argc, char* argv[])
 
         std::cerr << "[string:likelihood]         Gaussian/Poisson/Binomial" << std::endl;
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
-        std::cerr << "[string:solver_type]        BTA or PARDISO" << std::endl;
+        std::cerr << "[string:solver_type]        BTA or PARDISO or Eigen" << std::endl;
 
         exit(1);
     }
@@ -229,8 +229,8 @@ int main(int argc, char* argv[])
     }
 
     // check if solver type is neither PARDISO nor RGF :
-    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
-        std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
+    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0 && solver_type.compare("Eigen") != 0){
+        std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA\nEigen" << std::endl;
         exit(1);
     }
 
@@ -1045,7 +1045,6 @@ int main(int argc, char* argv[])
          if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor with add. spatial field." << std::endl;
         } 
-        std::cout << "theta prior param = " << theta_prior_param.transpose() << std::endl;
         fun = new PostTheta(ns, nt, nss, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else {
         printf("invalid combination of parameters!\n");
@@ -1385,6 +1384,7 @@ double time_bfgs = 0.0;
         std::cout << "estimated covariance theta with epsilon = " << eps << "  :  \n" << cov << std::endl;*/
 
         if(MPI_rank == 0){
+            fun->convert_interpret2theta(theta_param, theta_original);
             std::cout << "\norig. mean parameters        : " << theta_original.transpose() << std::endl;
             std::cout << "est.  mean parameters        : " << theta.transpose() << std::endl;
         }
