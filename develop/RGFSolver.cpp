@@ -23,12 +23,9 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
     MPI_Get_processor_name(processor_name, &name_len);
     //printf("Processor name : %s\n",processor_name);
 
-
     // CAREFUL USING N in both functions ..
     n  = ns_t*nt_t + nb_t;
 
-    // take out 
-    // assign GPU
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
 #ifdef PRINT_MSG
@@ -36,7 +33,6 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
 #endif
 
     if(strcmp ("KW60890", processor_name) == 0){
-
         GPU_rank = 0;
         if(MPI_rank == 0){
             printf("Careful! GPU rank hard coded to machine: kw60890!\n");
@@ -47,7 +43,6 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
             printf("assuming I'm on ALEX!\n"); 
         }   
 
-        // assume max 3 ranks per node
         int max_rank_per_node = 4;
         int MPI_rank_mod = MPI_rank % max_rank_per_node; 
 
@@ -67,7 +62,11 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
       
     }
     //GPU_rank = MPI_rank % noGPUs;
-    cudaSetDevice(GPU_rank);
+    cudaError_t cudaErr = cudaSetDevice(GPU_rank);
+    if(cudaErr != cudaSuccess){
+        printf("setting device was not successful! ns = %ld, nt = %ld, nb = %ld, thread_ID = %ld\n");
+        exit(1);
+    }
 
     int numa_node = topo_get_numNode(GPU_rank);
     
@@ -75,22 +74,21 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
     int hwt_count = read_numa_threads(numa_node, &hwt);
 
     // now they will be directly next to each other ... lets see if this is a problem
-    pin_hwthreads(1, &hwt[omp_get_thread_num()]);
-    std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
-    std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
+    //pin_hwthreads(1, &hwt[omp_get_thread_num()]);
+    pin_hwthreads(1, &hwt[thread_ID]);
+    std::cout<<"In RGF constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", threadID " << thread_ID << ", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+    std::cout<<", hwthreads: " << hwt[thread_ID] << std::endl;
 
 #ifdef PRINT_MSG
     std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
 #endif	
     
-    exit(1);
-    solver = new RGF<double>(ns_t, nt_t, nb_t);
+    solver = new RGF<double>(ns_t, nt_t, nb_t, GPU_rank);
  
 #ifdef PRINT_MSG    
     if(MPI_rank == 0)
     	std::cout << "new RGFSolver Class version." << std::endl; 
 #endif
-
 }
 
 // currently not needed !!

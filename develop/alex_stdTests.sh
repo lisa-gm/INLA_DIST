@@ -12,7 +12,7 @@
 #SBATCH --output=%x.out         #The .output file name
 
 base_path=/home/hpc/ihpc/ihpc060h/b_INLA/develop
-results_folder=${base_path}/standard_tests_new
+results_folder=${base_path}/standard_tests_solverThreadID
 
 if [ ! -d ${results_folder} ]; then
   mkdir -p ${results_folder};

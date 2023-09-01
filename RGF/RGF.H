@@ -28,7 +28,7 @@ class RGF{
 	
 public:
 
-    RGF(size_t,size_t,size_t);
+    RGF(size_t,size_t,size_t, int);
 
     ~RGF();
     double factorize(size_t* ia, size_t* ja, T* a);
@@ -62,6 +62,8 @@ private:
 
     size_t ind_invBlks_fi;
     size_t mem_alloc_dev = 0;   // keep track of allocated memory on GPU
+
+    int GPU_rank;
 
     //size_t b_size;
     bool MF_allocated = false;
@@ -160,13 +162,15 @@ private:
 /************************************************************************************************/
 
 template <class T>
-RGF<T>::RGF(size_t ns, size_t nt, size_t nd)
+RGF<T>::RGF(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 {
    if(ns == 0){
       printf("ns = %ld, nt = %ld. no spatial field. Just fixed effects. Consider using a different solver!\n", ns, nt);
       exit(1);
    }
    // only set up indices etc. no values yet.
+   // set device from GPU rank
+   GPU_rank = GPU_rank_;
 
 #ifdef CUDA_POTRF
    printf("using CUDA POTRF.\n");
@@ -478,11 +482,22 @@ double RGF<T>::FirstStageFactor()
        	std::cout << "IB = " << IB << std::endl;
 #endif
 
+   /*
+   int GPU_CurrRank;
+   cudaGetDevice(&GPU_CurrRank);
+   printf("in firstStageFactor. cudaGetDevice : %ld, supposed GPU rank : %ld\n", GPU_CurrRank, GPU_rank);
+   */
+
     init_supernode(blockR_dev, IB, magma_cudaStream_1);
     if (matrix_nd > 0)
     {
        init_supernode(blockDense_dev, matrix_nt, magma_cudaStream_1);
     }
+
+   /*cudaDeviceSynchronize();
+   copy_supernode_to_host_write(blockR_dev, IB);
+   exit(1);*/
+
 
     // put it in cudaEvent
     //gpuErrchk(cudaEventRecord(copy_gpu, magma_cudaStream_1)); // want compute_stream to wait
@@ -2012,15 +2027,21 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
    std::cout << "entered factorize." << std::endl;
 #endif
 
-    //int GPU_rank;
-    //cudaGetDevice(&GPU_rank);
+   int GPU_currRank;
+   cudaGetDevice(&GPU_currRank);
+
+   if(GPU_currRank != GPU_rank){
+      //printf("In factorize. Current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      cudaSetDevice(GPU_rank);
+      cudaGetDevice(&GPU_currRank);
+      //printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+   }
+
     //int numaNodeID = topo_get_numNode(GPU_rank);
 
     matrix_ia = ia;
     matrix_ja = ja;
     matrix_a = a;
-
-    //create_blocks();
 
    double t_allocate_MF_host = get_time(0.0);
 
@@ -2124,7 +2145,15 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
    matrix_ja = ja;
    matrix_a = a;
 
-   //create_blocks();
+   int GPU_currRank;
+   cudaGetDevice(&GPU_currRank);
+
+   if(GPU_currRank != GPU_rank){
+      //printf("in factorize_noCopyHost. Current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      cudaSetDevice(GPU_rank);
+      cudaGetDevice(&GPU_currRank);
+      //printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+   }
 
     // Data allocation device
     if (!MF_dev_allocated)
@@ -2254,6 +2283,16 @@ double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
 template <class T>
 double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
 {
+   // check current device. set appropriately.
+   int GPU_currRank;
+   cudaGetDevice(&GPU_currRank);
+
+   if(GPU_currRank != GPU_rank){
+      printf("in RGFdiag. current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      cudaSetDevice(GPU_rank);
+      cudaGetDevice(&GPU_currRank);
+      printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+   }
 
    if (!factorization_completed)
        factorize(ia, ja, a);
@@ -2309,6 +2348,15 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
 template <class T>
 double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
 {  
+   int GPU_currRank;
+   cudaGetDevice(&GPU_currRank);
+
+   if(GPU_currRank != GPU_rank){
+      printf("in RGFselInv. current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      cudaSetDevice(GPU_rank);
+      cudaGetDevice(&GPU_currRank);
+      printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+   }
 
    if (!factorization_completed)
        factorize(ia, ja, a);

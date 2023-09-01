@@ -228,11 +228,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		//{
 		//#pragma omp task
 		//{
-		solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);
+		solverQst = new RGFSolver(ns, nt, 0, no, threadID_solverQst);
 		//}
 		//#pragma omp task
 		//{
-		solverQst = new RGFSolver(ns, nt, 0, no, threadID_solverQst);
+		solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);
 		//}
 		//}
 	} else if(solver_type == "Eigen"){
@@ -2127,8 +2127,8 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 #endif
 
 	//std::cout << "mu(1:10) = " << mu.head(10).transpose() << ", norm(mu) = " << mu.norm() << std::endl;
-
 	eval_denominator(theta, val_d, Q, rhs, mu);
+
 	/*#pragma omp parallel 
 	{
 	printf("omp get num threads = %d\n", omp_get_num_threads());
