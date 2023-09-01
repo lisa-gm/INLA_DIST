@@ -30,9 +30,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	if(likelihood.compare("gaussian") == 0){
 		dimList(0) = dim_th;
 	} else {
-		
-		std::cout << "dim(extraCoeffVecLik) = " << extraCoeffVecLik.size() << std::endl;
-		//std::cout << "extraCoeffVecLik(1:10) = " << extraCoeffVecLik.head(10).transpose() << std::endl;
+		if(MPI_rank == 0){
+			std::cout << "dim(extraCoeffVecLik) = " << extraCoeffVecLik.size() << std::endl;
+			//std::cout << "extraCoeffVecLik(1:10) = " << extraCoeffVecLik.head(10).transpose() << std::endl;
+		}
 	}
 	dim_th = dimList.sum();
 

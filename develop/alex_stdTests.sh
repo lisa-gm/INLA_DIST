@@ -37,6 +37,10 @@ RESULT_FILE=${results_folder}/results_tests_${solver_type}_${num_ranks}_${l1t}_$
 
 source ~/env/cholmod.sh
 
+##################################
+###### GAUSSIAN LIKELIHOOD #######
+##################################
+
 ################################## TEST I ##########################################
 echo " "
 
@@ -200,3 +204,46 @@ echo -e "orig. mean parameters        :  1.386 -4.42 0.634 1.674 -4.608 2.244" >
 echo -n "estimated mean fixed effects : "  >> ${RESULT_FILE}
 cat ${test4_output} | grep "estimated mean fixed effects" | cut -d':' -f 2 >> ${RESULT_FILE}
 echo -e "orig. mean fixed effects     :  -1 3 0.5 2" >> ${RESULT_FILE}
+
+
+########################################################################################################################
+
+##################################
+####### POISSON LIKELIHOOD #######
+##################################
+
+########################################################################################################################
+
+################################## TEST V ##########################################
+echo " "
+echo "POISSON TEST CASES"
+
+ns=0
+nss=0
+ntFit=0
+ntPred=0
+nt=$((${ntFit}+${ntPred}))
+nb=6
+no=100
+
+data_type=regression
+likelihood=Poisson
+folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/${likelihood}Data/nb${nb}_no${no}
+test5_output=${results_folder}/INLA_testCase_V_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
+
+echo "TEST CASE V. regression model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
+
+echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test5_output}
+
+## fixed effects INLA : 0.166, -1.7075385, -2.0048265692293, 2.09097384070468, 1.79709866484101, -1.03048874777528
+
+################################ WRITE OUT RESULTS #####################################
+
+echo -e "numRanks numThreadsL1 numThreadsL2 SolverType "  >> ${RESULT_FILE}
+echo -e "${num_ranks} ${l1t} ${l2t} ${solver_type} " >> ${RESULT_FILE}
+echo -e " " >> ${RESULT_FILE}
+echo -e "TEST CASE V. regression model. Poisson Data. ns = ${ns}, nt = ${nt}, nb = ${nb}, no = ${nb}. " >> ${RESULT_FILE}
+echo -n "No hyperparameters!"  >> ${RESULT_FILE}
+cat ${test5_output} | grep "estimated mean fixed effects" | cut -d':' -f 2 >> ${RESULT_FILE}
+echo -e "mean fixed effects INLA     : 0.166, -1.71, -2.00, 2.09, 1.797, -1.03" >> ${RESULT_FILE}

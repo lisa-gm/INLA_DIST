@@ -519,15 +519,18 @@ int main(int argc, char* argv[])
         std::string extraCoeffVecLik_file        =  base_path + "/extraCoeff_" + to_string(no) + "_1" + ".dat";
         file_exists(extraCoeffVecLik_file);
         extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
-        std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;    
 
         std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
         file_exists(mean_latent_file);
         mean_latent_original = read_matrix(mean_latent_file, n, 1);  
-        std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;    
-        mu_initial = mean_latent_original + Vect::Random(n);
-        std::cout << "mu initial : " << mu_initial.head(min(10, int (n))).transpose() << std::endl;    
 
+        mu_initial = mean_latent_original + Vect::Random(n);
+
+        if(MPI_rank == 0){
+            std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;    
+            std::cout << "mean latent original: " << mean_latent_original.head(min(10, int (n))).transpose() << std::endl;    
+            std::cout << "mu initial : " << mu_initial.head(min(10, int (n))).transpose() << std::endl;    
+        }
     }
 
 //#endif
@@ -594,7 +597,8 @@ int main(int argc, char* argv[])
         if(MPI_rank == 0){
             std::cout << "initial theta : "  << theta.transpose() << std::endl; 
         }   
-        
+    } else if(ns == 0 && nt == 0 && likelihood.compare("poisson") == 0){
+        printf("Poisson regression. No hyperparameters needed!\n");
     } else if(ns > 0 && nt == 1){
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
@@ -616,7 +620,7 @@ int main(int argc, char* argv[])
         theta_param << theta_original_param; // + Vect::Random(dim_th);
         std::cout << "initial theta param : "  << theta_param.transpose() << std::endl;   
 
-    } else {
+    } else if (ns > 0 && nt > 1){
 
 #ifdef DATA_SYNTHETIC
         data_type = "synthetic";
@@ -927,6 +931,10 @@ int main(int argc, char* argv[])
         exit(1);
 #endif
 
+    } else {
+        printf("unknown parameters, likelihood or datatype!");
+        std::cout << "likelihood : " << likelihood << std::endl;
+        exit(1);
     } // end else for spatial-temporal case
 
     // ========================== set up validation set ======================= //
