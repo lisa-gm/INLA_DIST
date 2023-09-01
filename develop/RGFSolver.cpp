@@ -29,16 +29,16 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     std::cout << "available GPUs : " << noGPUs << std::endl;
 #endif
 
-    /*GPU_rank = 0;
-    if(MPI_rank == 0){
-        printf("Careful! GPU rank hard coded to machine: kw60890!\n");
-    }*/
+    if(strcmp ("KW60890", processor_name) == 0){
 
-    /*if(noGPUs < 8){
-        printf("not on Alex! change GPU assignment!");
-        exit(1);
-    }*/
-    
+        GPU_rank = 0;
+        if(MPI_rank == 0){
+            printf("Careful! GPU rank hard coded to machine: kw60890!\n");
+        }
+
+    } else {
+        printf("assuming I'm on ALEX!\n");    
+    }
     // assume max 3 ranks per node
     int max_rank_per_node = 4;
     int MPI_rank_mod = MPI_rank % max_rank_per_node; 
