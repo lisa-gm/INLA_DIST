@@ -68,6 +68,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 #ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 #endif
@@ -79,8 +85,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQst = new PardisoSolver(MPI_rank);
 		}
 	} else if(solver_type == "BTA"){
-		//solverQ   = new RGFSolver(ns, nt, nb, no);
-		//solverQst = new RGFSolver(ns, nt, 0, no);
+		//solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);
+		//solverQst = new RGFSolver(ns, nt, 0,  no, threadID_solverQst);
 		printf("CALLING EIGEN CHOLMOD SOLVER INSTEAD OF BTA!\n");
 		solverQ   = new EigenCholSolver(MPI_rank);
 		solverQst = new EigenCholSolver(MPI_rank);
@@ -200,6 +206,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 	#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
@@ -216,11 +228,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		//{
 		//#pragma omp task
 		//{
-		solverQ   = new RGFSolver(ns, nt, nb, no);
+		solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);
 		//}
 		//#pragma omp task
 		//{
-		solverQst = new RGFSolver(ns, nt, 0, no);
+		solverQst = new RGFSolver(ns, nt, 0, no, threadID_solverQst);
 		//}
 		//}
 	} else if(solver_type == "Eigen"){
@@ -382,6 +394,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 	#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
@@ -402,8 +420,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 			solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
 		}
 		}*/
-		solverQst = new RGFSolver(ns, nt, 0, no);
-		solverQ   = new RGFSolver(ns, nt, nb, no);  
+		solverQst = new RGFSolver(ns, nt, 0,  no, threadID_solverQst);
+		solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);  
 	} else if(solver_type == "Eigen"){
 		solverQ     = new EigenCholSolver(MPI_rank);
 		solverQst   = new EigenCholSolver(MPI_rank);
@@ -588,6 +606,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 	#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
@@ -608,8 +632,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 			solverQ = new RGFSolver(ns, nt, nb+nss, no);  // solver for prior random effects. best way to handle this? 
 		}
 		}*/
-		solverQst = new RGFSolver(ns, nt, nss, no);
-		solverQ   = new RGFSolver(ns, nt, nb+nss, no); 
+		solverQst = new RGFSolver(ns, nt, nss, no, threadID_solverQst);
+		solverQ   = new RGFSolver(ns, nt, nb+nss, no, threadID_solverQ); 
 	} else if(solver_type == "Eigen"){
 		solverQ   = new EigenCholSolver(MPI_rank);
 		solverQst = new EigenCholSolver(MPI_rank);

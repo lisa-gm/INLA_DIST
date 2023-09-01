@@ -37,10 +37,11 @@ class RGFSolver: public Solver {
         int MPI_size;
         int MPI_rank;
 
-	char processor_name[MPI_MAX_PROCESSOR_NAME];
+	    char processor_name[MPI_MAX_PROCESSOR_NAME];
     	int name_len;
 
         int threads_level1;
+        int thread_ID;
 
         /* matrix size */
         unsigned int nnz;       /**< number of nonzeros */
@@ -69,7 +70,7 @@ class RGFSolver: public Solver {
         RGF<double> *solver;    /**< RGF solver object */
 
    	public:
-   		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
+   		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_, int thread_ID_);
 
         /**
          * @brief not used for RGFSolver, only in PARDISO

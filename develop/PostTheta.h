@@ -81,6 +81,9 @@ class PostTheta{
     Solver* solverQ;
     Solver* solverQst;
 
+    int threadID_solverQst;
+    int threadID_solverQ;
+
     string likelihood;  /**< assumed likelihood of the observations         */
     Vect extraCoeffVecLik;
 

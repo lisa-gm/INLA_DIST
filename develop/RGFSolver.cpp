@@ -2,7 +2,7 @@
 #include "RGFSolver.h"
 
 
-RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no){
+RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_) : ns_t(ns), nt_t(nt), nb_t(nb), no_t(no), thread_ID(thread_ID_){
    	
     MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
@@ -13,6 +13,12 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
 
     threads_level1 = omp_get_num_threads();  // get number of threads of current level. not one below.
     //std::cout << "threads level 1 : " << threads_level1 << std::endl;
+
+    // thread_ID only used to set GPU rank & align with appropriate cores
+    if(thread_ID-1 > threads_level1 || thread_ID > 1){
+        printf("thread_ID = %d, num threads level 1 = %d. max thread_ID = 2! MISMATCH!\n", thread_ID, threads_level1);
+        exit(1);
+    }
 
     MPI_Get_processor_name(processor_name, &name_len);
     //printf("Processor name : %s\n",processor_name);
@@ -37,25 +43,29 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
         }
 
     } else {
-        printf("assuming I'm on ALEX!\n");    
-    }
-    // assume max 3 ranks per node
-    int max_rank_per_node = 4;
-    int MPI_rank_mod = MPI_rank % max_rank_per_node; 
+        if(MPI_rank == 0){
+            printf("assuming I'm on ALEX!\n"); 
+        }   
 
-    if(MPI_rank_mod == 0){
-	   GPU_rank = 2 + omp_get_thread_num(); // GPU2 & 3 attached to NUMA 1
-    } else if(MPI_rank_mod == 1){
-	   GPU_rank = 0 + omp_get_thread_num(); // GPU0 & 1 attached to NUMA 3
-    } else if(MPI_rank_mod == 2){
-	   GPU_rank = 6 + omp_get_thread_num(); // GPU6 & 7 attached to NUMA 5
-    } else if(MPI_rank_mod == 3){
-        GPU_rank = 4 + omp_get_thread_num(); // GPU4 & 5 attached to NUMA 7
-    } else {
-       printf("too many MPI ranks per node ...\n");
-       exit(1);
-    }
+        // assume max 3 ranks per node
+        int max_rank_per_node = 4;
+        int MPI_rank_mod = MPI_rank % max_rank_per_node; 
+
+        if(MPI_rank_mod == 0){
+            //GPU_rank = 2 + get_omp_num_threads(); // GPU2 & 3 attached to NUMA 1
+            GPU_rank = 2 + thread_ID; // GPU2 & 3 attached to NUMA 1
+        } else if(MPI_rank_mod == 1){
+            GPU_rank = 0 + thread_ID; // GPU0 & 1 attached to NUMA 3
+        } else if(MPI_rank_mod == 2){
+            GPU_rank = 6 + thread_ID; // GPU6 & 7 attached to NUMA 5
+        } else if(MPI_rank_mod == 3){
+            GPU_rank = 4 + thread_ID; // GPU4 & 5 attached to NUMA 7
+        } else {
+            printf("too many MPI ranks per node ...\n");
+            exit(1);
+        }
       
+    }
     //GPU_rank = MPI_rank % noGPUs;
     cudaSetDevice(GPU_rank);
 
@@ -73,6 +83,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no) : ns_t(ns), nt_
     std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
 #endif	
     
+    exit(1);
     solver = new RGF<double>(ns_t, nt_t, nb_t);
  
 #ifdef PRINT_MSG    
