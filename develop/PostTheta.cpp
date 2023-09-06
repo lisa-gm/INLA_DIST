@@ -1497,10 +1497,12 @@ MatrixXd PostTheta::get_Cov_interpret_param(Vect interpret_theta, double eps){
 	return cov;
 }
 
-void PostTheta::get_marginals_f(Vect& theta, Vect& mu, Vect& vars){
+void PostTheta::get_marginals_f(Vect& theta, Vect& mu_, Vect& vars){
 	
+	mu = mu_;
 	SpMat Q(n, n);
 	construct_Q(theta, mu, Q);
+	std::cout << "in get marginals f. Q(1:10,1:10) = \n" << Q.block(0,0,10,10) << std::endl;
 
 	/*
 	MatrixXd Q_d = MatrixXd(Q);
@@ -1537,6 +1539,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& mu, Vect& vars){
 	double timespent_sel_inv_pardiso = -omp_get_wtime();
 
 	if(constr == true){
+		printf("in get_marginals_f() constraints == TRUE.\n");
 		#pragma omp parallel
 		{
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
@@ -2783,6 +2786,7 @@ void PostTheta::construct_Q_spatial(Vect& theta, SpMat& Qs){
 		exit(1);
 	}
 
+	//std::cout << "theta = " << theta.transpose() << std::endl;
 	//printf("exp_theta1 = %f, exp_theta2 = %f\n", exp_theta1, exp_theta2);
 	//double exp_theta1 = -3;
 	//double exp_theta2 = 1.5;
@@ -2950,9 +2954,6 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 	}
 
 	if(ns > 0){
-		//SpMat Qu(nu, nu);
-		// TODO: find good way to assemble Qx
-
 		if(nt > 1){
 			construct_Q_spat_temp(theta, Qu);
 		} else {	
@@ -2964,7 +2965,6 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 		//t_Qcomp = - omp_get_wtime();
 	    for(int i=0; i<Qu.nonZeros(); i++){
             Qx.valuePtr()[i] = Qu.valuePtr()[i];
-            //Qx_new.valuePtr()[i] = 0.0;
         }
 
 		if(nss > 0){
@@ -2978,41 +2978,10 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 				{
 				Qx.coeffRef(it.row()+nst,it.col()+nst) = it.value();  
 				}
-			}
-
-			//instead go over valuePtr as before
-			// Qx.valuePtr()[i]               
+			}              
 		}
 
 		//t_Qcomp += omp_get_wtime();
-
-		// old way to assemble matrix, inefficient
-		/*
-		double t_Qcomp = -omp_get_wtime();	
-		// if the sparsity pattern of Qx is not set up yet
-		SpMat Qx_comp(n,n);
-		int nnz = Qu.nonZeros();
-		Qx_comp.reserve(nnz);
-
-		for (int k=0; k<Qu.outerSize(); ++k){
-		  for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
-		  {
-		    Qx_comp.insert(it.row(),it.col()) = it.value();                 
-		  }
-		}
-
-		for(int i=nu; i < n; i++){
-			// CAREFUL 1e-3 is arbitrary choice!!
-			Qx_comp.coeffRef(i,i) = 1e-3;
-		}
-
-		t_Qcomp += omp_get_wtime();
-		printf("old way: %f\n", t_Qcomp);
-		
-		printf("new way: %f\n", t_Qcomp);
-		printf("norm(Qx - Qx_comp) = %f\n", (Qx - Qx_comp).norm());
-		*/
-
 
 #ifdef PRINT_MSG
 		//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
@@ -3020,7 +2989,18 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 #endif
 		// can also be optimized but not as straight forward
 		// would need zero-padding in Qx
-		Q =  Qx + exp_theta0 * AxTAx;
+
+		if(likelihood.compare("gaussian") == 0){
+			Q =  Qx + exp_theta0 * AxTAx;
+		} else {
+			Vect eta = Ax * mu;
+			Vect diag_hess_eta = diagHess_cond_negLogPoisLik(eta);
+			SpMat hess_eta(no,no);
+			hess_eta.setIdentity();
+			hess_eta.diagonal() = diag_hess_eta;
+
+			Q = Qx + Ax.transpose() * hess_eta * Ax;
+		}
 
 #ifdef PRINT_MSG
 		std::cout << "exp(theta0) : \n" << exp_theta0 << std::endl;
@@ -3048,14 +3028,6 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 			//printf("in non-gaussian regression statement.\n");
 			SpRmMat hess_eta(no,no);
 			hess_eta.setIdentity();
-			// TODO: make x input parameter
-			/*if(n != 4){
-				printf("in construct_Q(). Properly implement it for non-Gaussian data!\n");
-				exit(1);
-			}*/
-
-			//Vect x(n); 
-			//x << -0.644116603734506,  0.473138588559389,  0.653101074984064, -1.813681904468703;
 			
 			// compute Gaussian at the mode
 			//std::cout << "mu: " << mu.transpose() << std::endl;
@@ -3065,7 +3037,7 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 			hess_eta.diagonal() = diag_hess_eta;
 			// hessian of negative log conditional (minimization)
 			Q = Qb + B.transpose() * hess_eta * B;
-			std::cout << "Q:\n" << MatrixXd(Q) << std::endl;
+			//std::cout << "Q:\n" << MatrixXd(Q) << std::endl;
 			//std::cout << "inv(Q):\n" << MatrixXd(Q).inverse() << std::endl;
 		}
 
@@ -3415,7 +3387,8 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
     Vect gradLik(no);
     Vect diag_hess_eta(no);
 
-    SpRmMat hess_eta(no,no);
+    //SpMat hess_eta(no,no);
+	SpRmMat hess_eta(no,no);
     hess_eta.setIdentity();
 
     Vect x_update(n);
@@ -3429,9 +3402,6 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
 	// construct prior Q (depends on theta which will remain fixed)
 	construct_Qprior(theta, Qx);
 
-    // Eigen solver for now
-    //SimplicialLLT<SpMat> solverNewton;
-
     // iteration
     int counter = 0;
     while((x_new - x_old).norm() > 1e-3){
@@ -3439,8 +3409,9 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
         counter += 1;
 		//printf("\ncounter = %d\n", counter);
 
-        if(counter > 20){
+        if(counter > 20){ // 20
             printf("max number of iterations reached in inner Iteration!\n");
+			//return;
             exit(1);
         }
 
@@ -3508,7 +3479,9 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
     }
 
     x = x_new;
-	std::cout << "Newton Iteration converged after " << counter << " iterations." << std::endl;
+	/*if(MPI_rank == 0){
+		std::cout << "Newton Iteration converged after " << counter << " iterations." << std::endl;
+	}*/
 
 }
 

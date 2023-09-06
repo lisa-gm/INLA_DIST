@@ -107,7 +107,7 @@ srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood}
 echo -e "numRanks numThreadsL1 numThreadsL2 SolverType "  >> ${RESULT_FILE}
 echo -e "${num_ranks} ${l1t} ${l2t} ${solver_type} " >> ${RESULT_FILE}
 echo -e " " >> ${RESULT_FILE}
-echo -e "TEST CASE I. regression model. Gaussian Data. ns = ${ns}, nt = ${nt}, nb = ${nb}, no = ${nb}. " >> ${RESULT_FILE}
+echo -e "TEST CASE II. spatial  model. Gaussian Data. ns = ${ns}, nt = ${nt}, nb = ${nb}, no = ${nb}. " >> ${RESULT_FILE}
 echo -n "est.  mean interpret. param. : "  >> ${RESULT_FILE}
 cat ${test2_output} | grep "est.  mean interpret. param." | cut -d':' -f 2 >> ${RESULT_FILE}
 echo -e "mean interpret. param. original  : 1.3862 -1.60943 1.098612 " >> ${RESULT_FILE}
