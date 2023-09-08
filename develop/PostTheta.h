@@ -22,6 +22,8 @@
 //#include <Eigen/CholmodSupport>
 #include <unsupported/Eigen/KroneckerProduct>
 
+//#include "../read_write_functions.h"
+
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
 #include "RGFSolver.h"
@@ -32,7 +34,7 @@
 
 //#define SMART_GRAD
 
-//#define PRINT_MSG
+#define PRINT_MSG
 //#define PRINT_TIMES
 //#define RECORD_TIMES
 //#define DATA_SYNTHETIC
@@ -372,9 +374,9 @@ class PostTheta{
     /**
      * @brief get conditional mean mu for theta -- Gaussian case.
      * @param [in]    theta hyperparameter vector
-     * @param [inout] mu vector of the conditional mean
+     * @param [inout] mu_ vector of the conditional mean
      */ 
-    void get_mu(Vect& theta, Vect& mu);
+    void get_mu(Vect& theta, Vect& mu_);
 
     #if 0
     /**
@@ -481,7 +483,7 @@ class PostTheta{
          * @param[inout] log_det inserts log determinant.
          * \todo construct spatial matrix (at the moment this is happening twice. FIX)
      */ 
-    void eval_log_prior_lat(Vect& theta, double &val);
+    void eval_log_prior_lat(Vect& theta, Vect& mu, double &val);
 
     /**
      * @brief compute log likelihood : log_det tau*no and value -theta*yTy
@@ -489,7 +491,7 @@ class PostTheta{
      * @param[inout] log_det inserts log determinant of log likelihood.
      * @param[inout] val inserts the value of -theta*yTy
      */ 
-    void eval_likelihood(Vect& theta, double &log_det, double &val);
+    void eval_likelihood(Vect& theta, Vect& mu, double &log_det, double &val);
     
     /**
      * @brief spatial model : SPDE discretisation -- matrix construction

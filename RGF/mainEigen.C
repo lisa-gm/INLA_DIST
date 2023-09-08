@@ -76,24 +76,24 @@ void construct_Q_spat_temp(SpMat& Qst, Vect& theta, SpMat& c0, SpMat& g1, SpMat&
 	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
 
 	 // g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
-		SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
+    SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
 
-		// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
-		SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
+    // g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
+    SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
-		#ifdef PRINT_MSG
-			/*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
-		std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
-		std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
-		std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
-        std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
-        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
-		#endif
+    #ifdef PRINT_MSG
+        /*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+    std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
+    std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
+    std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
+    std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
+    std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
+    #endif
 
-		// assemble overall precision matrix Q.st
-		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+    // assemble overall precision matrix Q.st
+    Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 
-		//std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
+    //std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
 }
 
 #if 1
@@ -553,10 +553,10 @@ size_t i; // iteration variable
     std::cout << "Q: \n" << Q << std::endl;
     */
 
-    int ns=2;
+    int ns=3;
     int nss=0;
-    int nt=3;
-    int nb=2;
+    int nt=5;
+    int nb=3;
     int n = ns*nt + nb;
 
     SpMat Q = gen_test_mat_base3(ns, nt, nb);
@@ -959,7 +959,7 @@ printf("# threads: %d\n", omp_get_max_threads());
 
 #if 1
 
-    
+
     int n = ns*nt + nss + nb;
     SpMat Q(n,n);
     Vect rhs(n);
@@ -972,8 +972,8 @@ printf("# threads: %d\n", omp_get_max_threads());
     //for(int c=0; c<1; c++){
         //theta = theta + Vect::Random(theta.size());
         //std::cout << "\niter = " << c << ". Constructing precision matrix Qxy. theta : " << theta.transpose() << std::endl;   
-        construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);
         
+        construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax); 
         std::cout << "Q : \n" << Q.block(0,0,8,8) << std::endl;
 
         //SpMat epsId(n,n);
@@ -1046,7 +1046,7 @@ printf("# threads: %d\n", omp_get_max_threads());
         // *********************************************** //
 
         RGF<T> *solver;
-        solver = new RGF<T>(ns, nt, nss+nb);
+        solver = new RGF<T>(ns, nt, nss+nb, GPU_rank);
 
         int m = 1;
         Vect t_factorize_vec(m-1);
@@ -1207,12 +1207,13 @@ printf("# threads: %d\n", omp_get_max_threads());
     }
 
     std::cout << "norm(diag(invQ_new)) = " << invQ_new.diagonal().norm() << std::endl;
-    std::cout << "norm(invDiag))       = " << invDiag_vec.norm() << std::endl;    
+    std::cout << "norm(invDiag)        = " << invDiag_vec.norm() << std::endl;   
+    //std::cout << "norm(diag(invEigen)) = " << inv_Q.diagonal().norm() << std::endl;    
     std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
     //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
 
-    std::string invQ_fileName = "invQ_new_" + to_string(n) + ".txt";
-    write_sym_CSC_matrix(invQ_fileName, invQ_new_lower);
+    //std::string invQ_fileName = "invQ_del2CompStream_" + to_string(n) + ".txt";
+    //write_sym_CSC_matrix(invQ_fileName, invQ_new_lower);
 
     /*
     std::string invQ_new_fileName = "invQ_new_diag_" + to_string(n) + ".txt";
