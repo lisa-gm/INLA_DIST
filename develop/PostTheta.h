@@ -34,7 +34,7 @@
 
 //#define SMART_GRAD
 
-#define PRINT_MSG
+//#define PRINT_MSG
 //#define PRINT_TIMES
 //#define RECORD_TIMES
 //#define DATA_SYNTHETIC

@@ -504,19 +504,13 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 	}
 	dimList(1) = 3;
 
-	if(nss == 0){
-		dim_th      = 4;    	 	// 6 hyperparameters, precision for the observations, 3 for the spatial-temporal model, 2 spatial model
-	}else if(nss > 0){
-		dim_th      = 6;
-		dimList(2)  = 2;
+	if(nss > 0){
+		dimList(2)  = 2;    	 	// 6 hyperparameters, precision for the observations, 3 for the spatial-temporal model, 2 spatial model
 		if(MPI_rank == 0){
 			printf("With additional spatial field!\n");
 		}
-	} else{
-		printf("invalid value for nss = %d\n!!", nss);
-		exit(1);
 	}
-
+	
 	if(theta_prior_param.size() != dimList.sum()){
 		printf("in spatial-temporal constructor. something wrong dimension theta!\n");
 		std::cout << "dim(theta prior param) = " << theta_prior_param.size() << std::endl;
@@ -645,8 +639,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 	// but we need it now for sparsity structure of Qx, Qxy
 	// get dimension of theta from theta_prior_param (has same dim. as theta)
 	Vect theta_dummy(theta_prior_param.size());
-	//theta_dummy.setOnes();
-	theta_dummy << 1.386796, -4.434666, 0.6711493, 1.632289, -5.058083, 2.664039;
+	theta_dummy.setOnes();
+	//theta_dummy << 1.386796, -4.434666, 0.6711493, 1.632289, -5.058083, 2.664039;
     //theta_dummy << 1.422895, -4.502342,  0.623269,  1.652469, -4.611303, 2.238631;
 	construct_Q_spat_temp(theta_dummy, Qst);
 
@@ -880,14 +874,14 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 #endif
 
 				Vect theta_forw(dim_th);
-				Vect mu_dummy = mu;
+				//Vect mu_dummy = mu;
 
 				theta_forw = theta + eps*G.col(k);
 #ifdef RECORD_TIMES
 		        t_Ftheta_ext = -omp_get_wtime();
 #endif			
 				//printf("\ni = %d. eval f(theta_forward)\n", i);
-				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu_dummy);
+				f_temp_list_loc(i) = eval_post_theta(theta_forw, mu);
 #ifdef RECORD_TIMES
                 t_Ftheta_ext += omp_get_wtime();
            		// for now write to file. Not sure where the best spot would be.
@@ -2075,7 +2069,7 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 // then evaluate p(x^* | theta), p(y | x^*, theta) & p(theta) -> no more parallelism in numerator & denominator
 double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
-	//std::cout << "in beginning eval post theta. mu(1:10) = " << mu.head(10).transpose() << std::endl;
+	//std::cout << "in beginning eval post theta. MPI rank = " << MPI_rank << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
 	if(omp_get_thread_num() == 0){
 		fct_count += 1;
 	}			
@@ -2494,13 +2488,13 @@ void PostTheta::eval_log_pc_prior_hp(double& log_sum, Vect& lambda, Vect& interp
 		// prior range s for add. spatial field
 		log_sum += log(dHalf * lambda[count]) - lambda[count] * exp(- dHalf * interpret_theta[count]) - dHalf * interpret_theta[count];
 		//log_sum += log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]);
-		//printf("prior range s for add. s: %f",log(lambda[4]) - 2*interpret_theta[4] - lambda[4]*exp(-interpret_theta[4]));
+		//printf("prior range s for add. s: %f",log(lambda[count]) - 2*interpret_theta[count] - lambda[count]*exp(-interpret_theta[count]));
 		count++;
 
 		// prior sigma u for add. spatial field
  		log_sum += log(lambda[count]) - lambda[count] * exp(interpret_theta[count]) + interpret_theta[count];
-		//log_sum += log(lambda[5]) - lambda[5]*exp(interpret_theta[5]);
-		//printf(", prior sigma u for add. s: %f", log(lambda[5]) - lambda[5]*exp(interpret_theta[5]));
+		log_sum += log(lambda[count]) - lambda[count]*exp(interpret_theta[count]);
+		//printf(", prior sigma u for add. s: %f", log(lambda[count]) - lambda[count]*exp(interpret_theta[count]));
 		count++;
   }
 
@@ -2811,8 +2805,6 @@ void PostTheta::construct_Q_spatial(Vect& theta, SpMat& Qs){
 
 
 void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
-
-	std::cout << "in construct QspatTemp. theta : " << theta.transpose() << std::endl;
 	
 	int count = 0;
 	// additional noise prec that we have to skip
@@ -2821,7 +2813,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 		count +=1;
 	}
 
-	printf("count + 2 = %d. theta[count+2] = %f\n", count+2, theta[count+2]);
+	//printf("count + 2 = %d. theta[count+2] = %f\n", count+2, theta[count+2]);
 
 	double exp_theta1 = exp(theta[count]);
 	double exp_theta2 = exp(theta[count+1]);
@@ -2832,8 +2824,6 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	/*double exp_theta1 = exp(-5.594859);
 	double exp_theta2 = exp(1.039721);
 	double exp_theta3 = exp(3.688879);*/
-
-	std::cout << "exp(theta) : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;	
 
 	// g^2 * fem$c0 + fem$g1
 	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
@@ -3226,11 +3216,12 @@ double PostTheta::cond_negLogPoisLik(Vect& eta){
 }
 
 Vect PostTheta::grad_cond_negLogPoisLik(Vect& eta){
+	//std::cout << "MPI rank: " << MPI_rank << ", in grad_cond_negLogPoisLik. norm(eta) = " << eta.norm() << ", eta(1:10) = " << eta.head(10).transpose() << std::endl;
 	Vect grad = y.array() - extraCoeffVecLik.array()*(eta.array().exp());
 
 	for(int i=0; i<no; i++){
 		if(isnan(grad[i]) || isinf(grad[i])){
-			printf("grad[%d] = %f, y[%d] = %f, extraCoeffVecLik[%d] = %f, eta[%d] = %f\n", i, grad[i], i, y[i], i, extraCoeffVecLik[i], i, eta[i]);
+			printf("MPI rank = %d, grad[%d] = %f, y[%d] = %f, extraCoeffVecLik[%d] = %f, eta[%d] = %f\n", MPI_rank, i, grad[i], i, y[i], i, extraCoeffVecLik[i], i, eta[i]);
 			printf("Potential problem: unreasonable values mu.\n");
 			exit(1);
 		}
@@ -3425,8 +3416,8 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
         counter += 1;
 		//printf("\ncounter = %d\n", counter);
 
-        if(counter > 20){ // 20
-            printf("max number of iterations reached in inner Iteration!\n");
+        if(counter > 50){ // 20
+            printf("max number of iterations reached in inner Iteration! counter = %d\n", counter);
 			//return;
             exit(1);
         }
@@ -3453,9 +3444,9 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
         hess_eta.diagonal() = diag_hess_eta;
 		//std::cout << "diagHessEta = " << diag_hess_eta.head(min(10, (int) n)).transpose() << std::endl;
 
-		/*std::cout << "gradLik(1:10)    = " << gradLik.head(10).transpose() << std::endl;
-		std::cout << "gradLik(-10:end) = " << gradLik.tail(10).transpose() << std::endl;
-		std::cout << "norm(gradLik) = " << gradLik.norm() << ", norm(diagHessEta) = " << diag_hess_eta.norm() << std::endl;*/
+		//std::cout << "gradLik(1:10)    = " << gradLik.head(10).transpose() << std::endl;
+		//std::cout << "gradLik(-10:end) = " << gradLik.tail(10).transpose() << std::endl;
+		//std::cout << "norm(gradLik) = " << gradLik.norm() << ", norm(diagHessEta) = " << diag_hess_eta.norm() << std::endl;
 
 		if(dimList(seq(1,2)).sum() == 0){
         	//FoD = Qx * x_new + B.transpose() * gradLik;
@@ -3495,11 +3486,12 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
     }
 
     x = x_new;
-#ifdef PRINT_MSG
-	if(MPI_rank == 0){
+	//std::cout << "mu(1:10) = " << x.head(10).transpose() << std::endl;
+//#ifdef PRINT_MSG
+	//if(MPI_rank == 0){
 		std::cout << "Newton Iteration converged after " << counter << " iterations." << std::endl;
-	}
-#endif
+	//}
+//#endif
 }
 
 // record times within one iteration (over multiple iterations)

@@ -432,13 +432,14 @@ int main(int argc, char* argv[])
     } else if(ns > 0 && nt > 1) {
 
         dimList(1) = 3;
+        if(likelihood.compare("gaussian") == 0){
+            dimList(0) = 1;
+        }
 
-        if(nss == 0){
-            dim_th = 4;
-        } else {
-            dim_th = 6;
+        if(nss > 0){
             dimList(2) = 2;
         }
+        dim_th = dimList.sum();
 
         //std::cout << "likelihood : " << likelihood << std::endl;
         
@@ -447,7 +448,7 @@ int main(int argc, char* argv[])
             if(nss > 0){
                 printf(" with add. spatial field");
             }
-            printf(".\n");
+            printf(". dim(theta) = %d\n", dim_th);
         }
 
         // files to construct Q.u depending on HYPERPARAMETERS theta
@@ -526,7 +527,8 @@ int main(int argc, char* argv[])
         file_exists(mean_latent_file);
         mean_latent_original = read_matrix(mean_latent_file, n, 1);  
 
-        mu_initial = mean_latent_original + Vect::Random(n);
+        // TODO: some initial guesses seem to be working others not ... whats going on
+        mu_initial = mean_latent_original + 0.5 * Vect::Random(n);
 
         if(MPI_rank == 0){
             std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;    
@@ -626,314 +628,344 @@ int main(int argc, char* argv[])
 
     } else if (ns > 0 && nt > 1){
 
+        if(likelihood.compare("gaussian") == 0){
+
 #ifdef DATA_SYNTHETIC
-        data_type = "synthetic";
+            data_type = "synthetic";
 
-        // constant in conversion between parametrisations changes dep. on spatial dim
-        // assuming sphere -> assuming R^3
-        dim_spatial_domain = 2;
-        //theta_test.spatial_dim = theta_prior_test.spatial_dim = theta_original_test.spatial_dim = 2;
+            // constant in conversion between parametrisations changes dep. on spatial dim
+            // assuming sphere -> assuming R^3
+            dim_spatial_domain = 2;
+            //theta_test.spatial_dim = theta_prior_test.spatial_dim = theta_original_test.spatial_dim = 2;
 
-        // define if on the sphere or plane
-        manifold = "sphere";
-        //theta_test.manifold = theta_prior_test.manifold = theta_original_test.manifold = "sphere"; 
+            // define if on the sphere or plane
+            manifold = "sphere";
+            //theta_test.manifold = theta_prior_test.manifold = theta_original_test.manifold = "sphere"; 
 
-        // =========== synthetic data set =============== //
-        if(MPI_rank == 0){ 
-            std::cout << "using SYNTHETIC DATASET" << std::endl; 
-            if(manifold == "sphere"){
-                std::cout << "spatial domain: " << manifold << std::endl;
+            // =========== synthetic data set =============== //
+            if(MPI_rank == 0){ 
+                std::cout << "using SYNTHETIC DATASET" << std::endl; 
+                if(manifold == "sphere"){
+                    std::cout << "spatial domain: " << manifold << std::endl;
+                }
+                else if(manifold.length() > 0){
+                    std::cout << "spatial domain: " << manifold << ", only SPHERE supported!" << std::endl;
+                    exit(1);
+                }
+            }     
+
+            if(nss == 0){
+                // sigma.e (noise observations), sigma.u, range s, range t
+                //theta_original_param << 0.5, 4, 1, 10;
+                // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
+                theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
+                //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
+                //theta_original_test.update_modelS(theta_original);
+                //std::cout << "theta original test : " << theta_original_test.flatten_modelS().transpose() << std::endl;
+
+                // using PC prior, choose lambda  
+                theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+                //theta_prior_test.update_interpretS(theta_prior_param);
+
+                //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
+                //theta_param << 4, 0, 0, 0;
+                //theta_param << 4,4,4,4;
+                theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
+                //theta_test.update_interpretS(theta_param);
+
+            } else {
+                // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
+                theta_original     << 1.386294, -3.870213, 0.6342557, 1.961659, -1.206621, -0.05889152;
+                //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
+                // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
+                //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
+                theta_prior_param  << -log(0.01)/5, -log(0.01)*pow(0.1, 0.5*dim_spatial_domain), -log(0.01)*pow(1, 0.5), -log(0.01)/1,-log(0.01)*pow(3000.0/6371.0, 0.5*dim_spatial_domain), -log(0.01)/5;
+                //theta_prior_test.update_interpretS(theta_prior_param);
+                
+                if(MPI_rank == 0){
+                    std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
+                }
+                // same order as above
+                //theta_param << 1.386294, 0.4054651, 1.386294,  0.6931472, 1.098612,  0.000000;
+                //theta_param        << 1.033, 0.431, 0.756, 0.247, 1.608, -0.495;
+                theta_param <<  4, 1, 3, 2, -1, 0;
             }
-            else if(manifold.length() > 0){
-                std::cout << "spatial domain: " << manifold << ", only SPHERE supported!" << std::endl;
-                exit(1);
-            }
-        }     
 
-        if(nss == 0){
-            // sigma.e (noise observations), sigma.u, range s, range t
-            //theta_original_param << 0.5, 4, 1, 10;
-            // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
-            theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
-            //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
-            //theta_original_test.update_modelS(theta_original);
-            //std::cout << "theta original test : " << theta_original_test.flatten_modelS().transpose() << std::endl;
+            if(constr == true){
 
-            // using PC prior, choose lambda  
-            theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
-            //theta_prior_test.update_interpretS(theta_prior_param);
-
-            //theta_param << 1.373900, 2.401475, 0.046548, 1.423546; 
-            //theta_param << 4, 0, 0, 0;
-            //theta_param << 4,4,4,4;
-            theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
-            //theta_test.update_interpretS(theta_param);
-
-        } else {
-            // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
-            theta_original     << 1.386294, -3.870213, 0.6342557, 1.961659, -1.206621, -0.05889152;
-            //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
-            // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
-            //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
-            theta_prior_param  << -log(0.01)/5, -log(0.01)*pow(0.1, 0.5*dim_spatial_domain), -log(0.01)*pow(1, 0.5), -log(0.01)/1,-log(0.01)*pow(3000.0/6371.0, 0.5*dim_spatial_domain), -log(0.01)/5;
-            //theta_prior_test.update_interpretS(theta_prior_param);
-            
-            if(MPI_rank == 0){
-                std::cout << "theta prior param : " << theta_prior_param.transpose() << std::endl;
-            }
-            // same order as above
-            //theta_param << 1.386294, 0.4054651, 1.386294,  0.6931472, 1.098612,  0.000000;
-            //theta_param        << 1.033, 0.431, 0.756, 0.247, 1.608, -0.495;
-            theta_param <<  4, 1, 3, 2, -1, 0;
-        }
-
-        if(constr == true){
-
-            if(MPI_rank == 0)
-                std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
-            // sum to zero constraint for latent parameters
-            // construct vector (in GMRF book called A, I will call it D) as D=diag(kron(M0, c0)) 
-            // in equidistant mesh this would be a vector of all ones, we want sum D_i x_i = 0
-
-            // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
-            // number of time-steps per constraint 
-            int tsPerConstr = 100;
-            num_constr = ceil(1.0 * nt / tsPerConstr);
-            if(MPI_rank == 0)
-                std::cout << "num constr = " << num_constr << std::endl;
-
-            if(num_constr*tsPerConstr < nt || tsPerConstr > nt){
                 if(MPI_rank == 0)
-                    std::cout << "Error! number of constraints * tsPerConstraint not matching nt!! " << num_constr << " " << tsPerConstr << std::endl;
-                exit(1);
-            }
+                    std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
+                // sum to zero constraint for latent parameters
+                // construct vector (in GMRF book called A, I will call it D) as D=diag(kron(M0, c0)) 
+                // in equidistant mesh this would be a vector of all ones, we want sum D_i x_i = 0
 
-            // initialize with zero
-            Dx.resize(num_constr, ns*nt);
-            Dx.setZero();
+                // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
+                // number of time-steps per constraint 
+                int tsPerConstr = 100;
+                num_constr = ceil(1.0 * nt / tsPerConstr);
+                if(MPI_rank == 0)
+                    std::cout << "num constr = " << num_constr << std::endl;
 
-            Vect M0_diag = M0.diagonal();
-
-            for(int i = 0; i<num_constr; i++){
-                int i_start = tsPerConstr*i;
-                //std::cout << "i_start = " << i_start << std::endl;
-                int i_end   = std::min(tsPerConstr*(i+1), (int) nt);
-                //std::cout << "i_end = " << i_end << std::endl;
-                int num_elem = i_end - i_start;
-
-                SpMat M(num_elem, num_elem);
-                Vect M_diag = M0_diag.segment(i_start,num_elem);
-                M = M0_diag.asDiagonal();
-                SpMat D = KroneckerProductSparse<SpMat, SpMat>(M, c0);
-                Vect D_diag = D.diagonal();
-
-                //std::cout << "ns*i_end = " << ns*i_end << std::endl;
-
-                for(int j=ns*i_start; j<ns*i_end; j++){
-                    //Dx(i,j) = 1.0;
-                    Dx(i,j) = D_diag(j);
+                if(num_constr*tsPerConstr < nt || tsPerConstr > nt){
+                    if(MPI_rank == 0)
+                        std::cout << "Error! number of constraints * tsPerConstraint not matching nt!! " << num_constr << " " << tsPerConstr << std::endl;
+                    exit(1);
                 }
 
-                //Dx = D.diagonal().transpose();
-                //Dx.row(i).segment(ns*i_start, ns*num_elem) << MatrixXd::Ones(1, num_elem);
-            }
+                // initialize with zero
+                Dx.resize(num_constr, ns*nt);
+                Dx.setZero();
 
-            /*if(MPI_rank == 0)
-                std::cout << Dx << std::endl;*/
+                Vect M0_diag = M0.diagonal();
 
-            // rescale Dx such that each row sums to one
-            for(int i=0; i<num_constr; i++){
-                double sum_row = Dx.row(i).sum();
-                Dx.row(i) = 1/sum_row*Dx.row(i);
-            }
+                for(int i = 0; i<num_constr; i++){
+                    int i_start = tsPerConstr*i;
+                    //std::cout << "i_start = " << i_start << std::endl;
+                    int i_end   = std::min(tsPerConstr*(i+1), (int) nt);
+                    //std::cout << "i_end = " << i_end << std::endl;
+                    int num_elem = i_end - i_start;
 
-            Dxy.resize(num_constr, n);
-            Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+                    SpMat M(num_elem, num_elem);
+                    Vect M_diag = M0_diag.segment(i_start,num_elem);
+                    M = M0_diag.asDiagonal();
+                    SpMat D = KroneckerProductSparse<SpMat, SpMat>(M, c0);
+                    Vect D_diag = D.diagonal();
 
-            // FOR NOW only SUM-TO-ZERO constraints feasible
-            e.resize(num_constr);
-            e = Vect::Zero(num_constr);     
+                    //std::cout << "ns*i_end = " << ns*i_end << std::endl;
 
-            //exit(1);       
+                    for(int j=ns*i_start; j<ns*i_end; j++){
+                        //Dx(i,j) = 1.0;
+                        Dx(i,j) = D_diag(j);
+                    }
+
+                    //Dx = D.diagonal().transpose();
+                    //Dx.row(i).segment(ns*i_start, ns*num_elem) << MatrixXd::Ones(1, num_elem);
+                }
+
+                /*if(MPI_rank == 0)
+                    std::cout << Dx << std::endl;*/
+
+                // rescale Dx such that each row sums to one
+                for(int i=0; i<num_constr; i++){
+                    double sum_row = Dx.row(i).sum();
+                    Dx.row(i) = 1/sum_row*Dx.row(i);
+                }
+
+                Dxy.resize(num_constr, n);
+                Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+                // FOR NOW only SUM-TO-ZERO constraints feasible
+                e.resize(num_constr);
+                e = Vect::Zero(num_constr);     
+
+                //exit(1);       
 
 #if 0
-            if(MPI_rank == 0)
-                std::cout << "constrain spatial-temporal data." << std::endl;
-            
-            // assemble Qst ... 
-            SpMat Qst(ns*nt, ns*nt);
-            construct_Q_spat_temp(theta_original, c0, g1, g2, g3, M0, M1, M2, Qst);
-            MatrixXd Qst_d = MatrixXd(Qst);
+                if(MPI_rank == 0)
+                    std::cout << "constrain spatial-temporal data." << std::endl;
+                
+                // assemble Qst ... 
+                SpMat Qst(ns*nt, ns*nt);
+                construct_Q_spat_temp(theta_original, c0, g1, g2, g3, M0, M1, M2, Qst);
+                MatrixXd Qst_d = MatrixXd(Qst);
 
-            generate_ex_spatial_temporal_constr(ns, nt, nb, no, theta_original, Qst_d, Ax, Dx, e, Prec, b, u, y);
+                generate_ex_spatial_temporal_constr(ns, nt, nb, no, theta_original, Qst_d, Ax, Dx, e, Prec, b, u, y);
 
-            Vect x(n);
-            x << u, b;
-            //std::cout << "true x = " << x.transpose() << std::endl;
+                Vect x(n);
+                x << u, b;
+                //std::cout << "true x = " << x.transpose() << std::endl;
 
-            // compute true UNCONSTRAINED marginal variances as
-            MatrixXd Q_x(n,n);
-            Q_x << Qst_d, MatrixXd::Zero(ns*nt, nb), MatrixXd::Zero(nb, ns*nt), Prec;
-            //std::cout << "Q_x : \n" << Q_x.block(0,0,20,20) << std::endl;
-            //std::cout << "dim(Q_x) = " << Q_x.rows() << " " << Q_x.cols() << std::endl;
-            //std::cout << "Q_x : \n" << Q_x(127,127) << std::endl; //Q_x.block(110,110,127,127)
+                // compute true UNCONSTRAINED marginal variances as
+                MatrixXd Q_x(n,n);
+                Q_x << Qst_d, MatrixXd::Zero(ns*nt, nb), MatrixXd::Zero(nb, ns*nt), Prec;
+                //std::cout << "Q_x : \n" << Q_x.block(0,0,20,20) << std::endl;
+                //std::cout << "dim(Q_x) = " << Q_x.rows() << " " << Q_x.cols() << std::endl;
+                //std::cout << "Q_x : \n" << Q_x(127,127) << std::endl; //Q_x.block(110,110,127,127)
 
-            //Q_xy = Q_x + t(Ax)*Q_e*Ax, where Q_e = exp(tau)*I  -> how to incorporate constraints?
-            MatrixXd Q_xy_true = Q_x + exp(theta_original[0])*Ax.transpose()*Ax;
-            MatrixXd Cov_xy_true = Q_xy_true.inverse(); // need to call pardiso here to be efficient ...       
-            //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
-            if(MPI_rank == 0)
-                std::cout << "unconstr. sd. fixed eff : " << Cov_xy_true.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
+                //Q_xy = Q_x + t(Ax)*Q_e*Ax, where Q_e = exp(tau)*I  -> how to incorporate constraints?
+                MatrixXd Q_xy_true = Q_x + exp(theta_original[0])*Ax.transpose()*Ax;
+                MatrixXd Cov_xy_true = Q_xy_true.inverse(); // need to call pardiso here to be efficient ...       
+                //std::cout << "Cov_xy_true = \n" << Cov_xy_true << std::endl;
+                if(MPI_rank == 0)
+                    std::cout << "unconstr. sd. fixed eff : " << Cov_xy_true.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
 
-            // update for constraints
-            MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
-            if(MPI_rank == 0)
-                std::cout << "constr. sd. fixed eff   : " << constraint_Cov_xy_true.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
+                // update for constraints
+                MatrixXd constraint_Cov_xy_true = Cov_xy_true - Cov_xy_true*Dxy.transpose()*(Dxy*Cov_xy_true*Dxy.transpose()).inverse()*Dxy*Cov_xy_true;
+                if(MPI_rank == 0)
+                    std::cout << "constr. sd. fixed eff   : " << constraint_Cov_xy_true.diagonal().tail(nb).cwiseSqrt().transpose() << std::endl;
 
-            //exit(1);
+                //exit(1);
 #endif            
-        } // end if(constraint)
+            } // end if(constraint)
 
 #elif defined(DATA_TEMPERATURE)
 
-        // =========== temperature data set =============== //
-        data_type = "temperature";
+            // =========== temperature data set =============== //
+            data_type = "temperature";
 
-        if(MPI_rank == 0){
-            std::cout << "using TEMPERATURE DATASET" << std::endl; 
-            if(constr)
-                std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
-        }
-
-        // constant in conversion between parametrisations changes dep. on spatial dim
-        dim_spatial_domain = 2;
-        //theta_test.spatial_dim = theta_prior_test.spatial_dim = theta_original_test.spatial_dim = 2;
-
-        //theta_param << 4, 0, 0, 0;
-        //theta_param << -1.5, 7, 7, 3;
-        theta_param << 0, 7, 2, 1.4;
-        //theta_test.update_interpretS(theta_param);
-
-        //theta_original << -1.269613,  5.424197, -8.734293, -6.026165;  // estimated from INLA / same for my code varies a bit according to problem size
-	    //theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
-
-        // using PC prior, choose lambda  
-        // previous order : interpret_theta & lambda order : sigma.e, range t, range s, sigma.u -> doesn't match anymore
-        // NEW ORDER sigma.e, range s, range t, sigma.u 
-        //theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
-        // -log(p)/u where c(u, p)
-        theta_prior_param[0] = -log(0.01)/5; 	      //prior.sigma obs : 5, 0.01
-        //theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
-        theta_prior_param[1] = -log(0.01)/300;        
-        //theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
-        theta_prior_param[2] = -log(0.01)/1;
-        //theta_prior_param[3] = -log(0.5)/10;          //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
-        theta_prior_param[3] = -log(0.01)/5;	    
-        //theta_prior_test.update_interpretS(theta_prior_param);
-
-        //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
-        //theta << -0.2, -2, -2, 3;
-        /*if(MPI_rank == 0){
-            std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
-        }*/
-
-        if(constr){
-#if 1
-            // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
-            // number of time-steps per constraint 
-            int tsPerConstr = nt;
-            num_constr = ceil(1.0 * nt / tsPerConstr);
-            if(MPI_rank == 0)
-                std::cout << "num constr = " << num_constr << std::endl;
-
-            if(num_constr*tsPerConstr < nt || tsPerConstr > nt){
-                if(MPI_rank == 0)
-                    std::cout << "Error! number of constraints * tsPerConstraint not matching nt!! " << num_constr << " " << tsPerConstr << std::endl;
-                exit(1);
+            if(MPI_rank == 0){
+                std::cout << "using TEMPERATURE DATASET" << std::endl; 
+                if(constr)
+                    std::cout << "assuming sum-to-zero constraints on spatial-temporal field." << std::endl;
             }
 
-            // initialize with zero
-            Dx.resize(num_constr, ns*nt);
-            Dx.setZero();
+            // constant in conversion between parametrisations changes dep. on spatial dim
+            dim_spatial_domain = 2;
+            //theta_test.spatial_dim = theta_prior_test.spatial_dim = theta_original_test.spatial_dim = 2;
 
-            Vect M0_diag = M0.diagonal();
+            //theta_param << 4, 0, 0, 0;
+            //theta_param << -1.5, 7, 7, 3;
+            theta_param << 0, 7, 2, 1.4;
+            //theta_test.update_interpretS(theta_param);
 
-            for(int i = 0; i<num_constr; i++){
-                int i_start = tsPerConstr*i;
-                //std::cout << "i_start = " << i_start << std::endl;
-                int i_end   = std::min(tsPerConstr*(i+1), (int) nt);
-                //std::cout << "i_end = " << i_end << std::endl;
-                int num_elem = i_end - i_start;
+            //theta_original << -1.269613,  5.424197, -8.734293, -6.026165;  // estimated from INLA / same for my code varies a bit according to problem size
+            //theta_original_param << -2.090, 9.245, 11.976, 2.997; // estimated from INLA
 
-                SpMat M(num_elem, num_elem);
-                Vect M_diag = M0_diag.segment(i_start,num_elem);
-                M = M0_diag.asDiagonal();
-                SpMat D = KroneckerProductSparse<SpMat, SpMat>(M, c0);
-                Vect D_diag = D.diagonal();
+            // using PC prior, choose lambda  
+            // previous order : interpret_theta & lambda order : sigma.e, range t, range s, sigma.u -> doesn't match anymore
+            // NEW ORDER sigma.e, range s, range t, sigma.u 
+            //theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
+            // -log(p)/u where c(u, p)
+            theta_prior_param[0] = -log(0.01)/5; 	      //prior.sigma obs : 5, 0.01
+            //theta_prior_param[1] = -log(0.5)/1000;        //prior.rs=c(1000, 0.5), ## P(range_s < 1000) = 0.5
+            theta_prior_param[1] = -log(0.01)/300;        
+            //theta_prior_param[2] = -log(0.5)/20;	      //prior.rt=c(20, 0.5), ## P(range_t < 20) = 0.5
+            theta_prior_param[2] = -log(0.01)/1;
+            //theta_prior_param[3] = -log(0.5)/10;          //prior.sigma=c(10, 0.5) ## P(sigma_u > 10) = 0.5
+            theta_prior_param[3] = -log(0.01)/5;	    
+            //theta_prior_test.update_interpretS(theta_prior_param);
 
-                //std::cout << "ns*i_end = " << ns*i_end << std::endl;
+            //std::cout << "theta prior        : " << std::right << std::fixed << theta_prior.transpose() << std::endl;
+            //theta << -0.2, -2, -2, 3;
+            /*if(MPI_rank == 0){
+                std::cout << "initial theta      : "  << std::right << std::fixed << theta.transpose() << std::endl;
+            }*/
 
-                for(int j=ns*i_start; j<ns*i_end; j++){
-                    //Dx(i,j) = 1.0;
-                    Dx(i,j) = D_diag(j);
+            if(constr){
+#if 1
+                // =============== 1 SUM-TO-ZERO CONSTRAINT PER K TIME-STEPS ==================== //
+                // number of time-steps per constraint 
+                int tsPerConstr = nt;
+                num_constr = ceil(1.0 * nt / tsPerConstr);
+                if(MPI_rank == 0)
+                    std::cout << "num constr = " << num_constr << std::endl;
+
+                if(num_constr*tsPerConstr < nt || tsPerConstr > nt){
+                    if(MPI_rank == 0)
+                        std::cout << "Error! number of constraints * tsPerConstraint not matching nt!! " << num_constr << " " << tsPerConstr << std::endl;
+                    exit(1);
                 }
 
-                //Dx = D.diagonal().transpose();
-                //Dx.row(i).segment(ns*i_start, ns*num_elem) << MatrixXd::Ones(1, num_elem);
-            }
+                // initialize with zero
+                Dx.resize(num_constr, ns*nt);
+                Dx.setZero();
 
-            /*if(MPI_rank == 0)
-                std::cout << Dx << std::endl;*/
+                Vect M0_diag = M0.diagonal();
 
-            // rescale Dx such that each row sums to one
-            for(int i=0; i<num_constr; i++){
-                double sum_row = Dx.row(i).sum();
-                Dx.row(i) = 1/sum_row*Dx.row(i);
-            }
+                for(int i = 0; i<num_constr; i++){
+                    int i_start = tsPerConstr*i;
+                    //std::cout << "i_start = " << i_start << std::endl;
+                    int i_end   = std::min(tsPerConstr*(i+1), (int) nt);
+                    //std::cout << "i_end = " << i_end << std::endl;
+                    int num_elem = i_end - i_start;
 
-            Dxy.resize(num_constr, n);
-            Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+                    SpMat M(num_elem, num_elem);
+                    Vect M_diag = M0_diag.segment(i_start,num_elem);
+                    M = M0_diag.asDiagonal();
+                    SpMat D = KroneckerProductSparse<SpMat, SpMat>(M, c0);
+                    Vect D_diag = D.diagonal();
 
-            // FOR NOW only SUM-TO-ZERO constraints feasible
-            e.resize(num_constr);
-            e = Vect::Zero(num_constr);  
-            
+                    //std::cout << "ns*i_end = " << ns*i_end << std::endl;
+
+                    for(int j=ns*i_start; j<ns*i_end; j++){
+                        //Dx(i,j) = 1.0;
+                        Dx(i,j) = D_diag(j);
+                    }
+
+                    //Dx = D.diagonal().transpose();
+                    //Dx.row(i).segment(ns*i_start, ns*num_elem) << MatrixXd::Ones(1, num_elem);
+                }
+
+                /*if(MPI_rank == 0)
+                    std::cout << Dx << std::endl;*/
+
+                // rescale Dx such that each row sums to one
+                for(int i=0; i<num_constr; i++){
+                    double sum_row = Dx.row(i).sum();
+                    Dx.row(i) = 1/sum_row*Dx.row(i);
+                }
+
+                Dxy.resize(num_constr, n);
+                Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+                // FOR NOW only SUM-TO-ZERO constraints feasible
+                e.resize(num_constr);
+                e = Vect::Zero(num_constr);  
+                
 #endif
-            // set up constraints Dx = e
-            /*Dx.resize(num_constr, ns*nt);
-            SpMat D = KroneckerProductSparse<SpMat, SpMat>(M0, c0);
-            Dx = D.diagonal().transpose();
-            if(MPI_rank == 0){
-                std::cout << "sum(Dx)  = " << Dx.row(0).sum() << std::endl;
-                //std::cout << "Dx(1:50) = " << Dx.block(0,0,1,50) << std::endl;
+                // set up constraints Dx = e
+                /*Dx.resize(num_constr, ns*nt);
+                SpMat D = KroneckerProductSparse<SpMat, SpMat>(M0, c0);
+                Dx = D.diagonal().transpose();
+                if(MPI_rank == 0){
+                    std::cout << "sum(Dx)  = " << Dx.row(0).sum() << std::endl;
+                    //std::cout << "Dx(1:50) = " << Dx.block(0,0,1,50) << std::endl;
+                }
+                //Dx << MatrixXd::Ones(num_constr, ns*nt);
+
+                // rescale Dx such that each row sums to one
+                for(int i=0; i<num_constr; i++){
+                    double sum_row = Dx.row(i).sum();
+                    Dx = 1/sum_row*Dx;
+                }
+
+                if(MPI_rank == 0){
+                    std::cout << "sum(Dx)  = " << Dx.row(0).sum() << std::endl;
+                    //std::cout << "Dx(1:50) = " << Dx.block(0,0,1,50) << std::endl;
+                }
+
+                Dxy.resize(num_constr, n);
+                Dxy << Dx, MatrixXd::Zero(num_constr, nb);
+
+                // FOR NOW only SUM-TO-ZERO constraints possible
+                e.resize(num_constr);
+                e = Vect::Zero(num_constr); 
+
+                //exit(1);*/
             }
-            //Dx << MatrixXd::Ones(num_constr, ns*nt);
-
-            // rescale Dx such that each row sums to one
-            for(int i=0; i<num_constr; i++){
-                double sum_row = Dx.row(i).sum();
-                Dx = 1/sum_row*Dx;
-            }
-
-            if(MPI_rank == 0){
-                std::cout << "sum(Dx)  = " << Dx.row(0).sum() << std::endl;
-                //std::cout << "Dx(1:50) = " << Dx.block(0,0,1,50) << std::endl;
-            }
-
-            Dxy.resize(num_constr, n);
-            Dxy << Dx, MatrixXd::Zero(num_constr, nb);
-
-            // FOR NOW only SUM-TO-ZERO constraints possible
-            e.resize(num_constr);
-            e = Vect::Zero(num_constr); 
-
-            //exit(1);*/
-        }
 
 #else 
-        std::cerr << "\nUnknown datatype! Choose synthetic or temperature dataset!" << std::endl;
-        exit(1);
+            std::cerr << "\nUnknown datatype! Choose synthetic or temperature dataset!" << std::endl;
+            exit(1);
 #endif
+
+        // none-gaussian likelihood
+        } else {
+            std::cout << "Spatial-Temporal model." << std::endl;
+
+            if(MPI_rank == 0){ 
+                std::cout << "using SYNTHETIC DATASET" << std::endl; 
+            }
+            dim_spatial_domain = 2; 
+            // read in original theta for comparison. order: prec obs, range s, prec sigma u
+            //std::string theta_original_param_file        =  base_path + "/theta_interpretS_original_" + to_string(dim_th) + "_1" + ".dat";
+            std::string theta_original_param_file        =  base_path + "/theta_interpretS_INLA_" + to_string(dim_th) + "_1" + ".dat";
+            file_exists(theta_original_param_file); 
+            theta_original_param = read_matrix(theta_original_param_file, dim_th, 1);
+
+            // read in lambdas for pc prior. same order.  
+            std::string lambda_file        =  base_path + "/pc_prior_theta_lambdas_" + to_string(dim_th) + "_1" + ".dat";
+            file_exists(lambda_file);
+
+            theta_prior_param = read_matrix(lambda_file, dim_th, 1);
+
+            //theta_prior_param << 1, -2.3, 2.1;
+            //theta_prior_test.update_modelS(theta_prior_param);
+            theta_param << theta_original_param + 2*Vect::Random(dim_th);
+            std::cout << "initial theta param : "  << theta_param.transpose() << std::endl; 
+        
+
+        } // end if : gaussian / non-gaussian
 
     } else {
         printf("unknown parameters, likelihood or datatype!");
@@ -1022,7 +1054,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-7;
     //param.delta = 1e-9; // ref sol
     // maximum line search iterations
-    param.max_iterations = 20; //200;
+    param.max_iterations = 200; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -1051,6 +1083,7 @@ int main(int argc, char* argv[])
     } else if(ns > 0 && nt > 1 && nss == 0){
         if(MPI_rank == 0){
             std::cout << "\ncall spatial-temporal constructor." << std::endl;
+            std::cout << "likelihood: " << likelihood << std::endl;
         }
         fun = new PostTheta(ns, nt, nb, no, Ax, y, c0, g1, g2, g3, M0, M1, M2, theta_prior_param, mu_initial, likelihood, extraCoeffVecLik, solver_type, dim_spatial_domain, manifold, constr, Dx, Dxy, validate, w);
     } else if(ns > 0 && nt > 1 && nss > 0){
@@ -1122,7 +1155,7 @@ int main(int argc, char* argv[])
         // no separate function to construct Qprior
         SpMat Qprior(n,n);
         fun->get_Qprior(theta_original, Qprior);
-        std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(0, 0, min(10, (int) n), min(10, (int) n)) << std::endl;
+        //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(0, 0, min(10, (int) n), min(10, (int) n)) << std::endl;
         //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(399, 399, 30, 30) << std::endl;
 
 
@@ -1131,8 +1164,6 @@ int main(int argc, char* argv[])
 
         Vect eta = Ax * mean_latent_original;
         std::cout << "eta(1:10) = " << eta.head(10).transpose() << std::endl;
-        double val_logPoisLik  = fun->cond_LogPoisLik(eta);
-        printf("val_logPoisLik:    %f\n", val_logPoisLik);
 
         double val_negLogPoisLik  = fun->cond_negLogPoisLik(eta);
         printf("val_negLogPoisLik: %f\n", val_negLogPoisLik);
@@ -1150,49 +1181,53 @@ int main(int argc, char* argv[])
         */
 
 #if 1
-        Vect gradEta(no);
-        fun->FD_gradient(eta, gradEta);
+        //Vect gradEta(no);
+        //fun->FD_gradient(eta, gradEta);
+        Vect gradEta = fun->grad_cond_negLogPoisLik(eta);
         //std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
         //std::cout << "grad    = " << (Ax.transpose() * gradEta).head(min(10, (int) n)).transpose() << std::endl;
+        std::cout << "norm(grad(eta)) = " << gradEta.norm() << std::endl;
 
-        Vect diagHessEta(no);
-        fun->FD_diag_hessian(eta, diagHessEta);
+        //Vect diagHessEta(no);
+        //fun->FD_diag_hessian(eta, diagHessEta);
+        Vect diagHessEta = fun->diagHess_cond_negLogPoisLik(eta);
         //std::cout << "diagHessEta = " << diagHessEta.head(10).transpose() << std::endl;
         SpMat hess_eta(no,no);
         hess_eta.setIdentity();
         hess_eta.diagonal() = diagHessEta;
+        std::cout << "norm(diagHess(eta)) = " << diagHessEta.norm() << std::endl;
         //std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
 
         SpMat Qxy(n,n);
         double log_det;
 
-        Vect mu = mean_latent_original; // + Vect::Random(n);
-        mu_initial = mu;
+        //Vect mu = mean_latent_original + Vect::Random(n);
+        Vect mu = mu_initial;
         std::cout << "initial  x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
+        std::cout << "norm(init. lat - orig lat) : " << (mu - mean_latent_original).norm() << std::endl;
 
         SpMat Qx(n,n);
-        std::cout << "call INLA. theta = " << theta_original.transpose() << std::endl;
         fun->get_Qprior(theta_original, Qx); // construct_Qprior() will throw error, probably sth to do with Qx being internal variable?
 
         //string fileName_Qprior = "Qx_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nss" + to_string(nss) + "_nb" + to_string(nb) + "_no" + to_string(no) + ".dat";
         //write_sym_CSC_matrix(fileName_Qprior, Qx);
         //std::cout << "Qx(1:10,1:10) = \n" << Qx.block(0,0,10,10) << std::endl;
-
-        fun->NewtonIter(theta_original, mu, Qxy, log_det);
-
-        //string fileName_Q = "Qxy_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nss" + to_string(nss) + "_nb" + to_string(nb) + "_no" + to_string(no) + ".dat";
-        //write_sym_CSC_matrix(fileName_Q, Qxy);
-        //std::cout << "Qxy(1:10,1:10) = \n" << Qxy.block(0,0,10,10) << std::endl;
+        fun->NewtonIter(theta, mu, Qxy, log_det);
+        
+        /*string fileName_Q = "Qxy_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nss" + to_string(nss) + "_nb" + to_string(nb) + "_no" + to_string(no) + ".dat";
+        write_sym_CSC_matrix(fileName_Q, Qxy);
+        std::cout << "Qxy(1:10,1:10) = \n" << Qxy.block(0,0,10,10) << std::endl;*/
 
         std::cout << "estimated x : " << mu.head(min(10, (int) n)).transpose() << std::endl;
         std::cout << "original  x : " << mean_latent_original.head(min(10, (int) n)).transpose() << "\n" << std::endl;
 
         std::cout << "estimated fixed effects : " << mu.tail(nb).transpose() << std::endl;
         std::cout << "original  fixed effects : " << mean_latent_original.tail(nb).transpose() << std::endl;
-
+        std::cout << "norm(est. lat - orig lat) : " << (mu - mean_latent_original).norm() << std::endl;
 
         Vect eta_est = Ax * mean_latent_original;
-        fun->FD_diag_hessian(eta_est, diagHessEta);
+        //fun->FD_diag_hessian(eta_est, diagHessEta);
+        diagHessEta = fun->diagHess_cond_negLogPoisLik(eta_est);
         MatrixXd hessModeCond = Qprior + Ax.transpose() * hess_eta * Ax;
 
         if(n < 25){
@@ -1201,6 +1236,8 @@ int main(int argc, char* argv[])
             std::cout << "invHessModeCond = \n" << invHessModeCond << std::endl;
             std::cout << "\nsd fixed effects = " << invHessModeCond.diagonal().cwiseSqrt().transpose() << std::endl; 
         }
+
+       // exit(1);
 
         Vect marg(n);
         fun->get_marginals_f(theta_original, mean_latent_original, marg);
@@ -1213,6 +1250,7 @@ int main(int argc, char* argv[])
     } // end testing inner iteration
 #endif
 
+MPI_Barrier(MPI_COMM_WORLD);
 //exit(1);
 
 #if 0
@@ -1470,7 +1508,7 @@ double time_bfgs = 0.0;
 
  double t_get_covariance = 0.0;
 
-#if 0
+#if 1
     Vect theta_max(dim_th);
     //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
     //theta_max << 1.377415, -4.522942, 0.6501593, 1.710503, -4.603187, 2.243890;
