@@ -6,7 +6,7 @@
 #include "CWC_utility.H"
 #include "magma_v2.h"
 
-#define CUDA_POTRF
+//#define CUDA_POTRF
 
 #ifdef CUDA_POTRF
 #include "cusolverDn.h"
@@ -30,18 +30,25 @@ extern "C" {
     void fortran_name(daxpy,DAXPY)(int *n,double *da,double *dx,int *incx,double *dy,\
                                       int *incy);
     double fortran_name(dnrm2,DNRM2)(int *n,double *dx,int *incx);
+    float fortran_name(snrm2,SNRM2)(int *n,float *dx,int *incx);
     double fortran_name(dznrm2,DZNRM2)(int *n,CPX *dx,int *incx);
     void fortran_name(dscal,DSCAL)(int *n,double *da,double *dx,int *incx);
     void fortran_name(zscal,ZSCAL)(int *n,CPX *da,CPX *dx,int *incx);
     void fortran_name(dgemm,DGEMM)(char *transa, char *transb, int *m, int *n, int *k, \
                                    double *alpha, double *a, int *lda, double *b, int *ldb, \
                                    double *beta, double *c, int *ldc);
+    void fortran_name(sgemm,SGEMM)(char *transa, char *transb, int *m, int *n, int *k, \
+                                   float *alpha, float *a, int *lda, float *b, int *ldb, \
+                                   float *beta, float *c, int *ldc);
     void fortran_name(dsymm,DSYMM)(char *side, char *uplo, int *m, int *n, double *alpha, \
                                    double *a, int *lda, double *b, int *ldb, double *beta, \
                                    double *c, int *ldc);
     void fortran_name(dtrsm,DTRSM)(char *side, char *uplo, char *transa, char *diag, \
                                    int *m, int *n, \
                                    double *alpha, double *a, int *lda, double *b, int *ldb);
+    void fortran_name(strsm,STRSM)(char *side, char *uplo, char *transa, char *diag, \
+                                   int *m, int *n, \
+                                   float *alpha, float *a, int *lda, float *b, int *ldb);                               
     void fortran_name(zgemm,ZGEMM)(char *transa, char *transb, int *m, int *n, int *k, \
                                    CPX *alpha, CPX *a, int *lda, CPX *b, int *ldb, \
                                    CPX *beta, CPX *c, int *ldc);
@@ -160,6 +167,14 @@ inline double c_dnrm2(int n,double* dx,int incx)
     return fortran_name(dnrm2,DNRM2)(&n,dx,&incx);
 }
 
+// NEW SINGLE PRECISION
+/************************************************************************************************/
+
+inline double c_dnrm2(int n,float* dx,int incx)
+{
+    return fortran_name(snrm2,SNRM2)(&n,dx,&incx);
+}
+
 /************************************************************************************************/
 
 inline double c_dznrm2(int n,CPX* dx,int incx)
@@ -191,6 +206,14 @@ inline void c_dgemm(char transa, char transb, int m, int n, int k, double alpha,
 
 /************************************************************************************************/
 
+inline void c_sgemm(char transa, char transb, int m, int n, int k, float alpha, float *a, \
+                    int lda, float *b, int ldb, float beta, float *c, int ldc)
+{
+    fortran_name(sgemm,SGEMM)(&transa,&transb,&m,&n,&k,&alpha,a,&lda,b,&ldb,&beta,c,&ldc);
+}
+
+/************************************************************************************************/
+
 inline void c_dsymm(char side,char uplo, int m, int n, double alpha, double *a, int lda, \
                     double *b, int ldb, double beta, double *c, int ldc)
 {
@@ -202,6 +225,14 @@ inline void c_dsymm(char side,char uplo, int m, int n, double alpha, double *a, 
 inline void c_dtrsm(char side, char uplo, char transa, char diag, int m, int n, double alpha, double *a, int lda, double *b, int ldb)
 {
     fortran_name(dtrsm,DTRSM)(&side,&uplo,&transa,&diag,&m,&n,&alpha,a,&lda,b,&ldb);
+}
+
+// new SINGLE PRECISION
+/************************************************************************************************/
+
+inline void c_strsm(char side, char uplo, char transa, char diag, int m, int n, float alpha, float *a, int lda, float *b, int ldb)
+{
+    fortran_name(strsm,STRSM)(&side,&uplo,&transa,&diag,&m,&n,&alpha,a,&lda,b,&ldb);
 }
 
 /************************************************************************************************/
@@ -354,6 +385,13 @@ inline double c_dtnrm2(int n,double *x,int incx)
     return c_dnrm2(n,x,incx);
 }
 
+// new SINGLE PRECISION
+template <>
+inline double c_dtnrm2(int n,float *x,int incx)
+{
+    return c_dnrm2(n,x,incx);
+}
+
 template <>
 inline double c_dtnrm2(int n,CPX *x,int incx)
 {
@@ -388,6 +426,13 @@ inline void c_tgemm(char transa, char transb, int m, int n, int k, double alpha,
                     int lda, double *b, int ldb, double beta, double *c, int ldc)
 {
     c_dgemm(transa,transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc);
+}
+
+template <>
+inline void c_tgemm(char transa, char transb, int m, int n, int k, float alpha, float *a, \
+                    int lda, float *b, int ldb, float beta, float *c, int ldc)
+{
+    c_sgemm(transa,transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc);
 }
 
 template <>
@@ -431,6 +476,14 @@ inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, 
     c_dtrsm(side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, \
+                    float alpha, float *a, int lda, float *b, int ldb)
+{
+    c_strsm(side,uplo,transa,diag,m,n,alpha,a,lda,b,ldb);
+}
+
 // for complex numbers
 template <>
 inline void c_ttrsm(char side, char uplo, char transa, char diag, int m, int n, \
@@ -456,6 +509,20 @@ inline void tgemm_dev(char transa, char transb, int m, int n, int k, double alph
     magma_dgemm(magma_transa,magma_transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc,queue);
 
 }
+
+// new SINGLE PRECISION
+template <>
+inline void tgemm_dev(char transa, char transb, int m, int n, int k, float alpha,\
+		      float *a, int lda, float *b, int ldb, float beta, float *c, int ldc, magma_queue_t queue)
+{
+    magma_trans_t magma_transa = magma_trans_const(transa);
+    magma_trans_t magma_transb = magma_trans_const(transb);
+
+    //dgemm_on_dev(handle,transa,transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc);
+    magma_sgemm(magma_transa,magma_transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc,queue);
+
+}
+
 
 template <>
 inline void tgemm_dev(char transa, char transb, int m, int n, int k, CPX alpha,\
@@ -721,6 +788,19 @@ inline void ttrtri_dev(char uplo,char diag,int n,double *a,int lda,int *info)
     magma_dtrtri_gpu(magma_uplo,magma_diag,n,a,lda,info);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void ttrtri_dev(char uplo,char diag,int n,float *a,int lda,int *info)
+{
+    magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    magma_diag_t magma_diag = magma_diag_const(diag);
+
+    //printf("trtri float.\n");
+    //cudaDeviceSynchronize();
+
+    magma_strtri_gpu(magma_uplo,magma_diag,n,a,lda,info);
+}
+
 template <>
 inline void ttrtri_dev(char uplo,char diag,int n,CPX *a,int lda,int *info)
 {
@@ -894,6 +974,35 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
     magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
     //magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version    
 
+    /*double a_problem_host;
+    int ind_error = 991;
+    gpuErrchk(cudaMemcpy(&a_problem_host, &a[ind_error], sizeof(double), cudaMemcpyDeviceToHost));
+    printf("ind error = %d, a[ind_error] = %f\n", ind_error, a_problem_host);
+    exit(1);*/
+
+    if(potrfErr != 0){
+	    std::cout << "magma potrf error = " << potrfErr << std::endl;
+        int ind_error = (potrfErr-1)*(lda+1);
+        double a_problem_host;
+        gpuErrchk(cudaMemcpy(&a_problem_host, &a[ind_error], sizeof(double), cudaMemcpyDeviceToHost));
+        printf("ind error = %d, a[ind_error] = %f\n", ind_error, a_problem_host);
+    	exit(1);
+    }
+}
+
+// new SINGLE PRECISION
+template <>
+inline void tpotrf_dev(char uplo,int n,float *a,int lda,int *info)
+{
+    //double a_host;
+    //gpuErrchk(cudaMemcpy(&a_host, &a[0], sizeof(double), cudaMemcpyDeviceToHost)); 
+    //printf("in potrf. n = %d, lda = %d, a[0] = %f\n", n, lda, a_host);
+
+    magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    //magma_int_t potrfErr = magma_dpotrf_expert_gpu(magma_uplo,n,a,lda,info, 64, MagmaNative ); // native: gpu only
+    magma_int_t potrfErr = magma_spotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
+    //magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version    
+
     if(potrfErr != 0){
 	    std::cout << "magma potrf error = " << potrfErr << std::endl;
         int ind_error = (potrfErr-1)*(lda+1);
@@ -931,6 +1040,21 @@ inline void ttrsm_dev(char side, char uplo, char trans, char diag, int m, int n,
     magma_dtrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void ttrsm_dev(char side, char uplo, char trans, char diag, int m, int n, float alpha, float *a, int lda, float *b, int ldb, magma_queue_t queue)
+{
+    magma_side_t magma_side = magma_side_const(side);
+    magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    magma_trans_t magma_trans = magma_trans_const(trans);
+    magma_diag_t magma_diag = magma_diag_const(diag);
+
+    //printf("in ttrsm float.\n");
+    //cudaDeviceSynchronize();
+
+    magma_strsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
+}
+
 template <>
 inline void ttrsm_dev(char side, char uplo, char trans, char diag, int m, int n, CPX alpha, CPX *a, int lda, CPX *b, int ldb, magma_queue_t queue)
 {
@@ -949,10 +1073,22 @@ inline void tlacpy_dev(char uplo, int m, int n, T *a, int lda, T *b, int ldb, ma
 
 template <>
 inline void tlacpy_dev(char uplo, int m, int n, double *a, int lda, double *b, int ldb, magma_queue_t queue)
-{
+{   
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
 
     magmablas_dlacpy(magma_uplo, m, n, a, lda, b, ldb, queue);
+
+}
+
+// new SINGLE PRECISION
+template <>
+inline void tlacpy_dev(char uplo, int m, int n, float *a, int lda, float *b, int ldb, magma_queue_t queue)
+{
+    magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    //printf("in tlacpy float.\n");
+    //cudaDeviceSynchronize();
+
+    magmablas_slacpy(magma_uplo, m, n, a, lda, b, ldb, queue);
 
 }
 
@@ -1193,6 +1329,12 @@ inline void init_eye_on_dev(double *var,int N,cudaStream_t stream){
     d_init_eye_on_dev(var,N,stream);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void init_eye_on_dev(float *var,int N,cudaStream_t stream){
+    s_init_eye_on_dev(var,N,stream);
+}
+
 template <>
 inline void init_eye_on_dev(CPX *var,int N,cudaStream_t stream){
     z_init_eye_on_dev(var,N,stream);
@@ -1282,6 +1424,13 @@ inline void tril_dev(double *A, int lda, int N)
     d_tril_on_dev(A, lda, N);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void tril_dev(float *A, int lda, int N)
+{
+    s_tril_on_dev(A, lda, N);
+}
+
 template <>
 inline void tril_dev(CPX *A, int lda, int N)
 {
@@ -1314,6 +1463,13 @@ template <>
 inline void indexed_copy_offset_dev(double *src, double *dst, size_t *index, size_t N, size_t offset)
 {
     d_indexed_copy_offset_on_dev(src, dst, index, N, offset);
+}
+
+// new SINGLE PRECISION
+template <>
+inline void indexed_copy_offset_dev(float *src, float *dst, size_t *index, size_t N, size_t offset)
+{
+    s_indexed_copy_offset_on_dev(src, dst, index, N, offset);
 }
 
 template <>
@@ -1396,6 +1552,13 @@ inline void fill_dev(double *x, const double value, size_t N)
     d_fill_on_dev(x, value, N);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void fill_dev(float *x, const float value, size_t N)
+{
+    s_fill_on_dev(x, value, N);
+}
+
 template <>
 inline void fill_dev(CPX *x, const CPX value, size_t N)
 {
@@ -1430,6 +1593,13 @@ inline void init_supernode_dev(double *M, size_t *ia, size_t *ja, double *a, siz
     d_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd, stream);
 }
 
+// new SINGLE PRECISION
+template <>
+inline void init_supernode_dev(float *M, size_t *ia, size_t *ja, float *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
+{
+    s_init_supernode_on_dev(M, ia, ja, a, supernode, supernode_nnz, supernode_offset, ns, nt, nd, stream);
+}
+
 template <>
 inline void init_supernode_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
@@ -1446,6 +1616,13 @@ template <>
 inline void extract_nnzA_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
 {
     d_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+}
+
+// new SINGLE PRECISION
+template <>
+inline void extract_nnzA_dev(float *a, size_t *ia, size_t *ja, float *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+    s_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
 }
 
 template <>

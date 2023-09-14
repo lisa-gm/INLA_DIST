@@ -18,7 +18,7 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
 
-//#define MAGMA
+#define MAGMA
 
 #if 1
 typedef float T;
@@ -47,7 +47,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line)
     }
 }
 
-
 MatrixXd read_matrix(const string filename,  int n_row, int n_col){
 
     arma::mat X(n_row, n_col);
@@ -57,23 +56,27 @@ MatrixXd read_matrix(const string filename,  int n_row, int n_col){
     return Eigen::Map<MatrixXd>(X.memptr(), X.n_rows, X.n_cols);
 }
 
-
 /*
-magma_zpotrf_expert_gpu_work(
+magma_int_t magma_tpotrf_expert(){
+    
+    magma_dpotrf_expert_gpu_work(
     magma_uplo_t uplo, magma_int_t n,
-    magmaDoubleComplex_ptr dA, magma_int_t ldda,
+    magmaDouble_ptr dA, magma_int_t ldda,
     magma_int_t *info,
-    magma_mode_t mode,
-    magma_int_t nb, magma_int_t recnb,
-    void* host_work,   magma_int_t *lwork_host,
-    void* device_work, magma_int_t *lwork_device,
-    magma_event_t events[2], magma_queue_t queues[2] )
+    magma_mode_t mode, // MagmaHybrid MagmaNative
+    magma_int_t nb, // block size -> 
+    magma_int_t recnb, // within nb -> double: 64/128, float 128/256. put recnb 32. then increase nb.
+    void* host_work,   magma_int_t *lwork_host, -> lwork_host set to negative number, in code
+    void* device_work, magma_int_t *lwork_device, -> lwork_device set to negative, in code
+    magma_event_t events[2], magma_queue_t queues[2] ) -> 
+}
 */
+
 
 // new magma -- double precision
 magma_int_t magma_tpotrf_gpu(magma_uplo_t magma_uplo, magma_int_t n, magmaDouble_ptr dA, magma_int_t ldda, magma_int_t * info)
 {
-    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,dA,ldda,info);
+    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,dA,ldda,info);    
     return potrfErr;
 }	
 
@@ -99,6 +102,54 @@ void tpotrf_magma_dev(char uplo,int n,T *a,int lda,int *info)
         std::cout << "magma potrf error = " << potrfErr << std::endl;
         exit(1);
     }
+
+}
+
+void ttrsm_dev(magma_side_t magma_side, magma_uplo_t magma_uplo, magma_trans_t magma_trans, magma_diag_t magma_diag, int m, int n, double alpha, double *a, int lda, double *b, int ldb, magma_queue_t queue)
+{
+    magma_dtrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
+}
+
+void ttrsm_dev(magma_side_t magma_side, magma_uplo_t magma_uplo, magma_trans_t magma_trans, magma_diag_t magma_diag, int m, int n, float alpha, float *a, int lda, float *b, int ldb, magma_queue_t queue)
+{
+    magma_strsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
+}
+
+void ttrsm_magma_dev(char side, char uplo, char trans, char diag, int m, int n, T alpha, T *a, int lda, T *b, int ldb, magma_queue_t queue){
+    
+    magma_side_t magma_side = magma_side_const(side);
+    magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    magma_trans_t magma_trans = magma_trans_const(trans);
+    magma_diag_t magma_diag = magma_diag_const(diag);
+
+    ttrsm_dev(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
+}
+
+
+void magma_tgemm(magma_trans_t transA, magma_trans_t transB, magma_int_t m, magma_int_t n, magma_int_t k, double alpha,
+                magmaDouble_const_ptr dA, magma_int_t ldda, magmaDouble_const_ptr dB, magma_int_t lddb,
+                double beta, magmaDouble_ptr dC, magma_int_t lddc, magma_queue_t queue)
+{
+    magma_dgemm(transA, transB, m, n, k, alpha, dA, ldda, dB, lddb, beta, dC, lddc, queue);	
+
+}
+
+
+void magma_tgemm(magma_trans_t transA, magma_trans_t transB, magma_int_t m, magma_int_t n, magma_int_t k, float alpha,
+                magmaFloat_const_ptr dA, magma_int_t ldda, magmaFloat_const_ptr dB, magma_int_t lddb, float beta, magmaFloat_ptr dC,
+                magma_int_t lddc, magma_queue_t queue)
+{
+    magma_sgemm(transA, transB, m, n, k, alpha, dA, ldda, dB, lddb, beta, dC, lddc, queue);	
+}	
+
+void tgemm_magma_dev(int n, T alpha, T beta, T *A, T* B, T* C, magma_queue_t queue){
+
+    //magma_trans_t magma_transa = magma_trans_const(transa);
+    //magma_trans_t magma_transb = magma_trans_const(transb);
+    magma_trans_t magma_transa = magma_trans_const('N');
+    magma_trans_t magma_transb = magma_trans_const('N');
+
+    magma_tgemm(magma_transa, magma_transb, n, n, n, alpha, A, n, B, n, beta, C, n, queue);
 
 }
 
@@ -272,10 +323,13 @@ int main(int argc, char* argv[])
     //std::string filename = "../gpu_potrf/Qst_firstBlock_" + to_string(n) + "_" + to_string(n) + ".txt";
 	//Q = read_matrix(filename, n, n);
 
-    
+    double t_genMat = - omp_get_wtime();
     Q = MatrixXd::Random(n,n);
     Q = Q*Q.transpose();
-    std::cout << "Q :\n" << Q << std::endl;
+    std::cout << "Q :\n" << Q.block(0,0,min(10, (int) n), min(10, (int) n)) << std::endl;
+
+    t_genMat += omp_get_wtime();
+    printf("time spent generate matrix : %f\n", t_genMat);
 
     if(sizeof(T) == 8){
         printf("Template T is double.\n");
@@ -297,13 +351,13 @@ int main(int argc, char* argv[])
     T* Q_host;
     T* L_host;
 
-    cudaMalloc((void**)&Id_dev, n*n*sizeof(T));
-    cudaMalloc((void**)&Q_dev1,n*n*sizeof(T));
-    cudaMalloc((void**)&Q_dev2,n*n*sizeof(T));
+    checkCudaErrors(cudaMalloc((void**)&Id_dev, n*n*sizeof(T)));
+    checkCudaErrors(cudaMalloc((void**)&Q_dev1,n*n*sizeof(T)));
+    checkCudaErrors(cudaMalloc((void**)&Q_dev2,n*n*sizeof(T)));
 
-    cudaMallocHost((void**)&Id_host, n*n*sizeof(T));
-    cudaMallocHost((void**)&Q_host,n*n*sizeof(T));
-    cudaMallocHost((void**)&L_host,n*n*sizeof(T));
+    checkCudaErrors(cudaMallocHost((void**)&Id_host, n*n*sizeof(T)));
+    checkCudaErrors(cudaMallocHost((void**)&Q_host,n*n*sizeof(T)));
+    checkCudaErrors(cudaMallocHost((void**)&L_host,n*n*sizeof(T)));
 
     for(int i=0; i<n*n; i++){
         Id_host[i] = 0.0;
@@ -330,7 +384,7 @@ int main(int argc, char* argv[])
     cudaEvent_t  compute_gpu;
     cudaEvent_t  copy_gpu;
 
-    //magma_queue_t magma_compute_queue;
+    magma_queue_t magma_compute_queue;
 
     checkCudaErrors(cudaStreamCreate(&compute_stream));
     checkCudaErrors(cudaStreamCreate(&copy_stream));
@@ -339,26 +393,56 @@ int main(int argc, char* argv[])
 
     checkCudaErrors(cudaMemcpy(Id_dev, Id_host, n*n*sizeof(T), cudaMemcpyHostToDevice));
 
+    double t_gpu_calls = - omp_get_wtime();
 #ifdef MAGMA
     printf("using MAMGA.\n");
     magma_init();
     
-    /*
     magma_device_t device;
     magma_getdevice(&device);
     magma_queue_create_from_cuda(device, compute_stream, NULL, NULL, &magma_compute_queue);
-    */
+    
    checkCudaErrors(cudaMemcpy(Q_dev1, Q_host, n*n*sizeof(T), cudaMemcpyHostToDevice));
 
 	tpotrf_magma_dev('L', n, Q_dev1, n, &info1);
     // TODO: check if this works for single preicision
 	checkCudaErrors(cudaMemcpy(L_host, Q_dev1, n*n*sizeof(T), cudaMemcpyDeviceToHost));
 
-	magma_finalize();
+	printf("\nL_host: ");
+	for(int i=0; i<n*n; i++){
+		printf(" %f", L_host[i]);
+	}
+	printf("\n");
+ 
+    cudaDeviceSynchronize();
+    ttrsm_magma_dev('R', 'L', 'T', 'N', n, n, alpha, Q_dev1, n, Id_dev, n, magma_compute_queue);
+
+	checkCudaErrors(cudaMemcpy(Id_host, Id_dev, n*n*sizeof(T), cudaMemcpyDeviceToHost));
+	printf("\nQ2 after ttrsm: ");
+	for(int i=0; i<n*n; i++){
+		printf(" %f", Id_host[i]);
+	}
+	printf("\n");
+
+    tgemm_magma_dev(n, alpha, beta, Id_dev, Id_dev, Q_dev2, magma_compute_queue);
+
+	printf("\nQ2 after gemm: ");
+	for(int i=0; i<n*n; i++){
+		printf(" %f", Id_host[i]);
+	}
+	printf("\n");
+	checkCudaErrors(cudaMemcpy(Id_host, Q_dev2, n*n*sizeof(T), cudaMemcpyDeviceToHost));
+
+
+    double logDet;
+    get_logDet(L_host, n, logDet);
+    printf("logDet       : %f\n", logDet);
+
+    magma_finalize();
 #else
     printf("using CUDA.\n");
     printf("entering loop\n\n");
-    for(int i=0; i<1; i++){
+    for(int i=0; i<10; i++){
         //checkCudaErrors(cudaMemcpyAsync(Q_dev1, Id_host, n*n*sizeof(double), cudaMemcpyHostToDevice, compute_stream));
         checkCudaErrors(cudaMemcpyAsync(Q_dev1, Q_host, n*n*sizeof(T), cudaMemcpyHostToDevice, copy_stream));
        
@@ -367,7 +451,7 @@ int main(int argc, char* argv[])
         checkCudaErrors(cudaStreamWaitEvent(compute_stream, copy_gpu, 0));	
 
         dpotrf_cuda_dev('L', n, Q_dev1, n, compute_stream, &info1);
-        //tgemm_cuda_dev(n, alpha, beta, Id_dev, Q_dev1, Q_dev2, compute_stream);
+        tgemm_cuda_dev(n, alpha, beta, Id_dev, Q_dev1, Q_dev2, compute_stream);
         
         // perform copying in copy_stream
         checkCudaErrors(cudaEventRecord(compute_gpu, compute_stream)); // want copy_stream to wait
@@ -375,14 +459,17 @@ int main(int argc, char* argv[])
         //checkCudaErrors(cudaMemcpyAsync(L_host, Q_dev2, n*n*sizeof(T), cudaMemcpyDeviceToHost, copy_stream));
         checkCudaErrors(cudaMemcpyAsync(L_host, Q_dev1, n*n*sizeof(T), cudaMemcpyDeviceToHost, copy_stream));
 
+        cudaDeviceSynchronize();
+
+        double logDet;
+        get_logDet(L_host, n, logDet);
+        printf("logDet       : %f\n", logDet);
+
     }
 #endif
 
-    cudaDeviceSynchronize();
-
-    double logDet;
-    get_logDet(L_host, n, logDet);
-    printf("logDet       : %f\n", logDet);
+    t_gpu_calls += omp_get_wtime();
+    printf("time spent cuda/magma call: %f\n", t_gpu_calls);
 
     Eigen::LLT<MatrixXd> lltOfA(Q); // compute the Cholesky decomposition of A
     MatrixXd L = lltOfA.matrixL();
@@ -390,17 +477,19 @@ int main(int argc, char* argv[])
     printf("logDet Eigen : %f\n", 2*(L.diagonal().array().log().sum()));
 
 
+
+
     /*for(int i=0; i<n*n; i++){
         L1.data()[i] = L_host[i];
     }*/
 
-	/*
-	printf("L array: ");
+	
+	printf("after trsm on host: ");
 	for(int i=0; i<n*n; i++){
-		printf(" %f", L.data()[i]);
+		printf(" %f", Id_host[i]);
 	}
 	printf("\n");
-	*/
+	
 
     //printf("after computation.\n");
 

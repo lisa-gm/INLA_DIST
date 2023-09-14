@@ -85,7 +85,9 @@ void copy_data_to_device(void *host_data,void *device_data,int N,int M,size_t si
 
 extern "C"
 void memcpy_to_device(void *host_data, void *device_data, size_t size_element, cudaStream_t stream ) {
-     cudaMemcpyAsync(device_data,host_data,size_element,cudaMemcpyHostToDevice, stream );
+     cudaError_t cudaErr = cudaMemcpyAsync(device_data,host_data,size_element,cudaMemcpyHostToDevice, stream );
+     //cudaError_t cudaErr = cudaMemcpy (device_data, host_data, size_element, cudaMemcpyHostToDevice);
+     if (cudaErr != cudaSuccess) { printf("Copy Supernode to device. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); }
 }
 
 extern "C"
@@ -166,6 +168,13 @@ void daxpy_on_dev(void *handle,int n,double alpha,double *x,int incx,double *y,i
     cublasDaxpy((cublasHandle_t)handle,n,&alpha,x,incx,y,incy);
 }
 
+// new SINGLE PRECISION
+extern "C"
+void saxpy_on_dev(void *handle,int n,float alpha,float *x,int incx,float *y,int incy){
+  
+    cublasSaxpy((cublasHandle_t)handle,n,&alpha,x,incx,y,incy);
+}
+
 extern "C"
 void zaxpy_on_dev(void *handle,int n,CPX alpha,CPX *x,int incx,CPX *y,int incy){
   
@@ -198,6 +207,22 @@ void dsum_on_dev(int n,double *x,int incx,double *result,magma_queue_t queue)
 
     cudaFree(y);
 }
+
+// *** new SINGLE PRECISION ***
+extern "C"
+void ssum_on_dev(int n,float *x,int incx,float *result,magma_queue_t queue)
+{
+    float one = 1.0;
+    float *y;
+    int incy = 0;
+    cudaMalloc(&y, 1*sizeof(float));
+    cudaMemcpy(y, &one, 1*sizeof(float), cudaMemcpyHostToDevice);
+
+    *result = magma_sdot(n, x, incx, y, incy, queue);
+
+    cudaFree(y);
+}
+// ************************ // 
 
 extern "C"
 void zsum_on_dev(int n,CPX *x,int incx,CPX *result,magma_queue_t queue)
@@ -254,6 +279,30 @@ void d_init_eye_on_dev(double *var,int N,cudaStream_t stream){
 
     d_init_eye_on_device<<< i_N/BLOCK_DIM, BLOCK_DIM, 0, stream >>>(var,N);
 }
+
+// *** new SINGLE PRECISION *** //
+__global__ void s_init_eye_on_device(float *var,int N){
+
+     int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+     if(idx<N*N){
+	var[idx] = 0.0;
+	if(!(idx%(N+1))){
+	    var[idx] = 1.0;
+	}	   
+     }
+
+     __syncthreads();
+}
+
+extern "C"
+void s_init_eye_on_dev(float *var,int N,cudaStream_t stream){
+
+    uint i_N = N*N + (BLOCK_DIM-((N*N)%BLOCK_DIM));
+
+    s_init_eye_on_device<<< i_N/BLOCK_DIM, BLOCK_DIM, 0, stream >>>(var,N);
+}
+// ***************************** //
 
 __global__ void z_init_variable_on_dev(cuDoubleComplex *var,int N){
 
@@ -385,6 +434,38 @@ void d_extract_diag_on_dev(double *D,int *edge_i,int *index_j,double *nnz,int NR
     d_extract_diag<<< i_N/BLOCK_DIM, BLOCK_DIM, 0, stream >>>(D,edge_i,index_j,nnz,NR,imin,imax,shift,findx);
 }
 
+// new SINGLE PRECISION
+__global__ void s_extract_diag(float *D,int *edge_i,int *index_j,float *nnz,\
+	   int NR,int imin,int imax,int shift,int findx){
+
+     int j;
+     int ind_j;	   
+     int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+     if(idx<NR){
+	  for(j=edge_i[idx+imin]-findx;j<edge_i[idx+imin+1]-findx;j++){
+	      ind_j = index_j[j]-findx-shift-imin;
+	      if((ind_j>=0)&&(ind_j<NR)){
+	          //D[idx+ind_j*NR] = nnz[j].x;
+	          D[idx+ind_j*NR] = nnz[j];
+	      }
+	  }
+     }	   
+
+     __syncthreads();
+}
+
+extern "C"
+void s_extract_diag_on_dev(float *D,int *edge_i,int *index_j,float *nnz,int NR,\
+     int imin,int imax,int shift,int findx,cudaStream_t stream){
+
+    uint i_N = NR + (BLOCK_DIM-(NR%BLOCK_DIM));
+
+    s_extract_diag<<< i_N/BLOCK_DIM, BLOCK_DIM, 0, stream >>>(D,edge_i,index_j,nnz,NR,imin,imax,shift,findx);
+}
+// *********************************** //
+
+
 __global__ void d_extract_not_diag(double *D,int *edge_i,int *index_j,double *nnz,\
 	   int NR,int imin,int imax,int jmin,int side,int shift,int findx){
 
@@ -485,6 +566,16 @@ void z_extract_not_diag_on_dev(CPX* *D,int *edge_i,int *index_j,CPX *nnz,int NR,
 extern "C"
 void d_copy_csr_to_device(int size,int n_nonzeros,int *hedge_i,int *hindex_j,double *hnnz,\
           		  int *dedge_i,int *dindex_j,double *dnnz){
+    
+    cudaMemcpyAsync(dedge_i,hedge_i,(size+1)*sizeof(int),cudaMemcpyHostToDevice,NULL);
+    cudaMemcpyAsync(dindex_j,hindex_j,n_nonzeros*sizeof(int),cudaMemcpyHostToDevice,NULL);
+    cudaMemcpyAsync(dnnz,hnnz,n_nonzeros*sizeof(double),cudaMemcpyHostToDevice,NULL);
+}
+
+// new SINGLE PRECISION
+extern "C"
+void s_copy_csr_to_device(int size,int n_nonzeros,int *hedge_i,int *hindex_j,float *hnnz,\
+          		  int *dedge_i,int *dindex_j,float *dnnz){
     
     cudaMemcpyAsync(dedge_i,hedge_i,(size+1)*sizeof(int),cudaMemcpyHostToDevice,NULL);
     cudaMemcpyAsync(dindex_j,hindex_j,n_nonzeros*sizeof(int),cudaMemcpyHostToDevice,NULL);
@@ -819,6 +910,33 @@ void d_tril_on_dev(double *A, int lda, int N)
     d_tril<<<grid, threads>>>(A, lda, N);
 }
 
+// *** new SINGLE PRECISION *** //
+__global__ void s_tril(float *A, int lda, int N)
+{
+   unsigned int xIndex = blockIdx.x * BLOCK_DIM + threadIdx.x;
+   unsigned int yIndex = blockIdx.y * BLOCK_DIM + threadIdx.y;
+
+   if((xIndex < N) && (yIndex < N) && (xIndex > yIndex))
+   {
+      unsigned int i  = xIndex * lda + yIndex;
+      A[i] = 0.0;
+   }
+
+   __syncthreads();
+}
+
+extern "C"
+void s_tril_on_dev(float *A, int lda, int N)
+{
+    uint i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
+
+    dim3 grid(i_size / BLOCK_DIM, i_size / BLOCK_DIM, 1);
+    dim3 threads(BLOCK_DIM, BLOCK_DIM, 1);
+
+    s_tril<<<grid, threads>>>(A, lda, N);
+}
+// ****************************** //
+
 __global__ void z_tril(cuDoubleComplex *A, int lda, int N)
 {
    unsigned int xIndex = blockIdx.x * BLOCK_DIM + threadIdx.x;
@@ -905,6 +1023,28 @@ void d_indexed_copy_offset_on_dev(double *src, double *dst, size_t *index, size_
     d_indexed_copy_offset<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(src, dst, index, N, offset);
 }
 
+// *** new SINGLE PRECISION ***
+__global__ void s_indexed_copy_offset(float *src, float *dst, size_t *index, size_t N, size_t offset)
+{
+   size_t idx = blockIdx.x * BLOCK_DIM + threadIdx.x;
+
+   if (idx < N)
+   {
+      dst[idx] = src[index[idx]-offset];
+   }
+
+   __syncthreads();
+}
+
+extern "C"
+void s_indexed_copy_offset_on_dev(float *src, float *dst, size_t *index, size_t N, size_t offset)
+{
+    size_t i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
+
+    s_indexed_copy_offset<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(src, dst, index, N, offset);
+}
+// ******************************* //
+
 __global__ void z_indexed_copy_offset(cuDoubleComplex *src, cuDoubleComplex *dst, size_t *index, size_t N, size_t offset)
 {
    size_t idx = blockIdx.x * BLOCK_DIM + threadIdx.x;
@@ -982,6 +1122,25 @@ void d_fill_on_dev(double *x, const double value, size_t N)
 
     d_fill<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(x, value, N);
 }
+
+// *** new SINGLE PRECISION *** //
+__global__
+void s_fill(float* x, const float value, size_t n)
+{
+    auto i = threadIdx.x + blockDim.x*blockIdx.x;
+    if(i < n) {
+        x[i] = value;
+    }
+}
+
+extern "C"
+void s_fill_on_dev(float *x, const float value, size_t N)
+{
+    size_t i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
+
+    s_fill<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(x, value, N);
+}
+// ************************ //
 
 __global__
 void z_fill(cuDoubleComplex* x, const cuDoubleComplex value, size_t n)
@@ -1104,7 +1263,7 @@ __global__ void d_init_supernode(double *M, size_t *ia, size_t *ja, double *a, s
 
       size_t i = getPos(r, c, ns, nt, nd) - offset;
       //printf("initSN: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
-
+      
       M[i] = a[idx];
    }
 
@@ -1114,7 +1273,7 @@ __global__ void d_init_supernode(double *M, size_t *ia, size_t *ja, double *a, s
 extern "C"
 void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, 
 	 size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
-{
+{    
     size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
 
     size_t supernode_fc = supernode * ns;
@@ -1122,7 +1281,49 @@ void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_
 
     d_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(M, ia, ja, a, supernode_fc, 
 	supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    //cudaDeviceSynchronize(); // needed for the printf() from getPos()
+
 }
+
+// *** new SINGLE PRECISION *** //
+__global__ void s_init_supernode(float *M, size_t *ia, size_t *ja, float *a, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+   size_t idx = blockIdx.x * BLOCK_DIM + threadIdx.x;
+
+   size_t offset = getPos(supernode_fc, supernode_fc, ns, nt, nd);
+
+   if (idx < supernode_nnz)
+   {
+      size_t c = 0;
+      while (ia[c+1] < idx+supernode_offset+1)
+         c++;
+      c += supernode_fc;
+      size_t r = ja[idx];
+
+      size_t i = getPos(r, c, ns, nt, nd) - offset;
+      //printf("initSN: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
+      
+      M[i] = a[idx];
+   }
+
+   __syncthreads();
+}
+
+extern "C"
+void s_init_supernode_on_dev(float *M, size_t *ia, size_t *ja, float *a, size_t supernode, 
+	 size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
+{
+    size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
+
+    size_t supernode_fc = supernode * ns;
+    size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
+
+    s_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(M, ia, ja, a, supernode_fc, 
+	supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    //cudaDeviceSynchronize(); // needed for the printf() from getPos()
+
+}
+// ******************************* //
 
 
 __global__ void z_init_supernode(cuDoubleComplex *M, size_t *ia, size_t *ja, cuDoubleComplex *a, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
@@ -1191,6 +1392,35 @@ __global__ void d_extract_nnzA(double *a, size_t *ia, size_t *ja, double *M, siz
    __syncthreads();
 }
 
+// *** new SINGLE PRECISION *** //
+__global__ void s_extract_nnzA(float *a, size_t *ia, size_t *ja, float *M, size_t supernode_fc, size_t supernode_lc, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+   size_t idx = blockIdx.x * BLOCK_DIM + threadIdx.x;
+
+   size_t offset = getPos(supernode_fc, supernode_fc, ns, nt, nd);
+
+   if (idx < supernode_nnz)
+   {
+      size_t c = 0;
+
+      while (ia[c+1] < idx+supernode_offset+1){
+         c++;
+      }
+
+      c += supernode_fc;
+      size_t r = ja[idx];
+      size_t i = getPos(r, c, ns, nt, nd) - offset;
+
+      //printf("exNNZ: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
+
+      a[idx] = M[i];
+   }
+
+   __syncthreads();
+}
+
+// ************************** //
+
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
 inline void gpuAssert(cudaError_t code, const char *file, int line)
@@ -1213,6 +1443,21 @@ void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t 
     size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
 
     d_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+
+    gpuErrchk(cudaDeviceSynchronize());
+}
+
+
+extern "C"
+void s_extract_nnzA_on_dev(float *a, size_t *ia, size_t *ja, float *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+{
+    //printf("in d_extract_nnzA_on_dev()\n");
+    size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
+
+    size_t supernode_fc = supernode * ns;
+    size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
+
+    s_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 
     gpuErrchk(cudaDeviceSynchronize());
 }

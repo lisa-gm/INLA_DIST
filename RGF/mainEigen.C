@@ -24,11 +24,13 @@ using Eigen::MatrixXd;
 
 typedef Eigen::VectorXd Vect;
 
-//#define PRINT_MSG
+#define PRINT_MSG
 
 #if 0
-typedef CPX T;
-#define assign_T(val) CPX(val, 0.0)
+typedef float T;
+#define assign_T(val);
+//typedef CPX T;
+//#define assign_T(val) CPX(val, 0.0)
 #else
 typedef double T;
 #define assign_T(val) val
@@ -76,27 +78,27 @@ void construct_Q_spat_temp(SpMat& Qst, Vect& theta, SpMat& c0, SpMat& g1, SpMat&
 	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
 
 	 // g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
-    SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
+		SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
 
-    // g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
-    SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
+		// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
+		SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
-    #ifdef PRINT_MSG
-        /*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
-    std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
-    std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
-    std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
-    std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
-    std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
-    #endif
+		#ifdef PRINT_MSG
+			/*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+		std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
+		std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
+		std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
+        std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
+        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
+		#endif
 
-    // assemble overall precision matrix Q.st
-    Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+		// assemble overall precision matrix Q.st
+		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 
-    //std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
+		//std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
 }
 
-#if 1
+#if 0
 void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3,\
 									  SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Ax){
 
@@ -104,13 +106,12 @@ void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat
 	int nu = ns*nt;
 
 	SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
-	/*std::cout << "Q_b " << std::endl;
-	std::cout << Eigen::MatrixXd(Q_b) << std::endl;*/
+	std::cout << "Q_b " << std::endl;
+	std::cout << Eigen::MatrixXd(Q_b) << std::endl;
 
 	if(ns > 0){
 		SpMat Qu(nu, nu);
 		// TODO: find good way to assemble Qx
-
 		if(nt > 1){
 			construct_Q_spat_temp(Qu, theta, c0, g1, g2, g3, M0, M1, M2);
 		} else {	
@@ -141,29 +142,32 @@ void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat
 
 		Qx.makeCompressed();
 
-		#ifdef PRINT_MSG
+#ifdef PRINT_MSG
 			//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 			//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
-		#endif
+#endif
 
 		Q =  Qx + exp_theta0 * Ax.transpose() * Ax;
 
-		#ifdef PRINT_MSG
-			std::cout << "exp(theta0) : " << exp_theta0 << std::endl;
-			std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
-
-			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
-			//std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-			std::cout << "theta : \n" << theta.transpose() << std::endl;
-
-		#endif
-	}
+	} else {
+        Q = Q_b + exp_theta0 * Ax.transpose() * Ax;
+    }
 
 	/*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
 	std::cout << Eigen::MatrixXd(*Q) - exp_theta*B.transpose()*B << std::endl;*/
 
+#ifdef PRINT_MSG
+			std::cout << "exp(theta0) : " << exp_theta0 << std::endl;
+			//std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
+			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
+			std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
+			std::cout << "theta : \n" << theta.transpose() << std::endl;
+
+#endif
+
 }
 #endif
+
 
 void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3,\
 									  SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Ax){
@@ -171,7 +175,10 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
     int n = ns*nt + nss + nb;
     SpMat Qx(n,n);
 
-    if(nss == 0){
+    if(ns > 0 && nt == 1){
+        printf("in construct Q. only spatial field. dummy. not implemented.\n");
+    }
+    else if(ns > 0 && nt > 1 && nss == 0){
         SpMat Qst(ns*nt, ns*nt);
         construct_Q_spat_temp(Qst, theta, c0, g1, g2, g3, M0, M1, M2);
 		
@@ -186,7 +193,7 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
         }
 
         printf("here.\n");
-    } else {
+    } else if(ns > 0 && nt > 0 && nss > 0){
         SpMat Qst(ns*nt, ns*nt);
         std::cout << "theta:           " << theta.transpose() << std::endl;
         std::cout << "theta(seq(0,3)): " << theta(seq(0,3)).transpose() << std::endl;
@@ -216,14 +223,14 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
             }
         }
 
-    }
+    } 
 
     std::cout << "dim(Ax) = " << Ax.rows() << " " << Ax.cols() << ", dim(Qx) = " << Qx.rows() << " " << Qx.cols() << std::endl;
 
     printf("here now. nb = %d, n = %d\n", nb, n);
 
     for(int i=ns*nt+nss; i < n; i++){
-        printf("i = %d\n", i);
+        //printf("i = %d\n", i);
 		// CAREFUL 1e-3 is arbitrary choice!!
 		Qx.insert(i,i) = 1e-3;
 	}	
@@ -301,11 +308,11 @@ void construct_lower_CSC_invBlks(size_t ns, size_t nt, size_t nb, size_t nnz_low
 
     int* row_ind_a; // row index of each nnz value
     int* col_ptr_a; // list of val indices where each column starts
-    T* a;
+    double* a;
 
     row_ind_a = new int [nnz_lower_invBlks];
     col_ptr_a = new int [n+1];
-    a         = new T[nnz_lower_invBlks];
+    a         = new double[nnz_lower_invBlks];
 
     size_t counter = 0;
 
@@ -415,11 +422,11 @@ void construct_full_CSC_invBlks(size_t ns, size_t nt, size_t nb, size_t nnz_invB
 
     int* row_ind_a; // row index of each nnz value
     int* col_ptr_a; // list of val indices where each column starts
-    T* a;
+    double* a;
 
     row_ind_a = new int [nnz_invBlks];
     col_ptr_a = new int [n+1];
-    a         = new T[nnz_invBlks];
+    a         = new double[nnz_invBlks];
 
     size_t counter = 0;
 
@@ -537,6 +544,18 @@ int main(int argc, char* argv[])
 {
 
 size_t i; // iteration variable
+std::string valueType;
+
+if(sizeof(T) == 8){
+    printf("Template T is double.\n");
+    valueType = "double";
+} else if (sizeof(T) == 4){
+    printf("Template T is float.\n");
+    valueType = "single";
+} else {
+    printf("invalid type T!\n");
+    exit(1);
+    }
 
 #if 0
 
@@ -553,10 +572,10 @@ size_t i; // iteration variable
     std::cout << "Q: \n" << Q << std::endl;
     */
 
-    int ns=3;
+    int ns=2;
     int nss=0;
-    int nt=5;
-    int nb=3;
+    int nt=3;
+    int nb=2;
     int n = ns*nt + nb;
 
     SpMat Q = gen_test_mat_base3(ns, nt, nb);
@@ -604,6 +623,10 @@ size_t i; // iteration variable
     if(ns > 0 && nt == 0){
         nt = 1;
     } 
+    // set nt = 0 for regression case
+    if(ns == 0){
+        nt = 0;
+    }
 
     // also save as string
     std::string ns_s = std::to_string(ns);
@@ -649,7 +672,7 @@ size_t i; // iteration variable
 
         // read in design matrix 
         // files containing B
-        std::string B_file        =  base_path + "/B_" + no_s + "_" + nb_s + ".dat";
+        std::string B_file        =  base_path + "/A_" + no_s + "_" + nb_s + ".dat";
         file_exists(B_file); 
 
         // casting no_s as integer
@@ -657,9 +680,11 @@ size_t i; // iteration variable
         std::cout << "total number of observations : " << no << std::endl;
       
         B = read_matrix(B_file, no, nb);
+        Ax = B.sparseView();
 
         // std::cout << "y : \n"  << y << std::endl;    
         // std::cout << "B : \n" << B << std::endl;
+        std::cout << "t(B)*B = " << B.transpose() * B << std::endl;
 
     } else if(ns > 0 && nt == 1 && nss == 0){
 
@@ -769,15 +794,20 @@ size_t i; // iteration variable
 
     Vect theta(dim_th);
     Vect theta_prior(dim_th);
+    
+    //printf("dim(theta) = %ld, ns = %ld, nt = %ld\n", dim_th, ns, nt);
 
-	if(nt == 1){
+    if(ns == 0 && nt == 0){
+        theta << 2;
+        std::cout << "theta : " << theta.transpose() << std::endl;
+    } else if(ns > 0 && nt == 1){
 	    theta << -1.5,-5,-2;
 	    //theta.print();
-    } else if(nt > 1 && nss == 0){
+    } else if(nt > 1 && ns > 0 && nss == 0){
+
         //theta << 5, -10, 2.5, 1;
-        //theta << 4.000000, -3.344954,  1.039721,  1.386294; // equals 4,0,0,0 in param scale     
-        theta << -1.998039, -9.828957,  1.981187,  8.288427;   
-        std::cout << "theta : " << theta.transpose() << std::endl;
+        theta << 1.386294, -5.882541,  1.039721,  3.688879; // equals 4,0,0,0 in param scale     
+        //std::cout << "theta : " << theta.transpose() << std::endl;
 	    //theta = {3, -5, 1, 2};
 	    //theta.print();
   	} else {
@@ -785,13 +815,7 @@ size_t i; // iteration variable
   	}
 
 
-printf("# threads: %d\n", omp_get_max_threads());
-
-//#pragma omp parallel
-//{
-
-//if(omp_get_thread_num() == 0) // instead of #pragma omp task -> want always the same thread to do same task
-//{
+    printf("# threads: %d\n", omp_get_max_threads());
 
 #if 0
 
@@ -894,9 +918,9 @@ printf("# threads: %d\n", omp_get_max_threads());
 
         t_Qx_factorise = get_time(0.0);
         //solver->solve_equation(GR);
-        //double flops_Qx_factorize = solver_Qx->factorize_noCopyHost(ia_Qx, ja_Qx, a_Qx, log_det_Qx);
-        //printf("after factorize no copy to host.\n");
-        
+        double flops_Qx_factorize = solver_Qx->factorize_noCopyHost(ia_Qx, ja_Qx, a_Qx, log_det_Qx);
+        printf("no Cpy to Host logdet       : %f\n", log_det_Qx);
+
         double flops_Qx_factorize = solver_Qx->factorize(ia_Qx, ja_Qx, a_Qx);
         log_det_Qx = solver_Qx->logDet(ia_Qx, ja_Qx, a_Qx);
 
@@ -951,15 +975,8 @@ printf("# threads: %d\n", omp_get_max_threads());
 
 #endif // end dummy example or reading in matrices
 
-//} // end omp if(thread 0)
-
-
-//if(omp_get_thread_num() == 1 || omp_get_num_threads() < 2)
-//{
 
 #if 1
-
-
     int n = ns*nt + nss + nb;
     SpMat Q(n,n);
     Vect rhs(n);
@@ -972,9 +989,61 @@ printf("# threads: %d\n", omp_get_max_threads());
     //for(int c=0; c<1; c++){
         //theta = theta + Vect::Random(theta.size());
         //std::cout << "\niter = " << c << ". Constructing precision matrix Qxy. theta : " << theta.transpose() << std::endl;   
-        
-        construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax); 
-        std::cout << "Q : \n" << Q.block(0,0,8,8) << std::endl;
+
+#if 0        
+        // test if FLOP rate holds up if blocks are dense
+        // make g1 dense. This should make all blocks dense!
+    
+        // random between [-1,1] -> shift to ensure pos. def.
+        double scalC = 1e-3;
+        MatrixXd tmpBlock = scalC * (MatrixXd::Random(2*ns, 1) - MatrixXd::Ones(2*ns, 1));
+
+        // manually compute nnz matrix should have if all nonzero blocks dense: 
+        // diagonal blocks: nt*ns*(ns+1)/2 + ns^2*(nt-1) + nss*nt + nss*(nss+1)/2 + nt*ns*nb + nss*nb + nb*(nb+1)/2
+        size_t comp_nnz = nt*ns*(ns+1)/2 + ns*ns*(nt-1) + nss*nt + nss*(nss+1)/2 + nt*ns*nb + nss*nb + nb*(nb+1)/2;
+        printf("ns = %ld, nt = %ld, nb = %ld, nss = %ld, expected nnz(Q_lower) = %ld\n", ns, nt, nb, nss, comp_nnz);
+
+        // CSC format -> fill by column 
+        SpMat Q_lower(n,n);
+        Q_lower.reserve(comp_nnz);
+
+        // only fill lower part
+        for(int j=0; j<n; j++){
+            int cut_off = ( j / ns ) * ns + 2 * ns;
+            for(int i=j; i<cut_off; i++){
+                // j always <= i
+                if(i < ns*nt){
+                    int j_loc = j % ns;
+                    int i_loc = i % 2*ns;
+                    Q_lower.insert(i,j) = tmpBlock(i_loc,0);
+                }
+            }
+
+            // also fill dense columns with whatever
+            for(int i=ns*nt; i<n; i++){
+                if(i >= j){
+                    int j_loc = j % ns;
+                    int i_loc = i % nb;      
+                    Q_lower.insert(i,j) = tmpBlock(i_loc, 0);
+                }
+            }
+        }
+
+        //std::cout << "Q_lower : \n" << MatrixXd(Q_lower) << std::endl;
+
+        SpMat epsId(n,n);
+        epsId.setIdentity();
+        epsId = 100 * epsId;
+
+        Q_lower = Q_lower + epsId;
+        std::cout << "Q : \n" << Q_lower.block(0,0,8,8) << std::endl;
+        //exit(1);
+
+        //std::cout << "g1 dense : " << g1_dense << std::endl;
+#endif        
+
+        construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);        
+        std::cout << "Q : \n" << Q.block(0,0,6,6) << std::endl;
 
         //SpMat epsId(n,n);
         //epsId.setIdentity();
@@ -991,14 +1060,18 @@ printf("# threads: %d\n", omp_get_max_threads());
 
         printf("nnz(Q_lower) = %ld\n", nnz);
 
-        /*
+        /*if(comp_nnz != nnz){
+            printf("expected nonzeros: %ld and actual nonzeros: %ld not the same! Check! \n", comp_nnz, nnz);
+            //exit(1);
+        }*/
+        
         //SpMat Q_lower_fstB = Q_lower.block(0,0,ns,ns);
         //std::string filename =  "Qst_firstBlock_lower_" + to_string(ns) + "_" + to_string(ns) + ".mtx";
-        std::string filename =  "Q_lower_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + ".mtx";
-        Eigen::saveMarket(Q_lower, filename);
-        exit(1);
-        */
+        //std::cout << "Q(1:10, 1:10) = \n" << Q.block(0,0,10,10) << std::endl;
 
+        //std::string filename =  "Q_lower_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + "_" + to_string(theta[0]) + "_" + to_string(theta[1]) + "_" + to_string(theta[2]) + "_" + to_string(theta[3]) + ".mtx";
+        //Eigen::saveMarket(Q_lower, filename);
+                
         //std::string Q_fileName = "Q_" + to_string(n) + ".txt";
         //write_sym_CSC_matrix(Q_fileName, Q_lower);
         
@@ -1014,7 +1087,7 @@ printf("# threads: %d\n", omp_get_max_threads());
         // allocate memory
         ia = new long unsigned int [n+1];
         ja = new long unsigned int [nnz];
-        a  = new double [nnz];
+        a  = new T [nnz];
 
         Q_lower.makeCompressed();
 
@@ -1026,8 +1099,13 @@ printf("# threads: %d\n", omp_get_max_threads());
             ja[i] = Q_lower.innerIndexPtr()[i];
         }  
 
+        // cast as double or f
         for (i = 0; i < nnz; ++i){
-            a[i] = Q_lower.valuePtr()[i];
+            a[i] = (T) Q_lower.valuePtr()[i];
+        }
+
+        for(i = 0; i < n; i++){
+            b[i] = (T) rhs[i];
         }
 
         double t_factorise;
@@ -1045,12 +1123,13 @@ printf("# threads: %d\n", omp_get_max_threads());
         std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
         // *********************************************** //
 
+        printf("call RGF constructor. nt = %ld\n", nt); 
         RGF<T> *solver;
         solver = new RGF<T>(ns, nt, nss+nb, GPU_rank);
 
-        int m = 1;
+        int m = 2;
         Vect t_factorize_vec(m-1);
-        double log_det;
+        T log_det;
 
         for(int i=0; i<m; i++){
 
@@ -1070,6 +1149,12 @@ printf("# threads: %d\n", omp_get_max_threads());
             t_solve = get_time(0.0); 
             double flops_solve = solver->solve(ia, ja, a, x, b, 1);
             t_solve = get_time(t_solve);
+
+            /*printf("\nx(1:10) = ");
+            for(int i=0; i<10; i++){
+                printf(" %f", x[i]);
+            }
+            printf("\n");*/
             //printf("flops solve:     %f\n", flops_solve);
 
             //printf("time chol(Q): %lg\n",t_factorise);
@@ -1078,9 +1163,11 @@ printf("# threads: %d\n", omp_get_max_threads());
             t_factorise = get_time(0.0);
             flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
             t_factorise = get_time(t_factorise);
+            printf("log det noCopyHost: %f\n", log_det);
             printf("time factorize noCopyHost: %f\n", t_factorise);
 
-            printf("logdet: %f\n", log_det);
+            //printf("logdet: %f\n", log_det);
+            
 
             // assign b to correct format
             /*for (int i = 0; i < n; i++){
@@ -1099,17 +1186,15 @@ printf("# threads: %d\n", omp_get_max_threads());
     //}
 
   	// create file with solution vector
-  	/*
-    std::string sol_x_file_name = "x_sol_RGF_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
+    std::string sol_x_file_name = "x_sol_BTA_" + valueType + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
   	std::ofstream sol_x_file(sol_x_file_name,    std::ios::out | std::ios::trunc);
 
 	for (i = 0; i < n; i++) {
 		sol_x_file << x[i] << std::endl;
 		// sol_x_file << x[i] << std::endl; 
 	}
-
-  sol_x_file.close();
-  */
+    sol_x_file.close();
+    
 
 #if 0
     // true inv diag from Eigen
@@ -1177,8 +1262,14 @@ printf("# threads: %d\n", omp_get_max_threads());
     invQa = new T[nnz];
     //printf("before rgfselinv\n");
     double flops_invQa = solver->RGFselInv(ia, ja, a, invQa);
+
     //printf("before logDetselInv\n");
-    double log_detRGFselInv = solver->logDet(ia, ja, a);
+    T log_detRGFselInv = solver->logDet(ia, ja, a);
+
+    double* invQa_d = new double[nnz];
+    for(int i=0; i<nnz; i++){
+        invQa_d[i] = (double) invQa[i];
+    }
 
     if(n < 25){
         printf("invQa : ");
@@ -1191,7 +1282,7 @@ printf("# threads: %d\n", omp_get_max_threads());
     //printf("computed RGFselInv\n");
 
     SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
-                               Q_lower.innerIndexPtr(),invQa);
+                               Q_lower.innerIndexPtr(),invQa_d);
 
 
     if(n < 25){
@@ -1207,12 +1298,11 @@ printf("# threads: %d\n", omp_get_max_threads());
     }
 
     std::cout << "norm(diag(invQ_new)) = " << invQ_new.diagonal().norm() << std::endl;
-    std::cout << "norm(invDiag)        = " << invDiag_vec.norm() << std::endl;   
-    //std::cout << "norm(diag(invEigen)) = " << inv_Q.diagonal().norm() << std::endl;    
-    std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
+    std::cout << "norm(invDiag))       = " << invDiag_vec.norm() << std::endl;    
+    //std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
     //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
 
-    //std::string invQ_fileName = "invQ_del2CompStream_" + to_string(n) + ".txt";
+    //std::string invQ_fileName = "invQ_seq_" + to_string(n) + ".txt";
     //write_sym_CSC_matrix(invQ_fileName, invQ_new_lower);
 
     /*
@@ -1236,6 +1326,16 @@ printf("# threads: %d\n", omp_get_max_threads());
     //invQ_full_file.close();
 
     */
+
+    // create file with inv Diag vector
+    std::string invDiag_file_name = "invDiag_BTA_" + valueType + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
+  	std::ofstream invDiag_file(invDiag_file_name,    std::ios::out | std::ios::trunc);
+
+	for (i = 0; i < n; i++) {
+		invDiag_file << invDiag[i] << std::endl;
+		// sol_x_file << x[i] << std::endl; 
+	}
+    invDiag_file.close();
 
     /*
     t_invBlks = get_time(0.0);

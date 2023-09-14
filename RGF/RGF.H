@@ -32,7 +32,7 @@ public:
 
     ~RGF();
     double factorize(size_t* ia, size_t* ja, T* a);
-    double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet);
+    double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet);
     double solve(size_t*, size_t*, T*, T*,size_t);
     double solve(size_t*, size_t*, T*, T*,T*,size_t);
     double RGFdiag(size_t*, size_t*, T*, T*);
@@ -130,7 +130,7 @@ private:
     inline size_t invblks_dense_block_index(size_t);
 
     double FirstStageFactor();
-    double FirstStageFactor_noCopyHost(double &logDet);
+    double FirstStageFactor_noCopyHost(T &logDet);
     double FirstStageFactor_noCopyHost_testV(double &logDet);
     double SecondStageSolve(size_t);
     double ThirdStageRGF(T*,T*, int);
@@ -908,7 +908,7 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::FirstStageFactor_noCopyHost(double &logDet)
+double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
 {
 
    //std::cout << "In FirstStageFactor_noCopyHost(), omp get thread num = " << omp_get_thread_num() << std::endl;
@@ -2031,10 +2031,10 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
    cudaGetDevice(&GPU_currRank);
 
    if(GPU_currRank != GPU_rank){
-      //printf("In factorize. Current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      //printf("In factorize. Current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
-      //printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+      //printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
     //int numaNodeID = topo_get_numNode(GPU_rank);
@@ -2134,7 +2134,7 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet)
+double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
 {
 
 #ifdef PRINT_MSG	
@@ -2149,10 +2149,10 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, double &logDet
    cudaGetDevice(&GPU_currRank);
 
    if(GPU_currRank != GPU_rank){
-      //printf("in factorize_noCopyHost. Current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      //printf("in factorize_noCopyHost. Current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
-      //printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+      //printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
     // Data allocation device
@@ -2288,10 +2288,10 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
    cudaGetDevice(&GPU_currRank);
 
    if(GPU_currRank != GPU_rank){
-      printf("in RGFdiag. current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      //printf("in RGFdiag. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
-      printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+      //printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
    if (!factorization_completed)
@@ -2352,10 +2352,10 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
    cudaGetDevice(&GPU_currRank);
 
    if(GPU_currRank != GPU_rank){
-      printf("in RGFselInv. current GPU rank: %ld. set GPU rank to: %ld\n", GPU_currRank, GPU_rank);
+      //printf("in RGFselInv. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
-      printf("updated GPU rank is: %ld.\n", GPU_currRank);   
+      //printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
    if (!factorization_completed)
@@ -2818,6 +2818,13 @@ inline double RGF<double>::f_one()
     return 1.0;
 }
 
+// new SINGLE PRECISION
+template <>
+inline float RGF<float>::f_one()
+{
+    return 1.0;
+}
+
 /************************************************************************************************/
 
 template <>
@@ -2828,6 +2835,13 @@ inline CPX RGF<CPX>::f_zero()
 
 template <>
 inline double RGF<double>::f_zero()
+{
+    return 0.0;
+}
+
+// new SINGLE PRECISION
+template <>
+inline float RGF<float>::f_zero()
 {
     return 0.0;
 }

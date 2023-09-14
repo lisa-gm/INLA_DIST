@@ -22,12 +22,15 @@ extern "C" {
   void zgemm_on_dev(void*,char,char,int,int,int,CPX,CPX*,\
 		    int,CPX*,int,CPX,CPX*,int);
   void daxpy_on_dev(void*,int,double,double*,int,double*,int);
+  void saxpy_on_dev(void*,int,float ,float *,int,float*,int);
   void zaxpy_on_dev(void*,int,CPX,CPX*,int,CPX*,int);
   void dasum_on_dev(void *handle,int n,double *x,int incx,double *result);
   void zasum_on_dev(void *handle,int n,CPX *x,int incx,double *result);
   void dsum_on_dev(int n,double *x,int incx,double *result,magma_queue_t queue);
+  void ssum_on_dev(int n,float  *x,int incx,float  *result,magma_queue_t queue); 
   void zsum_on_dev(int n,CPX *x,int incx,CPX *result,magma_queue_t queue);
   void d_copy_csr_to_device(int,int,int*,int*,double*,int*,int*,double*);
+  void s_copy_csr_to_device(int,int,int*,int*,float* ,int*,int*,float*);
   void z_copy_csr_to_device(int,int,int*,int*,CPX*,int*,int*,CPX*);
   void d_csr_mult_f(void*,int,int,int,int,int*,int*,double*,double,\
 		    double*,double,double*);
@@ -39,12 +42,15 @@ extern "C" {
   void z_transpose_matrix(CPX*,CPX*,int,int);
   void d_init_var_on_dev(double*,int,cudaStream_t);
   void d_init_eye_on_dev(double*,int,cudaStream_t);
-  void z_init_var_on_dev(CPX*,int,cudaStream_t);
+  void s_init_eye_on_dev(float*,int,cudaStream_t);
   void z_init_eye_on_dev(CPX*,int,cudaStream_t);
+  void z_init_var_on_dev(CPX*,int,cudaStream_t);
   void correct_diag_on_dev(CPX*,int,cudaStream_t);
   void change_var_type_on_dev(double*,CPX*,int,cudaStream_t);
   void change_sign_imag_on_dev(CPX*,int);
   void d_extract_diag_on_dev(double*,int*,int*,double*,int,int,int,int,int,\
+			     cudaStream_t);
+  void s_extract_diag_on_dev(float*,int*,int*,float*,int,int,int,int,int,\
 			     cudaStream_t);
   void d_extract_not_diag_on_dev(double*,int*,int*,double*,int,int,int,int,\
 				 int,int,int,cudaStream_t); 
@@ -56,22 +62,27 @@ extern "C" {
   void z_symmetrize_matrix(CPX*,int,cudaStream_t);
   void z_symmetrize_matrix_2(CPX*,int,cudaStream_t);
   void d_tril_on_dev(double *A, int lda, int N);
+  void s_tril_on_dev(float  *A, int lda, int N);
   void z_tril_on_dev(CPX *A, int lda, int N);
   void d_indexed_copy_on_dev(double *src, double *dst, size_t *index, size_t N);
   void z_indexed_copy_on_dev(CPX *src, CPX *dst, size_t *index, size_t N);
   void d_indexed_copy_offset_on_dev(double *src, double *dst, size_t *index, size_t N, size_t offset);
+  void s_indexed_copy_offset_on_dev(float  *src, float  *dst, size_t *index, size_t N, size_t offset);
   void z_indexed_copy_offset_on_dev(CPX *src, CPX *dst, size_t *index, size_t N, size_t offset);
   void d_log_on_dev(double *x, size_t N);
   void z_log_on_dev(CPX *x, size_t N);
   void d_fill_on_dev(double *x, const double value, size_t N);
+  void s_fill_on_dev(float  *x, const float  value, size_t N);
   void z_fill_on_dev(CPX *x, const CPX value, size_t N);
   void d_init_block_matrix_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t nnz, size_t ns, size_t nt, size_t nd);
   void z_init_block_matrix_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t nnz, size_t ns, size_t nt, size_t nd);
   void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream);
+  void s_init_supernode_on_dev(float *M, size_t *ia, size_t *ja, float *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream);  
   void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream );
   //void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
   //void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
 
   // new
   void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
+  void s_extract_nnzA_on_dev(float *a,  size_t *ia, size_t *ja, float *M,  size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
 }
