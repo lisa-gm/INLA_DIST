@@ -440,7 +440,6 @@ int main(int argc, char* argv[])
 
 	//tpotrf_magma_dev('L', n, Q_dev1, n, &info1);
 
-#if 0 
     int init_flag = 0;
 
     int* info;
@@ -472,6 +471,10 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
+    checkCudaErrors(cudaMalloc((void**)&device_work,lwork_device*sizeof(double)));
+    checkCudaErrors(cudaMallocHost((void**)&host_work, lwork_host*sizeof(double)));    
+    cudaDeviceSynchronize();
+
     printf("Properly calling dpotrf expert now.\n");
     potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, Q_dev1, n, info, mode, subN, subSubN, 
                                                         host_work, &lwork_host, device_work, &lwork_device, events, queues);     
@@ -480,8 +483,12 @@ int main(int argc, char* argv[])
         exit(1);
     }  
    
+    cudaDeviceSynchronize();
     printf("after dpotrf expert now.\n");
-#endif
+
+    cudaFree(device_work);
+    cudaFreeHost(host_work);
+
 	checkCudaErrors(cudaMemcpy(L_host, Q_dev1, n*n*sizeof(T), cudaMemcpyDeviceToHost));
 
 	printf("\nL_host: ");
@@ -593,7 +600,7 @@ int main(int argc, char* argv[])
     cudaFreeHost(Id_host);
     cudaFreeHost(Q_host);
     cudaFreeHost(L_host);
-  
+
 
 	return 1;
 
