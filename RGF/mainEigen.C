@@ -27,13 +27,19 @@ typedef Eigen::VectorXd Vect;
 #define PRINT_MSG
 
 #if 0
+// ******************* 
+#define SINGLE_PREC
 typedef float T;
 #define assign_T(val);
 //typedef CPX T;
 //#define assign_T(val) CPX(val, 0.0)
+// *******************  
 #else
+// ******************* 
+#define DOUBLE_PREC
 typedef double T;
 #define assign_T(val) val
+// ******************* 
 #endif
 
 void construct_Q_spatial(SpMat& Qs, Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2){
@@ -546,16 +552,15 @@ int main(int argc, char* argv[])
 size_t i; // iteration variable
 std::string valueType;
 
-if(sizeof(T) == 8){
+#ifdef DOUBLE_PREC
     printf("Template T is double.\n");
     valueType = "double";
-} else if (sizeof(T) == 4){
+#endif
+
+#ifdef SINGLE_PREC
     printf("Template T is float.\n");
     valueType = "single";
-} else {
-    printf("invalid type T!\n");
-    exit(1);
-    }
+#endif
 
 #if 0
 
@@ -572,19 +577,17 @@ if(sizeof(T) == 8){
     std::cout << "Q: \n" << Q << std::endl;
     */
 
-    int ns=2;
+    int ns=3;
     int nss=0;
-    int nt=3;
-    int nb=2;
+    int nt=7;
+    int nb=3;
     int n = ns*nt + nb;
 
     SpMat Q = gen_test_mat_base3(ns, nt, nb);
 
 
-    Vect rhs(n);
-    rhs.setOnes(n);
-
-
+    Vect rhs = Vect::Random(n);
+    //rhs.setOnes(n);
 
 #else
 
@@ -1064,17 +1067,80 @@ if(sizeof(T) == 8){
             printf("expected nonzeros: %ld and actual nonzeros: %ld not the same! Check! \n", comp_nnz, nnz);
             //exit(1);
         }*/
-        
-        //SpMat Q_lower_fstB = Q_lower.block(0,0,ns,ns);
-        //std::string filename =  "Qst_firstBlock_lower_" + to_string(ns) + "_" + to_string(ns) + ".mtx";
-        //std::cout << "Q(1:10, 1:10) = \n" << Q.block(0,0,10,10) << std::endl;
 
-        //std::string filename =  "Q_lower_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + "_" + to_string(theta[0]) + "_" + to_string(theta[1]) + "_" + to_string(theta[2]) + "_" + to_string(theta[3]) + ".mtx";
-        //Eigen::saveMarket(Q_lower, filename);
-                
+#if 0
+    // true inv diag from Eigen
+    //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
+    SimplicialLLT<SpMat> solverQ;
+    solverQ.compute(Q);
+
+   if(solverQ.info()!=Success) {
+     cout << "Oh: Very bad" << endl;
+   }
+
+    Vect x_Eigen = solverQ.solve(rhs);
+
+   SpMat L = solverQ.matrixL();
+   if(n < 20){
+        std:cout << "L: \n" << MatrixXd(L) << std::endl;
+    }
+
+    MatrixXd L_d = MatrixXd(L);
+    Vect y_Eigen = L_d.fullPivLu().solve(rhs);
+    // std::cout << "\nrhs  = " << rhs.transpose() << std::endl;
+    // std::cout << "\ny Eigen = " << y_Eigen.transpose() << std::endl;
+
+    std::cout << "norm(L_d*y_Eigen - rhs) = " << (L_d*y_Eigen - rhs).norm() << std::endl;
+
+    /*MatrixXd L_fB = L_d.block(0,0,ns,ns);
+    printf("first block L:\n");
+   for(int i = 0; i<ns*ns; i++){
+      printf(" %f ", L_fB.data()[i]);
+   }
+   printf("\n\n");
+   std::cout << "L21 block : \n" << L_d.block(ns,0,ns,ns) << std::endl;
+
+   std::cout << "rhs(seq(ns,2*ns-1))       = "  << rhs(seq(ns,2*ns-1)).transpose() << std::endl;
+   std::cout << "L_fB*y_Eigen(seq(0,ns-1)) = "  << (L_d.block(ns,0,ns,ns)*y_Eigen(seq(0,ns-1))).transpose() << std::endl;
+   Vect temp = rhs(seq(ns,2*ns-1)) - L_d.block(ns,0,ns,ns)*y_Eigen(seq(0,ns-1));
+   std::cout << "b_2 - L11*y1 = " << temp.transpose() << std::endl;*/
+     
+    SpMat eye(n,n);
+    eye.setIdentity();
+
+   // compute log sum by hand
+   double logDetEigen = 0.0;
+   for(int i = 0; i<n; i++){
+        logDetEigen += log(L.coeff(i,i));
+   }
+   logDetEigen *=2.0;
+
+   //std::cout << "diag(L Eigen) : " << L.diagonal().transpose() << std::endl;
+   //std::cout << "log Det Eigen : " << logDetEigen << std::endl;
+   //std::cout << "diff Log Dets : " << logDetEigen - log_det << std::endl;
+
+   /*SpMat inv_Q = solverQ.solve(eye);
+   if(n < 25){
+    MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
+    std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
+   }*/
+
+#endif
+
+
+
+#if 0
+        std::string filename =  "Q_lower_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + ".mtx"; // + "_" + to_string(theta[0]) + "_" + to_string(theta[1]) + "_" + to_string(theta[2]) + "_" + to_string(theta[3]) 
+        Eigen::saveMarket(Q_lower, filename);                
         //std::string Q_fileName = "Q_" + to_string(n) + ".txt";
         //write_sym_CSC_matrix(Q_fileName, Q_lower);
-        
+
+        std::string filename_rhs = "b_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + ".mtx";
+        //Eigen::saveMarket(rhs, filename_rhs);
+        write_vector(filename_rhs, rhs, n);
+        exit(1);
+#endif
+
         size_t* ia; 
         size_t* ja;
         T* a; 
@@ -1140,7 +1206,7 @@ if(sizeof(T) == 8){
             log_det = solver->logDet(ia, ja, a);
             printf("logdet: %f\n", log_det);
             t_factorise = get_time(t_factorise);
-            printf("time factorize:             %f\n", t_factorise);
+            //printf("time factorize:             %f\n", t_factorise);
 
             if(i>0){
                 t_factorize_vec(i-1) = t_factorise;
@@ -1159,6 +1225,50 @@ if(sizeof(T) == 8){
 
             //printf("time chol(Q): %lg\n",t_factorise);
             printf("time solve:                %f\n",t_solve);
+            printf("time factorize + solve     %f\n", t_factorise+t_solve);
+
+            printf("Residual norm. :           %e\n", solver->residualNorm(x, b));
+            printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
+            /*printf("x.head(10) = ");
+            for(i = 0; i<10; i++){
+                printf(" %f ", x[i]);
+            }
+            printf("\n");*/
+#if 0 
+
+#ifdef DOUBLE_PREC
+            printf("Calling single precision solve using double precision Cholesky factor.\n");
+            t_solve = get_time(0.0); 
+            flops_solve = solver->solve_s(ia, ja, a, x, b, 1);
+            t_solve = get_time(t_solve);
+
+            printf("time single precision solve: %f\n",t_solve);
+
+            printf("Residual norm. single prec :           %e\n", solver->residualNorm(x, b));
+            printf("Residual norm normalized single prec : %e\n", solver->residualNormNormalized(x, b));
+            /*printf("x.head(10) = ");
+            for(i = 0; i<10; i++){
+                printf(" %f ", x[i]);
+            }
+            printf("\n"); */
+#endif
+
+#ifdef SINGLE_PREC
+            printf("Calling double precision solve using single precision Cholesky factor.\n");
+            t_solve = get_time(0.0); 
+            flops_solve = solver->solve_d(ia, ja, a, x, b, 1);
+            t_solve = get_time(t_solve);
+
+            printf("time double precision solve: %f\n",t_solve);
+
+            printf("Residual norm. double prec :           %e\n", solver->residualNorm(x, b));
+            printf("Residual norm normalized double prec : %e\n", solver->residualNormNormalized(x, b));   
+            /*printf("x.head(10) = ");
+            for(i = 0; i<10; i++){
+                printf(" %f ", x[i]);
+            }
+            printf("\n");*/   
+#endif
 
             t_factorise = get_time(0.0);
             flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
@@ -1166,17 +1276,35 @@ if(sizeof(T) == 8){
             printf("log det noCopyHost: %f\n", log_det);
             printf("time factorize noCopyHost: %f\n", t_factorise);
 
+#endif
+
+      	    T *x_new = new T[n];
+
+            t_factorise = get_time(0.0);
+            flops_factorize = solver->factorizeSolve(ia, ja, a, x_new, b, 1);
+            t_factorise = get_time(t_factorise);
+            log_det = solver->logDet(ia, ja, a);
+
+            Vect x_new_vec(n);
+            Vect x_vec(n);
+
+            for(int i=0; i<n; i++){
+                x_new_vec[i] = x_new[i];
+                x_vec[i]     = x[i];
+            }
+            std::cout << "norm(x-x_new) = " << (x_vec - x_new_vec).norm() << std::endl;
+
+            printf("log det factorizeSolve   : %f\n", log_det);
+            printf("time factorizeSolve      : %f\n", t_factorise);
+
             //printf("logdet: %f\n", log_det);
-            
+
 
             // assign b to correct format
             /*for (int i = 0; i < n; i++){
                 b[i] = rhs[i];
                 //printf("%f\n", b[i]);
             }*/
-
-            printf("Residual norm.:           %e\n", solver->residualNorm(x, b));
-            printf("Residual norm normalized: %e\n", solver->residualNormNormalized(x, b));
 
         }
 
@@ -1185,6 +1313,7 @@ if(sizeof(T) == 8){
 
     //}
 
+#if 0
   	// create file with solution vector
     std::string sol_x_file_name = "x_sol_BTA_" + valueType + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
   	std::ofstream sol_x_file(sol_x_file_name,    std::ios::out | std::ios::trunc);
@@ -1194,47 +1323,10 @@ if(sizeof(T) == 8){
 		// sol_x_file << x[i] << std::endl; 
 	}
     sol_x_file.close();
-    
+#endif   
+
 
 #if 0
-    // true inv diag from Eigen
-    //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
-    SimplicialLLT<SpMat> solverQ;
-    solverQ.compute(Q);
-
-   if(solverQ.info()!=Success) {
-     cout << "Oh: Very bad" << endl;
-   }
-
-   SpMat L = solverQ.matrixL();
-   /*if(n < 20){
-        std:cout << "L: \n" << MatrixXd(L) << std::endl;
-    }*/
-
-   SpMat eye(n,n);
-   eye.setIdentity();
-
-   // compute log sum by hand
-   double logDetEigen = 0.0;
-   for(int i = 0; i<n; i++){
-        logDetEigen += log(L.coeff(i,i));
-   }
-   logDetEigen *=2.0;
-
-   //std::cout << "diag(L Eigen) : " << L.diagonal().transpose() << std::endl;
-   std::cout << "log Det Eigen : " << logDetEigen << std::endl;
-   std::cout << "diff Log Dets : " << logDetEigen - log_det << std::endl;
-
-   SpMat inv_Q = solverQ.solve(eye);
-   if(n < 25){
-    MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
-    std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
-   }
-
-#endif
-
-
-#if 1
 
     T *invDiag;
     invDiag  = new T[n];
@@ -1327,6 +1419,7 @@ if(sizeof(T) == 8){
 
     */
 
+#if 0
     // create file with inv Diag vector
     std::string invDiag_file_name = "invDiag_BTA_" + valueType + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
   	std::ofstream invDiag_file(invDiag_file_name,    std::ios::out | std::ios::trunc);
@@ -1336,7 +1429,7 @@ if(sizeof(T) == 8){
 		// sol_x_file << x[i] << std::endl; 
 	}
     invDiag_file.close();
-
+#endif 
     /*
     t_invBlks = get_time(0.0);
     double flops_invBlks = solver->RGFinvBlks(ia, ja, a, invBlks);
@@ -1488,3 +1581,4 @@ if(sizeof(T) == 8){
 
 
   }
+

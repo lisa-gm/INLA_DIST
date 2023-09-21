@@ -765,6 +765,83 @@ inline void ttrtri_dev_cuda(char uplo, char unit_diag, int n, double *a,int lda,
 
 }
 
+// *** new SINGLE PRECISION
+template <>
+inline void ttrtri_dev_cuda(char uplo, char unit_diag, int n, float *a,int lda,int *info, int *cuda_buffer_flag, 
+                       cusolverDnHandle_t *handle, cudaStream_t stream,
+                       size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host)
+{
+
+    cublasFillMode_t uplo_cuda;
+    if(uplo == 'L'){
+        uplo_cuda = CUBLAS_FILL_MODE_LOWER;
+    } else if(uplo =='U') {
+        uplo_cuda = CUBLAS_FILL_MODE_UPPER;
+    } else {
+        printf("invalid potrf argmument uplo: %c\n", uplo);
+        exit(1);
+    }
+
+    // to indicate whether diagonal has "unity", i.e. is all ones?? which it is not?!
+    cublasDiagType_t unit_diag_cuda;
+    if(unit_diag == 'n' || unit_diag == 'N'){
+        unit_diag_cuda = CUBLAS_DIAG_NON_UNIT;
+    } else if(unit_diag == 'u' || unit_diag == 'U'){
+        unit_diag_cuda = CUBLAS_DIAG_UNIT;
+    } else {
+        printf("invalid trtri argmument unit_diag: %c\n", unit_diag);
+        exit(1);      
+    }
+
+    // initialize cuda buffer
+    if(cuda_buffer_flag[0] == 0){
+
+        cusolverStatus_t cuSolverError = cusolverDnXtrtri_bufferSize( 
+                *handle, uplo_cuda, unit_diag_cuda, n, CUDA_R_32F, a, lda, dev_size, host_size);
+
+       if(cuSolverError != 0){
+            printf("cuSolverError buffer size allocation!\n");
+            exit(1);
+        }
+
+        cuda_buffer_flag[0] = 1;
+
+        //printf("dev size = %ld, host size = %ld\n", *dev_size, *host_size);
+
+
+    }
+
+    cudaMalloc((void**)&mem_cuda_dev,      (*dev_size) * sizeof(double));
+    cudaMallocHost((void**)&mem_cuda_host, (*host_size) * sizeof(double));
+
+    //printf("n = %d, lda = %d, uplo = %c, dev_size = %ld, host_size = %ld\n", n, lda, uplo, dev_size[0], host_size[0]);
+
+    cusolverStatus_t cuSolverError = cusolverDnSetStream(*handle, stream);
+    if(cuSolverError != 0){
+        printf("cuSolverError set Stream! cuSolverError = %d\n", cuSolverError);
+        exit(1);
+    } 
+
+    cuSolverError = cusolverDnXtrtri( 
+            *handle, uplo_cuda, unit_diag_cuda, n, CUDA_R_32F, a, lda, 
+            mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info);
+
+    if(cuSolverError != 0){
+        printf("cuSolverError trtri! cuSolverError : %d, lda = %d\n", cuSolverError, lda);
+        exit(1);
+    }
+
+    int info_host;
+    cudaMemcpyAsync(&info_host, info, sizeof(int), cudaMemcpyDeviceToHost, stream);
+
+    if(info_host != 0){
+        printf("cuSolverError trtri info not zero! info = %d, lda = %d\n", info_host, lda);
+        exit(1);
+    }
+
+}
+
+
 template <>
 inline void ttrtri_dev_cuda(char uplo, char unit_diag, int n, CPX *a,int lda,int *info, int *cuda_buffer_flag, 
                        cusolverDnHandle_t *handle, cudaStream_t stream,
@@ -923,6 +1000,70 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
 
     cuSolverError = cusolverDnXpotrf(
             *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, 
+            mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info);
+
+
+    if(cuSolverError != 0){
+        printf("cuSolverError potrf! cuSolverError : %d, lda = %d\n", cuSolverError, lda);
+        exit(1);
+    }
+
+    int info_host;
+    cudaMemcpyAsync(&info_host, info, sizeof(int), cudaMemcpyDeviceToHost, stream);
+
+    if(info_host != 0){
+        printf("cuSolverError potrf info not zero! info = %d, lda = %d\n", info_host, lda);
+        exit(1);
+    }
+
+}
+
+// *** new SINGLE PRECISION *** //
+template <>
+inline void tpotrf_dev_cuda(char uplo,int n,float *a,int lda,int *info, int *cuda_buffer_flag, 
+                       cusolverDnHandle_t *handle, cusolverDnParams_t *params, cudaStream_t stream,
+                       size_t *dev_size, size_t *host_size, double *mem_cuda_dev, double *mem_cuda_host)
+{
+
+    // initialize cuda buffer
+    //printf("in Potrf. cuda buffer flag: %d\n", cuda_buffer_flag[0]);
+
+    cublasFillMode_t uplo_cuda;
+
+    if(uplo == 'L'){
+        uplo_cuda = CUBLAS_FILL_MODE_LOWER;
+    } else if(uplo =='U') {
+        uplo_cuda = CUBLAS_FILL_MODE_UPPER;
+    } else {
+        printf("invalid potrf argmument uplo: %c\n", uplo);
+        exit(1);
+    }
+
+    if(cuda_buffer_flag[0] == 0){
+
+        cusolverStatus_t cuSolverError = cusolverDnXpotrf_bufferSize(
+                *handle, *params, uplo_cuda, n, CUDA_R_32F, a, lda, CUDA_R_32F, dev_size, host_size);
+        if(cuSolverError != 0){
+            printf("cuSolverError buffer size allocation!\n");
+            exit(1);
+        }
+
+        cuda_buffer_flag[0] = 1;
+    } 
+
+    cudaMalloc((void**)&mem_cuda_dev,      (*dev_size) * sizeof(double));
+    cudaMallocHost((void**)&mem_cuda_host, (*host_size) * sizeof(double));
+
+    //printf("n = %d, lda = %d, uplo = %c, dev_size = %ld, host_size = %ld\n", n, lda, uplo, dev_size[0], host_size[0]);
+
+    cusolverStatus_t cuSolverError = cusolverDnSetStream(*handle, stream);
+    if(cuSolverError != 0){
+        printf("cuSolverError set Stream! cuSolverError = %d\n", cuSolverError);
+        exit(1);
+    } 
+
+    cuSolverError = cusolverDnXpotrf(
+            *handle, *params, uplo_cuda, n, CUDA_R_32F, a, lda, CUDA_R_32F, 
             mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info);
 
 
@@ -1636,6 +1777,7 @@ inline void extract_nnzA_dev(CPX *a, size_t *ia, size_t *ja, CPX *M, size_t supe
 /************************************************************************************************/
 
 #endif
+
 
 
 

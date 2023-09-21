@@ -33,8 +33,13 @@ public:
     ~RGF();
     double factorize(size_t* ia, size_t* ja, T* a);
     double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet);
+    double factorizeSolve(size_t* ia, size_t* ja, T* a, T* x, T* rhs,size_t nrhs);
     double solve(size_t*, size_t*, T*, T*,size_t);
     double solve(size_t*, size_t*, T*, T*,T*,size_t);
+    // single precision solve but assuming double precision input
+    double solve_s(size_t*, size_t*, double*, double*,double*,size_t);
+    // double precision solve but assuming single precision input
+    double solve_d(size_t*, size_t*, float*, float*,float*,size_t); 
     double RGFdiag(size_t*, size_t*, T*, T*);
     double RGFinvBlks(size_t*, size_t*, T*, T*);
     double RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ);
@@ -108,6 +113,7 @@ private:
     T *blockM_dev;
     T *blockDense_dev;
     T *rhs;
+    T *rhs_dev; 
 
     size_t *ia_dev;
     size_t *ja_dev;
@@ -130,9 +136,16 @@ private:
     inline size_t invblks_dense_block_index(size_t);
 
     double FirstStageFactor();
+    double FirstSecondStageFactor(size_t nhrs);
     double FirstStageFactor_noCopyHost(T &logDet);
     double FirstStageFactor_noCopyHost_testV(double &logDet);
+    double ForwardPassSolve(size_t);
+    double BackwardPassSolve(size_t);
     double SecondStageSolve(size_t);
+    // single precision solve with double precision factor
+    double SecondStageSolve_s(size_t, float* rhs_s);
+    // double precision solve with single precision factor
+    double SecondStageSolve_d(size_t, double* rhs_d);
     double ThirdStageRGF(T*,T*, int);
     //void create_blocks();
     void initialize_MF_host();
@@ -828,6 +841,458 @@ double RGF<T>::FirstStageFactor()
 }
 
 /************************************************************************************************/
+
+// combine first & second Stage factor to do forward solve directly on GPU, i.e. L L^T x = b, solve L y = b 
+// directly when computing L recursively
+template <class T>
+double RGF<T>::FirstSecondStageFactor(size_t nrhs)
+{
+
+#ifdef PRINT_MSG
+    std::cout << "In FirstSecondStageFactor(), omp get thread num = " << omp_get_thread_num() << std::endl;
+#endif
+   
+    double t_potrf    = 0;
+    double t_dgemm    = 0;
+    double t_copy_DtH = 0;
+    double t_temp;
+
+    double t_init_supernode = get_time(0.0);
+
+    int info;
+    size_t IB;
+    size_t NR,NM;
+    T ONE      = f_one();
+
+    // count floating point operations
+    double flop_count = 0;
+
+    IB = 0;
+    NR = Bmax[0]-Bmin[0];
+
+#ifdef PRINT_MSG
+       	std::cout << "IB = " << IB << std::endl;
+#endif
+
+   /*int GPU_CurrRank;
+   cudaGetDevice(&GPU_CurrRank);
+   printf("in firstStageFactor. cudaGetDevice : %ld, supposed GPU rank : %ld\n", GPU_CurrRank, GPU_rank);*/
+
+    init_supernode(blockR_dev, IB, magma_cudaStream_1);
+    if (matrix_nd > 0)
+    {
+       init_supernode(blockDense_dev, matrix_nt, magma_cudaStream_1);
+    }
+
+#ifdef PRINT_MSG
+    std::cout << "calling first Cholesky factorization now" << std::endl;
+#endif
+
+    t_init_supernode = get_time(t_init_supernode);
+    //printf("time init supernode in factorize: %f\n", t_init_supernode);
+
+    // start timer for counting flops
+    double t_fact = get_time(0.0);
+	
+    t_temp = get_time(0.0);
+    // CHOLESKY FACTORISATION FIRST DIAGONAL BLOCK
+#ifdef CUDA_POTRF
+     // factorization first block -> set buffer flag to zero!
+     cuda_buffer_flag_potrf[0] = 0;
+     tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
+                       handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+   // magma_queue currently not supported
+    cudaDeviceSynchronize(); 
+    tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+    cudaDeviceSynchronize();
+#endif
+    //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
+    t_temp = get_time(t_temp);
+    t_potrf += t_temp;
+    //printf("IB = %d, t_potrf = %f\n", IB, t_temp);
+    //flop_count += 1.0/3.0 * NR * NR * NR;
+    flop_count += 1.0/3.0 * NR * NR * NR + 0.5 * NR * NR + 1.0/6.0 * NR; 
+
+   // the trsm shouldn't be launched until potrf has finished 
+   //cudaDeviceSynchronize();
+   gpuErrchk(cudaEventRecord(potrf_dev_ev, magma_cudaStream_1)); 
+   gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, potrf_dev_ev, 0));   
+
+   cudaDeviceSynchronize();
+   // FORWARD SOLVE: when Cholesky factor for L11 computed solve L11 * y1 = b1
+   //c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(0, 0)], mf_block_lda(0, 0), &rhs[Bmin[0]], matrix_size);
+   // TODO: update magma queue?
+   ttrsm_dev('L', 'L', 'N', 'N', NR, nrhs, ONE, blockR_dev, mf_block_lda(0,0), &rhs_dev[Bmin[0]], matrix_size, magma_queue_1);
+   // flop_count += 2.0 * NR * NR * nrhs;
+
+    // TODO: if nt = 0 but nd != 0 => problem !! 
+    //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
+    if (matrix_nt > 1)
+    {
+       t_temp = get_time(0.0);	    
+       // UPDATE COLUMNS ACCORDING TO CHOLESKY FACTORISATION
+       // separate the two operations
+       //ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue_1);
+       ttrsm_dev('R', 'L', 'T', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[NR], mf_block_lda(1, 0), magma_queue_1);
+
+       t_temp = get_time(t_temp);
+       t_dgemm += t_temp;
+       flop_count += NR * NR * NR;
+    }
+
+    if (matrix_nd > 0){
+      //printf("mf_dense_block_offset(IB) : %ld\n", mf_dense_block_offset(IB));
+      //printf("mf_dense_block_lda(IB) : %ld\n", mf_dense_block_lda(IB));
+       ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(0, 0), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
+       flop_count += matrix_nd * NR * NR;
+    }
+
+    t_temp = get_time(0.0);
+    cudaDeviceSynchronize();
+    // if copy supernode device to host happens while new supernode is being initialized ... memory issues?
+    copy_supernode_to_host(blockR_dev, IB, copyStream);
+    //copy_supernode_to_host_write(blockR_dev, IB);
+
+    t_temp = get_time(t_temp);
+    t_copy_DtH =+ t_temp;
+
+#ifdef PRINT_MSG
+	std::cout << "entering loop block factorization loop now" << std::endl;	
+#endif  
+
+    //rj IB = 1; IB < NBlock; IB++
+    for (IB = 1; IB < matrix_nt-1; IB++)
+    {
+
+#ifdef PRINT_MSG
+       	std::cout << "IB = " << IB << std::endl;
+#endif
+
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       double flop_1iter = 0.0;
+
+       // 
+       swap_pointers(&blockR_dev, &blockM_dev);
+
+       nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
+       init_supernode(blockR_dev, IB, magma_cudaStream_1);
+       //init_supernode(blockR_dev, IB);
+       nvtxRangeEnd(id_initSN);
+
+       // UPDATE NEXT DIAGONAL BLOCK 
+       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
+       // todo rj: 3-last parameter ZERO in PARDISO
+       // magma_queue_1 is on top of magma_cudaStream_1
+
+       // add cuda_event such that magma_queue_2/magma_cudaStream_2 wait for magma_cudaStream_1 to get here
+       // maybe better to use magma version?
+       gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
+       gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
+
+       nvtxRangeId_t id_dgemm = nvtxRangeStartA("BigGemm_inLoop");
+       t_temp = get_time(0.0);
+       tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
+       t_temp = get_time(t_temp);
+       nvtxRangeEnd(id_dgemm);
+       t_dgemm += t_temp;
+              
+       // dim dgemm: m = , n = , k = 
+       flop_count += 2.0 * NR * NR * NM;
+
+      // copy back y1
+      /*T* y_host = new T[NR*NR];
+      cudaMemcpy(y_host, &rhs_dev[Bmin[0]], NR*NR*sizeof(T), cudaMemcpyDeviceToHost );
+      printf("rhs host(%ld) before gemm = ", IB-1);
+      for(int i = 0; i<NR*NR; i++){
+         printf(" %f ", y_host[i]);
+      }
+      printf("\n");
+
+      delete [] y_host;*/
+
+      // FORWARD SOLVE
+       // compute b_i = b_i - L_ii-1 * x_i-1
+       //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB-1]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+       tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+       //flop_count += 2.0 * NR * nrhs * NM;
+
+      // copy back blockR_dev
+      /*size_t size_SN = 2*NR*NR+matrix_nd*NR;
+      T* blockR_host = new T[size_SN];
+      cudaMemcpy(blockR_host, blockM_dev, size_SN*sizeof(T), cudaMemcpyDeviceToHost );
+      printf("\nChol host(%ld) = ", IB);
+      for(int i = 0; i<size_SN; i++){
+         printf(" %f ", blockR_host[i]);
+      }
+      printf("\n\n");*/
+
+       // direct into separate stream -> becomes relevant when many fixed effects ...
+       if (matrix_nd > 0)
+       {
+          // Update dense rows of next super node IB
+          id_dgemm = nvtxRangeStartA("DenseLowerGemm_inLoop");
+	       t_temp = get_time(0.0);
+	       tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
+          t_dgemm += get_time(t_temp);
+          nvtxRangeEnd(id_dgemm);
+	       // NM = NR
+          flop_count += 2.0*matrix_nd * NR * NM;
+          
+          // update last diagonal block
+          id_dgemm = nvtxRangeStartA("LastBlockLowerGemm_inLoop");
+          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_2);
+          nvtxRangeEnd(id_dgemm);
+          flop_count +=  2.0* matrix_nd *matrix_nd *NM;
+
+          // FORWARD SOLVE
+          // update b_n+1 = b_n+1 - L_ni * y_i
+          //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[i]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+          //flop_count += 2.0*NR * nrhs * NM;          
+          //printf("NBlock: %ld, Bmin[NBlock-1]: %ld\n", NBlock, Bmin[NBlock-1]);
+          tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[NBlock-1]], matrix_size, magma_queue_2);
+       
+          // 
+       }
+
+       //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
+       //rj dpotrf MF[IB,IB]
+       t_temp = get_time(0.0);
+       nvtxRangeId_t id_dpotrf = nvtxRangeStartA("Potrf_inLoop");       
+
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag_potrf[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
+                       handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+      // how can I get the default stream to wait but make an exception for copyStream ?
+       cudaDeviceSynchronize(); // TO BE REPLACED
+       tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+       cudaDeviceSynchronize();
+#endif
+
+       nvtxRangeEnd(id_dpotrf);
+       t_temp  = get_time(t_temp);
+       t_potrf += t_temp;
+       //printf("IB = %d, t_potrf = %f\n", IB, t_temp);
+       flop_count += 1.0/3.0 * NR * NR * NR + 0.5*NR*NR + 1.0/6.0 * NR;
+
+       // FORWARD SOLVE: with newly computed Cholesky factor
+       // solve for y_i = L^-1_i*b_i (which was updated before)
+       //c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+       ttrsm_dev('L', 'L', 'N', 'N', NR, nrhs, ONE, blockR_dev, mf_block_lda(IB,IB), &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+       //flop_count += 2.0*NR * NR * nrhs; 
+
+      // rhs_dev[Bmin[IB]]
+      /*T* rhs_host = new T[NR*NR];
+      cudaMemcpy(rhs_host, &rhs_dev[Bmin[IB-1]], NR*NR*sizeof(T), cudaMemcpyDeviceToHost );
+      printf("\nrhs host(%ld) after ttrsm = ", IB);
+      for(int i = 0; i<NR*NR; i++){
+         printf(" %f ", rhs_host[i]);
+      }
+      printf("\n\n");
+
+      delete [] rhs_host;*/
+
+       magma_event_record(potrf_dev_magma_ev, magma_queue_1);	      
+       magma_queue_wait_event(magma_queue_2, potrf_dev_magma_ev);	
+       
+       // triangular solve, all columns -> potentially split this ... when nd large ... two separate streams.
+       //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
+       //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
+       nvtxRangeId_t id_ttrsm = nvtxRangeStartA("ttrsm_inLoop");       
+       //ttrsm_dev('R', 'L', 'T', 'N', NR+matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue_1);
+       ttrsm_dev('R', 'L', 'T', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[NR], mf_block_lda(IB+1, IB), magma_queue_1);
+
+       if(matrix_nd > 0){
+         ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
+       }
+
+       nvtxRangeEnd(id_ttrsm);
+
+       flop_count += (NR + matrix_nd) * NR * NR;
+       //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
+
+       t_temp = get_time(0.0);
+
+       nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_SN_toHost_inLoop");     
+       cudaDeviceSynchronize();
+       copy_supernode_to_host(blockR_dev, IB, copyStream);  
+       //copy_supernode_to_host(blockR_dev, IB);
+       nvtxRangeEnd(id_Cpy_SN_host);             
+       t_copy_DtH += get_time(t_temp);
+   
+    }  // end for loop IB
+
+    if (matrix_nt > 1)
+    {
+       IB = matrix_nt-1;
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+#ifdef PRINT_MSG
+       	std::cout << "IB = " << IB << std::endl;
+#endif
+
+       swap_pointers(&blockR_dev, &blockM_dev);
+       nvtxRangeId_t id_initSN = nvtxRangeStartA("initLastSuperNode");
+       init_supernode(blockR_dev, IB, magma_cudaStream_1);
+       //init_supernode(blockR_dev, IB);
+       nvtxRangeEnd(id_initSN);
+
+       gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
+       gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
+
+       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
+       // todo rj: 3-last parameter ZERO in PARDISO
+       nvtxRangeId_t id_dgemm = nvtxRangeStartA("LastLargeGemm");
+       tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
+       nvtxRangeEnd(id_dgemm);             
+       flop_count += 2.0* NR * NR * NM;
+
+       // FORWARD SOLVE
+       // compute b_i = b_i - L_ii-1 * y_i-1
+       //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB-1]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+       tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+       //flop_count += 2.0 * NR * nrhs * NM;
+
+       if (matrix_nd > 0)
+       {
+          tgemm_dev('N', 'T', matrix_nd, NR, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_2);
+          flop_count += 2.0*matrix_nd * NR * NM;
+
+          tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_2);
+          flop_count += 2.0*matrix_nd *matrix_nd *NM; 
+
+          // FORWARD SOLVE
+          // update b_n+1 = b_n+1 - L_ni * y_i
+          //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[i]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+          tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[NBlock-1]], matrix_size, magma_queue_2);
+          //flop_count += 2.0*NR * nrhs * NM;               
+       }
+
+       //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
+       //rj dpotrf MF[IB,IB]
+        nvtxRangeId_t id_dpotrf = nvtxRangeStartA("LastPotrf");       
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag_potrf[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
+                       handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+       cudaDeviceSynchronize(); // TO BE REPLACED
+       tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
+       cudaDeviceSynchronize();
+#endif
+       nvtxRangeEnd(id_dpotrf);
+       flop_count += 1.0/3.0 * NR * NR * NR + 0.5*NR*NR + 1.0/6.0 * NR;
+
+       // FORWARD SOLVE: with newly computed Cholesky factor
+       // solve for y_i = L^-1_i*b_i (which was updated before)
+       //c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+       ttrsm_dev('L', 'L', 'N', 'N', NR, nrhs, ONE, blockR_dev, mf_block_lda(IB,IB), &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+       //flop_count += 2.0*NR * NR * nrhs; 
+
+       //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
+       //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
+       if (matrix_nd > 0)
+       {
+          nvtxRangeId_t id_ttrsm = nvtxRangeStartA("LastTtrsm");       
+          ttrsm_dev('R', 'L', 'T', 'N', matrix_nd, NR, ONE, blockR_dev, mf_block_lda(IB, IB), &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), magma_queue_1);
+          nvtxRangeEnd(id_ttrsm);
+          flop_count += matrix_nd * NR * NR;
+       
+       }
+       //printf("RJ: ttrsm NR: %d, a: %d, lda: %d, b: %d, ldb: %d\n", NR, mf_block_index(IB-1, IB-1), mf_block_lda(IB-1, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1));
+	    t_temp = get_time(0.0);
+
+       cudaDeviceSynchronize();
+       nvtxRangeId_t id_Cpy_SN_host = nvtxRangeStartA("copy_LastLarge_SN_toHost");  
+       copy_supernode_to_host(blockR_dev, IB, copyStream);     
+       //copy_supernode_to_host_write(blockR_dev, IB);
+       //copy_supernode_to_host(blockR_dev, IB);
+       nvtxRangeEnd(id_Cpy_SN_host);
+
+       t_copy_DtH += get_time(t_temp);
+
+    }
+
+    if (matrix_nd > 0)
+    {
+       IB = NBlock-1;
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+#ifdef PRINT_MSG
+       	std::cout << "IB = " << IB << std::endl;
+#endif
+
+       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
+       //rj NM is the same for all blocks 0..nt-1
+       tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_1);
+       flop_count += 2.0 * matrix_nd *matrix_nd *NM; 
+
+       // FORWARD SOLVE
+       // update b_n+1 = b_n+1 - L_ni * y_i
+       //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[i]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+       tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockR_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[NBlock-1]], matrix_size, magma_queue_1);
+       //flop_count += 2.0*NR * nrhs * NM;          
+   
+       //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
+       //rj dpotrf MF[IB,IB]
+       //tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+#ifdef CUDA_POTRF
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         cuda_buffer_flag_potrf[0] = 0;
+       }
+       tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
+                       handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#else
+       tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
+#endif
+
+       flop_count += 1.0/3.0 * NR * NR * NR + 0.5*NR*NR + 1.0/6.0 * NR;
+       //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(IB, IB), mf_block_lda(IB, IB));
+
+       // FORWARD SOLVE -- last block
+       ttrsm_dev('L', 'L', 'N', 'N', NR, nrhs, ONE, blockDense_dev, mf_block_lda(IB, IB), &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+       // flop_count += 2.0*NR * NR * nrhs;
+
+#ifdef PRINT_MSG
+       std::cout << "after complete Cholesky factorization + forward solve" << std::endl;
+#endif
+       t_temp = get_time(0.0);
+
+       cudaDeviceSynchronize();
+       copy_supernode_to_host(blockDense_dev, IB, copyStream);
+       //copy_supernode_to_host_write(blockDense_dev, IB);
+       
+       t_copy_DtH += get_time(t_temp);
+    
+    }
+
+   cudaDeviceSynchronize(); // TO BE REPLACED
+
+   t_fact = get_time(t_fact);
+   //nt    : " << flop_count / 1e9 << std::endl;
+   //std::cout << "time factorize : " << t_fact << ", sum time copy DtH : " << t_copy_DtH << ", sum t potrf : " << t_potrf << ", sum t dgemm : " << t_dgemm << std::endl;
+   double gflops = flop_count / (1e9*t_fact);
+   //printf("GFLOPS factorize : %f\n", gflops);
+
+   //std::cout << "time factorization Qxy : " << t_fact << std::endl;
+   //std::cout << "gflop count Qxy        : " << flop_count / 1e9 << std::endl;
+   return gflops;
+}
+
+/************************************************************************************************/
 // dummy function to check calls
 
 template <class T>
@@ -1211,7 +1676,155 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
 }
 
 /************************************************************************************************/
+// divide SecondStageSolve into ForwardPass & BackwardPass to make functions usable separately
 
+template <class T>
+double RGF<T>::ForwardPassSolve(size_t nrhs){
+
+   int info;
+   size_t IB;
+   size_t NR,NM,NP;
+   T ONE      = f_one();
+
+   NR = Bmax[0]-Bmin[0];
+
+   // counting FLOPS
+   double flop_count = 0;
+
+#ifdef PRINT_MSG
+   std::cout <<"calling first block solver in second stage factor now" << std::endl;
+#endif
+
+   nvtxRangeId_t id_solve = nvtxRangeStartA("ForwardPassSolve");
+
+   double t_solve = get_time(0.0);
+
+   //rj dtrsm LLNN MF[0,0] rhs[0]
+   // solve for first diagonal block (using solve for tridiagonal matrix), ie. x_0 = D^-0*b_0
+   c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(0, 0)], mf_block_lda(0, 0), &rhs[Bmin[0]], matrix_size);
+   flop_count += 2.0 * NR * NR * nrhs;
+
+   //rj IB = 1; IB < NBlock; IB++
+   for (IB = 1; IB < matrix_nt; IB++)
+   {
+      NR  = Bmax[IB]-Bmin[IB];
+      NM  = Bmax[IB-1]-Bmin[IB-1];
+
+      // compute b_i = b_i - E_i-1 * x_i-1
+      //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
+      c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB-1]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+      flop_count += 2.0 * NR * nrhs * NM;
+      // solve for x_i = D^-1_i*b_i (which was updated before)
+      //rj dtrsm LLNN MF[IB,IB] rhs[IB]
+      c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+      flop_count += 2.0*NR * NR * nrhs; 
+   }
+
+   // dense rows at the end
+   if (matrix_nd > 0)
+   {
+      IB = NBlock-1;
+      NR  = Bmax[IB]-Bmin[IB];
+      NM  = Bmax[IB-1]-Bmin[IB-1];
+
+      // compute b_n = b_n - (F_1*x_1 + F_2*x_2 + ... F_n-1*x_n-1)
+      //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
+      for (size_t i = 0; i < NBlock-1; i++)
+      {    
+         c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[i]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+         flop_count += 2.0*NR * nrhs * NM;
+      }
+      //rj dtrsm LLNN MF[IB,IB] rhs[IB]
+      c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+      flop_count += 2.0*NR * NR * nrhs;
+   }
+
+   return flop_count;
+
+}
+
+// assumes rhs to contain the result from forward pass
+template <class T>
+double RGF<T>::BackwardPassSolve(size_t nrhs){
+
+   int info;
+   size_t IB;
+   size_t NR,NM,NP;
+   T ONE      = f_one();
+
+   int flop_count = 0;
+
+   double t_solve = get_time(0.0);
+   
+   if (matrix_nd > 0)
+   {
+      IB = NBlock-1;
+      NR  = Bmax[IB]-Bmin[IB];
+      NM  = Bmax[IB-1]-Bmin[IB-1];
+
+      // solve D^T_n*x_n = y_n for x_n
+      //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
+      c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+      flop_count += NR * NR * nrhs;
+      // now update y everywhere : y_i = y_i - F^T_i * x_n
+      //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
+      for (size_t i = 0; i < NBlock-1; i++)
+      {
+         c_tgemm('T', 'N', NM, nrhs, NR, -ONE, &MF[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs[Bmin[IB]], matrix_size, ONE, &rhs[Bmin[i]], matrix_size);
+         flop_count += 2.0*NM * nrhs * NR;
+      }
+   }
+
+   // loop for tridiagonal block structure (right-hand side y already includes updates from dense rows/columns)
+   for (IB = matrix_nt-1; IB > 0; IB--)
+   {
+      NR  = Bmax[IB]-Bmin[IB];
+      NM  = Bmax[IB-1]-Bmin[IB-1];
+
+      // compute D^T_i x_i = y_i
+      //rj dtrsm LLTN MF[IB,IB] rhs[IB]
+      c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+      flop_count += NR * NR * nrhs;
+      // compute y_i = y_i - E_i^T * x_i+1
+      //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
+      c_tgemm('T', 'N', NM, nrhs, NR, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB]], matrix_size, ONE, &rhs[Bmin[IB-1]], matrix_size);
+      flop_count += 2.0 * NM * nrhs * NR; 
+   }
+
+   IB = 0;
+   NR = Bmax[IB]-Bmin[IB];
+
+   // compute D^T_0 x_0 = y_0
+   //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
+   c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+
+   flop_count += NR * NR * nrhs;
+   t_solve = get_time(t_solve);
+
+   double gflops = flop_count / (1e9*t_solve);
+   //printf("GFLOPS solve : %f\n", gflops);
+
+#ifdef PRINT_MSG
+   std::cout << "after forward-backword solve in 2nd stage factor" << std::endl;
+#endif
+
+   return gflops;
+
+}
+
+template <class T>
+double RGF<T>::SecondStageSolve(size_t nrhs)
+{
+   size_t gflops = 0;
+
+   gflops += ForwardPassSolve(nrhs);
+   gflops += BackwardPassSolve(nrhs);
+
+   return gflops;
+}
+
+
+#if 0 
 // After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
 template <class T>
 double RGF<T>::SecondStageSolve(size_t nrhs)
@@ -1317,6 +1930,293 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
    // compute D^T_0 x_0 = y_0
     //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
     c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
+
+    flop_count += NR * NR * nrhs;
+    t_solve = get_time(t_solve);
+
+    nvtxRangeEnd(id_solve);
+
+    double gflops = flop_count / (1e9*t_solve);
+    //printf("GFLOPS solve : %f\n", gflops);
+
+
+#ifdef PRINT_MSG
+    std::cout << "after forward-backword solve in 2nd stage factor" << std::endl;
+#endif
+
+
+    return gflops;
+}
+#endif
+
+/************************************************************************************************/
+
+// After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
+template <class T>
+double RGF<T>::SecondStageSolve_d(size_t nrhs, double* rhs_d)
+{
+    printf("in SecondStageSolve_d()\n");
+
+    int info;
+    size_t IB;
+    size_t NR,NM,NP;
+    double ONE_d      = f_one();
+
+    // do CONVERSION OF MF!!
+    // ========================================= //
+    double* MF_d = new double[matrix_n_nonzeros];
+
+    double t_MF_conv = get_time(0.0);
+    
+    for(int i = 0; i<matrix_n_nonzeros; i++){
+      MF_d[i] = (double) MF[i];
+    }
+
+    t_MF_conv = get_time(t_MF_conv);
+    printf("time spent conversion to MF double prec: %f\n", t_MF_conv);
+
+    // ========================================= //
+
+    //Forward pass
+    NR = Bmax[0]-Bmin[0];
+
+    // counting FLOPS
+    double flop_count = 0;
+
+#ifdef PRINT_MSG
+    std::cout <<"calling first block solver in second stage factor now" << std::endl;
+#endif
+
+    nvtxRangeId_t id_solve = nvtxRangeStartA("solve");
+
+    double t_solve = get_time(0.0);
+
+    //rj dtrsm LLNN MF[0,0] rhs[0]
+    // solve for first diagonal block (using solve for tridiagonal matrix), ie. x_0 = D^-0*b_0
+    c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE_d, &MF_d[mf_block_index(0, 0)], mf_block_lda(0, 0), &rhs_d[Bmin[0]], matrix_size);
+    flop_count += 2.0 * NR * NR * nrhs;
+
+    //rj IB = 1; IB < NBlock; IB++
+    for (IB = 1; IB < matrix_nt; IB++)
+    {
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // compute b_i = b_i - E_i-1 * x_i-1
+       //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
+       c_tgemm('N', 'N', NR, nrhs, NM, -ONE_d, &MF_d[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs_d[Bmin[IB-1]], matrix_size, ONE_d, &rhs_d[Bmin[IB]], matrix_size);
+       flop_count += 2.0 * NR * nrhs * NM;
+       // solve for x_i = D^-1_i*b_i (which was updated before)
+       //rj dtrsm LLNN MF[IB,IB] rhs[IB]
+       c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE_d, &MF_d[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_d[Bmin[IB]], matrix_size);
+       flop_count += 2.0*NR * NR * nrhs; 
+    }
+
+    // dense rows at the end
+    if (matrix_nd > 0)
+    {
+       IB = NBlock-1;
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // compute b_n = b_n - (F_1*x_1 + F_2*x_2 + ... F_n-1*x_n-1)
+       //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
+       for (size_t i = 0; i < NBlock-1; i++)
+       {    
+          c_tgemm('N', 'N', NR, nrhs, NM, -ONE_d, &MF_d[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs_d[Bmin[i]], matrix_size, ONE_d, &rhs_d[Bmin[IB]], matrix_size);
+          flop_count += 2.0*NR * nrhs * NM;
+       }
+       //rj dtrsm LLNN MF[IB,IB] rhs[IB]
+       c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE_d, &MF_d[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_d[Bmin[IB]], matrix_size);
+       flop_count += 2.0*NR * NR * nrhs;
+    }
+
+    //Backward pass
+    if (matrix_nd > 0)
+    {
+       IB = NBlock-1;
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // solve D^T_n*x_n = y_n for x_n
+       //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
+       c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_d, &MF_d[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_d[Bmin[IB]], matrix_size);
+       flop_count += NR * NR * nrhs;
+       // now update y everywhere : y_i = y_i - F^T_i * x_n
+       //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
+       for (size_t i = 0; i < NBlock-1; i++)
+       {
+          c_tgemm('T', 'N', NM, nrhs, NR, -ONE_d, &MF_d[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs_d[Bmin[IB]], matrix_size, ONE_d, &rhs_d[Bmin[i]], matrix_size);
+          flop_count += 2.0*NM * nrhs * NR;
+       }
+    }
+
+    // loop for tridiagonal block structure (right-hand side y already includes updates from dense rows/columns)
+    for (IB = matrix_nt-1; IB > 0; IB--)
+    {
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // compute D^T_i x_i = y_i
+       //rj dtrsm LLTN MF[IB,IB] rhs[IB]
+       c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_d, &MF_d[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_d[Bmin[IB]], matrix_size);
+       flop_count += NR * NR * nrhs;
+       // compute y_i = y_i - E_i^T * x_i+1
+       //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
+       c_tgemm('T', 'N', NM, nrhs, NR, -ONE_d, &MF_d[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs_d[Bmin[IB]], matrix_size, ONE_d, &rhs_d[Bmin[IB-1]], matrix_size);
+       flop_count += 2.0 * NM * nrhs * NR; 
+    }
+
+    IB = 0;
+    NR = Bmax[IB]-Bmin[IB];
+
+   // compute D^T_0 x_0 = y_0
+    //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
+    c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_d, &MF_d[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_d[Bmin[IB]], matrix_size);
+
+    flop_count += NR * NR * nrhs;
+    t_solve = get_time(t_solve);
+
+    nvtxRangeEnd(id_solve);
+
+    double gflops = flop_count / (1e9*t_solve);
+    //printf("GFLOPS solve : %f\n", gflops);
+
+
+#ifdef PRINT_MSG
+    std::cout << "after forward-backword solve in 2nd stage factor" << std::endl;
+#endif
+
+
+    return gflops;
+}
+
+/************************************************************************************************/
+
+/************************************************************************************************/
+
+// After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
+template <class T>
+double RGF<T>::SecondStageSolve_s(size_t nrhs, float* rhs_s)
+{
+    printf("in SecondStageSolve_s()\n");
+
+    int info;
+    size_t IB;
+    size_t NR,NM,NP;
+    float ONE_s      = f_one();
+
+    // do CONVERSION OF MF!!
+    // ========================================= //
+    float* MF_s = new float[matrix_n_nonzeros];
+
+    double t_MF_conv = get_time(0.0);
+    
+    for(int i = 0; i<matrix_n_nonzeros; i++){
+      MF_s[i] = (float) MF[i];
+    }
+
+    t_MF_conv = get_time(t_MF_conv);
+    printf("time spent conversion to MF single prec: %f\n", t_MF_conv);
+
+    // ========================================= //
+
+    //Forward pass
+    NR = Bmax[0]-Bmin[0];
+
+    // counting FLOPS
+    double flop_count = 0;
+
+#ifdef PRINT_MSG
+    std::cout <<"calling first block solver in second stage factor now" << std::endl;
+#endif
+
+    nvtxRangeId_t id_solve = nvtxRangeStartA("solve");
+
+    double t_solve = get_time(0.0);
+
+    //rj dtrsm LLNN MF[0,0] rhs[0]
+    // solve for first diagonal block (using solve for tridiagonal matrix), ie. x_0 = D^-0*b_0
+    c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(0, 0)], mf_block_lda(0, 0), &rhs_s[Bmin[0]], matrix_size);
+    flop_count += 2.0 * NR * NR * nrhs;
+
+    //rj IB = 1; IB < NBlock; IB++
+    for (IB = 1; IB < matrix_nt; IB++)
+    {
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // compute b_i = b_i - E_i-1 * x_i-1
+       //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
+       c_tgemm('N', 'N', NR, nrhs, NM, -ONE_s, &MF_s[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs_s[Bmin[IB-1]], matrix_size, ONE_s, &rhs_s[Bmin[IB]], matrix_size);
+       flop_count += 2.0 * NR * nrhs * NM;
+       // solve for x_i = D^-1_i*b_i (which was updated before)
+       //rj dtrsm LLNN MF[IB,IB] rhs[IB]
+       c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_s[Bmin[IB]], matrix_size);
+       flop_count += 2.0*NR * NR * nrhs; 
+    }
+
+    // dense rows at the end
+    if (matrix_nd > 0)
+    {
+       IB = NBlock-1;
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // compute b_n = b_n - (F_1*x_1 + F_2*x_2 + ... F_n-1*x_n-1)
+       //rj dgemm NN M[IB,IB-1] rhs[IB-1] rhs[IB]
+       for (size_t i = 0; i < NBlock-1; i++)
+       {    
+          c_tgemm('N', 'N', NR, nrhs, NM, -ONE_s, &MF_s[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs_s[Bmin[i]], matrix_size, ONE_s, &rhs_s[Bmin[IB]], matrix_size);
+          flop_count += 2.0*NR * nrhs * NM;
+       }
+       //rj dtrsm LLNN MF[IB,IB] rhs[IB]
+       c_ttrsm('L', 'L', 'N', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_s[Bmin[IB]], matrix_size);
+       flop_count += 2.0*NR * NR * nrhs;
+    }
+
+    //Backward pass
+    if (matrix_nd > 0)
+    {
+       IB = NBlock-1;
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // solve D^T_n*x_n = y_n for x_n
+       //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
+       c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_s[Bmin[IB]], matrix_size);
+       flop_count += NR * NR * nrhs;
+       // now update y everywhere : y_i = y_i - F^T_i * x_n
+       //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
+       for (size_t i = 0; i < NBlock-1; i++)
+       {
+          c_tgemm('T', 'N', NM, nrhs, NR, -ONE_s, &MF_s[mf_dense_block_index(i)], mf_dense_block_lda(i), &rhs_s[Bmin[IB]], matrix_size, ONE_s, &rhs_s[Bmin[i]], matrix_size);
+          flop_count += 2.0*NM * nrhs * NR;
+       }
+    }
+
+    // loop for tridiagonal block structure (right-hand side y already includes updates from dense rows/columns)
+    for (IB = matrix_nt-1; IB > 0; IB--)
+    {
+       NR  = Bmax[IB]-Bmin[IB];
+       NM  = Bmax[IB-1]-Bmin[IB-1];
+
+       // compute D^T_i x_i = y_i
+       //rj dtrsm LLTN MF[IB,IB] rhs[IB]
+       c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_s[Bmin[IB]], matrix_size);
+       flop_count += NR * NR * nrhs;
+       // compute y_i = y_i - E_i^T * x_i+1
+       //rj dgemm TN M[IB,IB-1] rhs[IB] rhs[IB-1]
+       c_tgemm('T', 'N', NM, nrhs, NR, -ONE_s, &MF_s[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs_s[Bmin[IB]], matrix_size, ONE_s, &rhs_s[Bmin[IB-1]], matrix_size);
+       flop_count += 2.0 * NM * nrhs * NR; 
+    }
+
+    IB = 0;
+    NR = Bmax[IB]-Bmin[IB];
+
+   // compute D^T_0 x_0 = y_0
+    //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
+    c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_s[Bmin[IB]], matrix_size);
 
     flop_count += NR * NR * nrhs;
     t_solve = get_time(t_solve);
@@ -2104,7 +3004,10 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
 #endif
 
     //Computation
+    double t_firstStageFactor = get_time(0.0);
     double gflops = FirstStageFactor();
+    t_firstStageFactor = get_time(t_firstStageFactor);
+    printf("time firstStageFactor : %f\n", t_firstStageFactor);
 
      /*std::string fileName = "L.txt"; 
       ofstream file(fileName,    ios::out | ::ios::trunc);
@@ -2216,6 +3119,132 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
 /************************************************************************************************/
 
 template <class T>
+double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
+{
+
+#ifdef PRINT_MSG
+   std::cout << "entered factorize." << std::endl;
+#endif
+
+   int GPU_currRank;
+   cudaGetDevice(&GPU_currRank);
+
+   if(GPU_currRank != GPU_rank){
+      //printf("In factorize. Current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
+      cudaSetDevice(GPU_rank);
+      cudaGetDevice(&GPU_currRank);
+      //printf("updated GPU rank is: %d.\n", GPU_currRank);   
+   }
+
+    //int numaNodeID = topo_get_numNode(GPU_rank);
+
+    matrix_ia = ia;
+    matrix_ja = ja;
+    matrix_a = a;
+
+   double t_allocate_MF_host = get_time(0.0);
+
+   initialize_MF_host();
+   
+#ifdef PRINT_MSG   
+   std::cout << "in factorize. MF_allocated : " << MF_allocated << std::endl; 
+#endif
+
+   t_allocate_MF_host = get_time(t_allocate_MF_host);
+   //std::cout << "time to allocate memory on CPU: " << t_allocate_MF_host << std::endl;
+
+   double t_allocate_MF_dev = get_time(0.0);
+
+    //Data allocation on GPU -> negligible time
+   if (!MF_dev_allocated){
+       //printf("In MF_dev_allocated not allocated.\n");
+       //MF = new T[matrix_n_nonzeros];
+       size_t max_supernode_nnz_dense = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
+       size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
+       allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz_dense*sizeof(T));
+       allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
+       allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+       MF_dev_allocated = true;
+    }
+
+   t_allocate_MF_dev = get_time(t_allocate_MF_dev);
+   //std::cout << "time to allocate memory on GPU: " << t_allocate_MF_dev << std::endl;
+
+   size_t nnz = matrix_ia[matrix_size];
+   //std::cout << "nnz = " << nnz << std::endl;
+   size_t max_rows = matrix_nt > 1 ? 2*matrix_ns+matrix_nd : matrix_ns+matrix_nd;
+   size_t max_cols = max(matrix_ns, matrix_nd);
+
+   //Temp data allocation
+   allocate_data_on_device((void**)&ia_dev,(max_cols+1)*sizeof(size_t));
+   allocate_data_on_device((void**)&ja_dev,max_rows*max_cols*sizeof(size_t));
+   mem_alloc_dev = allocate_data_on_device((void**)&a_dev,max_rows*max_cols*sizeof(T));
+
+   // Data allocation for right-hand side
+   rhs = new T[matrix_size*nrhs];
+   //Copy data
+   memcpy(rhs,b,matrix_size*nrhs*sizeof(T));
+
+   allocate_data_on_device((void**)&rhs_dev,matrix_size*sizeof(T));
+   // TODO: stream later
+   memcpy_to_device(b, rhs_dev,matrix_size*sizeof(T), NULL);
+
+#ifdef PRINT_MSG
+    printf("Allocated GPU memory FactorizeSolve(): %ld\n", mem_alloc_dev);
+#endif
+
+   // ************************************************************* // 
+   //Computation Factorization + Forward Solve
+   double t_firstSecondStageFactor = get_time(0.0);
+
+   double gflops = FirstSecondStageFactor(nrhs);
+   
+   t_firstSecondStageFactor = get_time(t_firstSecondStageFactor);
+   printf("time firstSecondStageFactor : %f\n", t_firstSecondStageFactor);
+   // ************************************************************* // 
+
+   // contains solution vector from forward pass
+   memcpy_to_host(rhs, rhs_dev,matrix_size*sizeof(T), NULL);
+
+   /*printf("y = ");
+   for(int i = 0; i<min((int) matrix_size, 20); i++){
+         printf(" %f ", rhs[i]);
+   }
+   printf("\n");*/   
+
+   // ************************************************************* // 
+   // Backward Solve on CPU
+   // Second stage factor backward solve only ()
+   // ************************************************************* // 
+
+    gflops += BackwardPassSolve(nrhs);
+    // ***************************************************** //
+    //Copy data
+    memcpy(x,rhs,matrix_size*nrhs*sizeof(T));
+
+    //Data deallocation
+    delete[] rhs;
+   
+   //Temp data deallocation Factorization
+   deallocate_data_on_dev(ia_dev,(max_cols+1)*sizeof(size_t));
+   deallocate_data_on_dev(ja_dev,max_rows*max_cols*sizeof(size_t));
+   mem_alloc_dev = deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));
+
+   // deallocate rhs device buffer
+   deallocate_data_on_dev(rhs_dev, matrix_size*sizeof(T));
+
+#ifdef PRINT_MGS
+    printf("Allocated GPU memory after Factorize: %ld\n", mem_alloc_dev);
+#endif
+
+   factorization_completed = true;
+
+   return gflops;
+}
+
+/************************************************************************************************/
+
+template <class T>
 double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs)
 {
     double gflops = solve(b, b, nrhs);
@@ -2277,6 +3306,98 @@ double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
 
     return gflops;
 }
+
+/************************************************************************************************/
+// COPY -- DOUBLE PRECISION but assuming SINGLE precision input
+#if 1
+template <class T>
+double RGF<T>::solve_d(size_t *ia, size_t *ja, float* a, float* x, float *b, size_t nrhs)
+{
+
+   if (!factorization_completed){
+       factorize(ia, ja, a);
+   }
+   
+   // check if solve is performed on the right matrix 
+   if(!(ia[matrix_size] == matrix_ia[matrix_size])){
+      std::cout << "Matrices don't match!!" << std::endl;
+      exit(1);
+   }
+
+   if(sizeof(T) == 8){
+      printf("T already double precision. Doesn't make sense to call solve_d()! Cholesky factor already in double precision!\n");
+      exit(1);
+   }
+
+    //Data allocation
+    double* rhs_d = new double[matrix_size*nrhs];
+
+   // copy b to rhs and store as single precision
+   for(int i=0; i<matrix_size*nrhs; i++){
+      rhs_d[i] = (double) b[i];
+   }
+
+    //Computation
+    double gflops = SecondStageSolve_d(nrhs, rhs_d);
+
+    //Copy solution into x and convert to double
+    for(int i=0; i<matrix_size*nrhs; i++){
+      x[i] = (float) rhs_d[i];
+    }
+
+    //Data deallocation
+    delete[] rhs_d;
+
+    return gflops;
+}
+
+#endif
+
+/************************************************************************************************/
+// COPY -- SINGLE PRECISION but assuming double precision input
+#if 1
+template <class T>
+double RGF<T>::solve_s(size_t *ia, size_t *ja, double* a, double* x, double*b, size_t nrhs)
+{
+
+   if (!factorization_completed){
+       factorize(ia, ja, a);
+   }
+   
+   // check if solve is performed on the right matrix 
+   if(!(ia[matrix_size] == matrix_ia[matrix_size])){
+      std::cout << "Matrices don't match!!" << std::endl;
+      exit(1);
+   }
+
+   if(sizeof(T) == 4){
+      printf("T already single precision. Doesn't make sense to call solve_s()! Cholesky factor already in single precision!\n");
+      exit(1);
+   }
+
+    //Data allocation
+    float* rhs_s = new float[matrix_size*nrhs];
+
+   // copy b to rhs and store as single precision
+   for(int i=0; i<matrix_size*nrhs; i++){
+      rhs_s[i] = (float) b[i];
+   }
+
+    //Computation
+    double gflops = SecondStageSolve_s(nrhs, rhs_s);
+
+    //Copy solution into x and convert to double
+    for(int i=0; i<matrix_size*nrhs; i++){
+      x[i] = (double) rhs_s[i];
+    }
+
+    //Data deallocation
+    delete[] rhs_s;
+
+    return gflops;
+}
+
+#endif
 
 /************************************************************************************************/
 
@@ -2849,4 +3970,5 @@ inline float RGF<float>::f_zero()
 /************************************************************************************************/
 
 #endif
+
 
