@@ -1,6 +1,8 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
+DEBUG= -g
+
 #BASE_PATH=/home/x_gaedkelb
 BASE_PATH=/home/hpc/ihpc/ihpc060h
 

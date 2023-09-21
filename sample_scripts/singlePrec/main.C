@@ -20,7 +20,7 @@
 
 #define MAGMA
 
-#if 1
+#if 0
 typedef float T;
 #define assign_T(val) val
 #else
@@ -71,6 +71,40 @@ magma_int_t magma_tpotrf_expert(){
     magma_event_t events[2], magma_queue_t queues[2] ) -> 
 }
 */
+
+magma_int_t magma_tpotrf_expert_wrapper(char uplo, int n, double* a, int lda, int* info, magma_mode_t mode, int subN, int subSubN, 
+                                        void* host_work, magma_int_t *lwork_host, void* device_work, magma_int_t *lwork_device,
+                                        magma_event_t events[2], magma_queue_t queues[2], int& init_flag){
+    
+    magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+
+    if(init_flag < 1){
+        *lwork_host   = -1;
+        *lwork_device = -1;
+        printf("in initializing potrf expert gpu.\n");
+        exit(1);
+        magma_int_t potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
+                                                          host_work, lwork_host, device_work, lwork_device, events, queues);
+        printf("DPOTRF EXPERT WORK. Allocating %d of host memory. Allocating %d of device memory.\n", lwork_host, lwork_device);
+        
+        if(potrfErr != 0){
+            std::cout << "in magma potrf error = " << potrfErr << std::endl;
+            exit(1);        
+        }
+
+        init_flag = 1;
+    }
+
+    magma_int_t potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
+                                host_work, lwork_host, device_work, lwork_device, events, queues);
+
+    if(potrfErr != 0){
+            std::cout << "in magma potrf expert work error = " << potrfErr << std::endl;
+            exit(1);        
+    }
+
+    return potrfErr;
+}
 
 
 // new magma -- double precision
@@ -404,8 +438,57 @@ int main(int argc, char* argv[])
     
    checkCudaErrors(cudaMemcpy(Q_dev1, Q_host, n*n*sizeof(T), cudaMemcpyHostToDevice));
 
-	tpotrf_magma_dev('L', n, Q_dev1, n, &info1);
-    // TODO: check if this works for single preicision
+	//tpotrf_magma_dev('L', n, Q_dev1, n, &info1);
+
+    int init_flag = 0;
+
+    int* info;
+    magma_mode_t mode = MagmaNative;
+    int subN = 256;
+    int subSubN = 32;
+    void* host_work;
+    int lwork_host = -1;
+    void* device_work;
+    int lwork_device = -1;
+    magma_event_t events[2];
+    magma_event_create(&events[0]);
+    magma_event_create(&events[1]);
+
+    magma_queue_t queues[2];
+    magma_queue_create(device, &queues[0]);	
+    magma_queue_create(device, &queues[1]);	
+
+    magma_uplo_t magma_uplo = magma_uplo_const('L');
+
+    printf("before initial magma potrf expert call.\n");
+    magma_int_t potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, Q_dev1, n, info, mode, subN, subSubN, 
+                                                        host_work, &lwork_host, device_work, &lwork_device, events, queues);                            
+    printf("after initial magma potrf expert call.\n");
+    printf("lwork device: %d. lwork host: %d\n", lwork_device, lwork_host);
+
+    if(potrfErr != 0){
+        std::cout << "magma potrf error = " << potrfErr << std::endl;
+        exit(1);
+    }
+
+    checkCudaErrors(cudaMalloc((void**)&device_work,lwork_device*sizeof(double)));
+    checkCudaErrors(cudaMallocHost((void**)&host_work, lwork_host*sizeof(double)));    
+    cudaDeviceSynchronize();
+
+    printf("Properly calling dpotrf expert now.\n");
+    potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, Q_dev1, n, info, mode, subN, subSubN, 
+                                                        host_work, &lwork_host, device_work, &lwork_device, events, queues);     
+    if(potrfErr != 0){
+        std::cout << "magma potrf error = " << potrfErr << std::endl;
+        exit(1);
+    }  
+   
+    cudaDeviceSynchronize();
+    printf("after dpotrf expert now.\n");
+
+    cudaFree(device_work);
+    cudaFreeHost(host_work);
+
 	checkCudaErrors(cudaMemcpy(L_host, Q_dev1, n*n*sizeof(T), cudaMemcpyDeviceToHost));
 
 	printf("\nL_host: ");
@@ -413,7 +496,12 @@ int main(int argc, char* argv[])
 		printf(" %f", L_host[i]);
 	}
 	printf("\n");
- 
+    exit(1);
+
+    /*magma_tpotrf_expert_wrapper('L', n, Q_dev1, n, info, mode, subN, subSubN, 
+                            host_work, lwork_host, device_work, lwork_device,
+                            events, queues, init_flag);*/
+
     cudaDeviceSynchronize();
     ttrsm_magma_dev('R', 'L', 'T', 'N', n, n, alpha, Q_dev1, n, Id_dev, n, magma_compute_queue);
 
@@ -512,7 +600,7 @@ int main(int argc, char* argv[])
     cudaFreeHost(Id_host);
     cudaFreeHost(Q_host);
     cudaFreeHost(L_host);
-  
+
 
 	return 1;
 
