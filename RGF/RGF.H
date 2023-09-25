@@ -21,7 +21,7 @@
 #include "nvToolsExt.h"
 
 
-//#define PRINT_MSG
+#define PRINT_MSG
 
 template <class T>
 class RGF{
@@ -31,11 +31,11 @@ public:
     RGF(size_t,size_t,size_t, int);
 
     ~RGF();
-    double factorize(size_t* ia, size_t* ja, T* a);
+    double factorize(size_t* ia, size_t* ja, T* a, double& t_firstStageFactor);
     double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet);
-    double factorizeSolve(size_t* ia, size_t* ja, T* a, T* x, T* rhs,size_t nrhs);
-    double solve(size_t*, size_t*, T*, T*,size_t);
-    double solve(size_t*, size_t*, T*, T*,T*,size_t);
+    double factorizeSolve(size_t* ia, size_t* ja, T* a, T* x, T* rhs,size_t nrhs, double& t_firstSecondStage, double& t_SecondStageBackPass);
+    double solve(size_t*, size_t*, T*, T*,size_t, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass);
+    double solve(size_t*, size_t*, T*, T*,T*,size_t, double& t_secondStageForwardPass, double& t_secondStageBackwardPass);
     // single precision solve but assuming double precision input
     double solve_s(size_t*, size_t*, double*, double*,double*,size_t);
     // double precision solve but assuming single precision input
@@ -104,7 +104,23 @@ private:
     size_t *host_size;
     double *mem_cuda_dev;
     double *mem_cuda_host;
-#endif
+#endif // end CUDA_POTRF
+
+#ifdef MAGMA_EXPERT
+    int magma_potrf_init_flag;
+
+    int magma_info[1];
+    //magma_mode_t mode = MagmaHybrid;
+    magma_mode_t mode; // = MagmaNative;
+    int subN; // = 256;      // nb = 64    and recnb =   32 for 4000
+    int subSubN; // = 32;    // nb = 512   and recnb = 128 for 20000 
+    void* host_work;
+    int lwork_host;
+    void* device_work;
+    int lwork_device;
+    magma_event_t magma_events[2];
+    magma_queue_t magma_queues[2];
+#endif  // end MAGMA_EXPERT
 
     T *MF;
     T *invBlks;
@@ -141,7 +157,7 @@ private:
     double FirstStageFactor_noCopyHost_testV(double &logDet);
     double ForwardPassSolve(size_t);
     double BackwardPassSolve(size_t);
-    double SecondStageSolve(size_t);
+    double SecondStageSolve(size_t, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass);
     // single precision solve with double precision factor
     double SecondStageSolve_s(size_t, float* rhs_s);
     // double precision solve with single precision factor
@@ -187,6 +203,8 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 
 #ifdef CUDA_POTRF
    printf("using CUDA POTRF.\n");
+#elif defined(MAGMA_EXPERT)
+   printf("using MAGMA EXPERT POTRF.\n");
 #else
    printf("using MAGMA POTRF.\n");
 #endif
@@ -304,6 +322,29 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 
 #endif 
 
+#ifdef MAGMA_EXPERT
+
+    magma_potrf_init_flag = 0;
+    // mode = MagmaHybrid;
+    mode = MagmaNative;
+    subN = 256;      // nb = 64    and recnb =   32 for 4000
+    subSubN = 32;    // nb = 512   and recnb = 128 for 20000 
+    
+    lwork_host = -1;
+    lwork_device = -1;
+    
+    magma_event_create(&magma_events[0]);
+    magma_event_create(&magma_events[1]);
+
+    // let's hope that this works.
+    magma_queues[0] = magma_queue_1;
+    magma_queues[1] = magma_queue_2;
+
+    //magma_queue_create(device, &queues[0]);	
+    //magma_queue_create(device, &queues[1]);	
+
+#endif
+
 }
 
 /************************************************************************************************/
@@ -365,6 +406,11 @@ RGF<T>::~RGF()
     cudaFreeHost(dev_size);
     cudaFreeHost(mem_cuda_host);
     cudaFree(mem_cuda_dev);
+#endif 
+
+#ifdef MAGMA_EXPERT
+    cudaFreeHost(host_work);
+    cudaFree(device_work);
 #endif 
 
 }
@@ -511,7 +557,6 @@ double RGF<T>::FirstStageFactor()
    copy_supernode_to_host_write(blockR_dev, IB);
    exit(1);*/
 
-
     // put it in cudaEvent
     //gpuErrchk(cudaEventRecord(copy_gpu, magma_cudaStream_1)); // want compute_stream to wait
     //gpuErrchk(cudaStreamWaitEvent(compute_stream, copy_gpu, 0));
@@ -533,11 +578,20 @@ double RGF<T>::FirstStageFactor()
      cuda_buffer_flag_potrf[0] = 0;
      tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+      magma_potrf_init_flag = 0;
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
    // magma_queue currently not supported
     cudaDeviceSynchronize(); 
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
     cudaDeviceSynchronize();
+
+    //copy_supernode_to_host_write(blockR_dev, IB);
+    //exit(1);
 #endif
     //printf("RJ: tpotrf NR: %d, a: %d, lda: %d\n\n", NR, mf_block_index(0, 0), mf_block_lda(0, 0));
     t_temp = get_time(t_temp);
@@ -603,20 +657,15 @@ double RGF<T>::FirstStageFactor()
        swap_pointers(&blockR_dev, &blockM_dev);
 
        nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
-       init_supernode(blockR_dev, IB, magma_cudaStream_1);
-       //init_supernode(blockR_dev, IB);
+       init_supernode(blockR_dev, IB,  magma_cudaStream_1);
        nvtxRangeEnd(id_initSN);
-
-       // UPDATE NEXT DIAGONAL BLOCK 
-       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
-       // todo rj: 3-last parameter ZERO in PARDISO
-       // magma_queue_1 is on top of magma_cudaStream_1
 
        // add cuda_event such that magma_queue_2/magma_cudaStream_2 wait for magma_cudaStream_1 to get here
        // maybe better to use magma version?
        gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
        gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
 
+       // UPDATE NEXT DIAGONAL BLOCK 
        nvtxRangeId_t id_dgemm = nvtxRangeStartA("BigGemm_inLoop");
        t_temp = get_time(0.0);
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
@@ -624,7 +673,6 @@ double RGF<T>::FirstStageFactor()
        nvtxRangeEnd(id_dgemm);
        t_dgemm += t_temp;
        
-       // dim dgemm: m = , n = , k = 
        flop_count += 2.0 * NR * NR * NM;
 
        // direct into separate stream -> becomes relevant when many fixed effects ...
@@ -659,11 +707,28 @@ double RGF<T>::FirstStageFactor()
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         //printf("Different block size! Re-initialize cudaBufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+       copy_supernode_to_host_write(blockR_dev, IB);
+       sleep(2);
+      //magma_potrf_init_flag = 0;
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      cudaDeviceSynchronize();   
+      sleep(2);                         
+      copy_supernode_to_host_write(blockR_dev, IB);
+      exit(1);
 #else
       // how can I get the default stream to wait but make an exception for copyStream ?
        cudaDeviceSynchronize(); // TO BE REPLACED
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
        cudaDeviceSynchronize();
+
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #endif
 
        nvtxRangeEnd(id_dpotrf);
@@ -750,6 +815,13 @@ double RGF<T>::FirstStageFactor()
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+      magma_potrf_init_flag = 0;
+
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        cudaDeviceSynchronize(); // TO BE REPLACED
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
@@ -807,6 +879,13 @@ double RGF<T>::FirstStageFactor()
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+      magma_potrf_init_flag = 0;
+
+      magma_tpotrf_expert_wrapper('L', NR, blockDense_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #endif
@@ -901,6 +980,12 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
      cuda_buffer_flag_potrf[0] = 0;
      tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+      magma_potrf_init_flag = 0;
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
    // magma_queue currently not supported
     cudaDeviceSynchronize(); 
@@ -953,6 +1038,7 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
     // if copy supernode device to host happens while new supernode is being initialized ... memory issues?
     copy_supernode_to_host(blockR_dev, IB, copyStream);
     //copy_supernode_to_host_write(blockR_dev, IB);
+    //exit(1);
 
     t_temp = get_time(t_temp);
     t_copy_DtH =+ t_temp;
@@ -974,7 +1060,6 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
 
        double flop_1iter = 0.0;
 
-       // 
        swap_pointers(&blockR_dev, &blockM_dev);
 
        nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
@@ -982,11 +1067,7 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
        //init_supernode(blockR_dev, IB);
        nvtxRangeEnd(id_initSN);
 
-       // UPDATE NEXT DIAGONAL BLOCK 
-       //rj dgemm NT M[IB,IB-1] M[IB,IB-1]
-       // todo rj: 3-last parameter ZERO in PARDISO
        // magma_queue_1 is on top of magma_cudaStream_1
-
        // add cuda_event such that magma_queue_2/magma_cudaStream_2 wait for magma_cudaStream_1 to get here
        // maybe better to use magma version?
        gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
@@ -1014,10 +1095,10 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
       delete [] y_host;*/
 
       // FORWARD SOLVE
-       // compute b_i = b_i - L_ii-1 * x_i-1
-       //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB-1]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
-       tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
-       //flop_count += 2.0 * NR * nrhs * NM;
+      // compute b_i = b_i - L_ii-1 * x_i-1
+      //c_tgemm('N', 'N', NR, nrhs, NM, -ONE, &MF[mf_block_index(IB, IB-1)], mf_block_lda(IB, IB-1), &rhs[Bmin[IB-1]], matrix_size, ONE, &rhs[Bmin[IB]], matrix_size);
+      tgemm_dev('N', 'N', NR, nrhs, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &rhs_dev[Bmin[IB-1]], matrix_size, ONE, &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+      //flop_count += 2.0 * NR * nrhs * NM;
 
       // copy back blockR_dev
       /*size_t size_SN = 2*NR*NR+matrix_nd*NR;
@@ -1069,6 +1150,15 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         //printf("Different block size! Re-initialize BufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
       // how can I get the default stream to wait but make an exception for copyStream ?
        cudaDeviceSynchronize(); // TO BE REPLACED
@@ -1186,6 +1276,16 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         //printf("Different block size! Re-initialize BufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        cudaDeviceSynchronize(); // TO BE REPLACED
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
@@ -1255,6 +1355,15 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         //printf("Different block size! Re-initialize BufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+      magma_tpotrf_expert_wrapper('L', NR, blockDense_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
 #endif
@@ -1309,21 +1418,30 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
     NR = Bmax[0]-Bmin[0];
 
     nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNodeDev");  
-    init_supernode(blockR_dev, IB);
+    init_supernode(blockR_dev, IB, magma_cudaStream_1);
     nvtxRangeEnd(id_initSN);    
+    cudaDeviceSynchronize();
+    copy_supernode_to_host_write(blockR_dev, IB);
+
 
     T* diag;
     diag = new T[NR];
 
+#ifdef MAGMA_EXPERT
     // loop where I copy from blockR_dev to blockM_dev & keep factorizing
+    magma_potrf_init_flag = 0;
+#endif
 
-    for(int i=0; i<100; i++){
+    for(int i=0; i<2; i++){
 #ifdef PRINT_MSG
        std::cout << "Copy to blockM_dev, i = " << i << ",  mf_block_lda(IB, IB) = " << mf_block_lda(IB, IB) << std::endl;
 #endif
        nvtxRangeId_t id_cpyDevDev = nvtxRangeStartA("CopySNtoblockMdev");  
        tlacpy_dev('N', 2*NR, NR, blockR_dev, mf_block_lda(IB, IB), blockM_dev,  mf_block_lda(IB, IB), magma_queue_1);
-       nvtxRangeEnd(id_cpyDevDev);    
+       nvtxRangeEnd(id_cpyDevDev);
+
+       sleep(2);  
+       copy_supernode_to_host_write(blockM_dev, IB);
 
 #ifdef PRINT_MSG
        std::cout << "IB = " << IB << std::endl;
@@ -1336,13 +1454,21 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 #ifdef CUDA_POTRF
        tpotrf_dev_cuda('L', NR, blockM_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+
+#elif defined(MAGMA_EXPERT)
+      copy_supernode_to_host_write(blockM_dev, IB);
+      sleep(2);
+      magma_tpotrf_expert_wrapper('L', NR, blockM_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      copy_supernode_to_host_write(blockM_dev, IB);
 #else
        cudaDeviceSynchronize();     
        tpotrf_dev('L', NR, blockM_dev, mf_block_lda(IB, IB), &info);
 #endif
        nvtxRangeEnd(id_dpotrf);    
 
-       //copy_supernode_to_host_write(blockR_dev, IB);
+       sleep(2);
+       copy_supernode_to_host_write(blockM_dev, IB);
 
        id_cpyDevDev = nvtxRangeStartA("CopyDiagDevDev");  
        copy_supernode_diag(blockM_dev, IB);
@@ -1389,10 +1515,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
     double t_temp;
     double t_dgemm;
 
-//tpotrf_dev('L', NR, M1_dev ,NR ,&info)
-//rj dpotrf MF[0,0]
-//rj dtrsm RLTN MF[0,0] MF[1,0]
-
     IB = 0;
     NR = Bmax[0]-Bmin[0];
 
@@ -1418,11 +1540,16 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
      cuda_buffer_flag_potrf[0] = 0;
      tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+      magma_potrf_init_flag = 0;
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
     cudaDeviceSynchronize();
     tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
     cudaDeviceSynchronize();
-
 #endif
 
     nvtxRangeEnd(id_dpotrf);    
@@ -1433,7 +1560,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
     gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, potrf_dev_ev, 0));   
 
     // TODO: if nt = 0 but nd != 0 => problem !! 
-    //rj dtrsm RLTN MF[IB,IB] MF[IB+1,IB]
     if (matrix_nt > 1)
     {
        t_temp = get_time(0.0);	    
@@ -1474,8 +1600,12 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
        NR  = Bmax[IB]-Bmin[IB];
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
+       printf("IB = %d. before copy supdernode to device in loop.\n", IB);
+       cudaDeviceSynchronize();
        swap_pointers(&blockR_dev, &blockM_dev);
+       cudaDeviceSynchronize();
        init_supernode(blockR_dev, IB, magma_cudaStream_1);
+       printf("IB = %d. after copy supernode to device in loop.\n", IB);
 
        //cudaDeviceSynchronize();
        gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
@@ -1500,7 +1630,6 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
           // update last diagonal block
           tgemm_dev('N', 'T', matrix_nd, matrix_nd, NM, -ONE, &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), &blockM_dev[mf_dense_block_offset(IB-1)], mf_dense_block_lda(IB-1), ONE, blockDense_dev, matrix_nd, magma_queue_2);
           flop_count += 2.0 * matrix_nd * matrix_nd * NM;
-
        }
 
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
@@ -1514,6 +1643,16 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         printf("Different block size! Re-initialize BufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+      magma_potrf_init_flag = 0;
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
@@ -1583,6 +1722,15 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
        }
        tpotrf_dev_cuda('L', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         //printf("Different block size! Re-initialize BufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+      magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockR_dev, mf_block_lda(IB, IB), &info);
@@ -1627,6 +1775,15 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
        }
        tpotrf_dev_cuda('L', NR, blockDense_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_potrf, 
                        handle, params, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
+#elif defined(MAGMA_EXPERT)
+       if(NR != NM){
+         //printf("Different block size! Re-initialize BufferSize. NR = %ld, NM = %ld\n", NR, NM);
+         magma_potrf_init_flag = 0;
+       }
+      magma_tpotrf_expert_wrapper('L', NR, blockDense_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
+                                  device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
+      //copy_supernode_to_host_write(blockR_dev, IB);
+      //exit(1);
 #else
        cudaDeviceSynchronize();
        tpotrf_dev('L', NR, blockDense_dev, mf_block_lda(IB, IB), &info);
@@ -1813,12 +1970,17 @@ double RGF<T>::BackwardPassSolve(size_t nrhs){
 }
 
 template <class T>
-double RGF<T>::SecondStageSolve(size_t nrhs)
+double RGF<T>::SecondStageSolve(size_t nrhs,  double& t_secondStageForwardPass,  double& t_secondStageBackwardPass)
 {
    size_t gflops = 0;
 
+   t_secondStageForwardPass = get_time(0.0);
    gflops += ForwardPassSolve(nrhs);
+   t_secondStageForwardPass = get_time(t_secondStageForwardPass);
+
+   t_secondStageBackwardPass = get_time(0.0);
    gflops += BackwardPassSolve(nrhs);
+   t_secondStageBackwardPass = get_time(t_secondStageBackwardPass);
 
    return gflops;
 }
@@ -2872,7 +3034,7 @@ template <class T>
 void RGF<T>::initialize_MF_host(){
 
 #ifdef PRINT_MSG
-   std::cout << "in initialize MF host" << std::endl;
+   std::cout << "in initialize MF host. MF allocated : " << MF_allocated << std::endl;
 #endif   
    
    // cudaMallocHost takes a long time -> only worth it if we reuse it!
@@ -2920,7 +3082,7 @@ void RGF<T>::initialize_invBlks_host(){
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
+double RGF<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFactor)
 {
 
 #ifdef PRINT_MSG
@@ -3004,20 +3166,28 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a)
 #endif
 
     //Computation
-    double t_firstStageFactor = get_time(0.0);
+    t_firstStageFactor = get_time(0.0);
     double gflops = FirstStageFactor();
     t_firstStageFactor = get_time(t_firstStageFactor);
     printf("time firstStageFactor : %f\n", t_firstStageFactor);
 
-     /*std::string fileName = "L.txt"; 
-      ofstream file(fileName,    ios::out | ::ios::trunc);
+     //std::string fileName = "L.txt"; 
+    /*time_t rawtime;
+    struct tm * timeinfo;
+    char buffer[80];
+
+    time (&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    strftime(buffer,sizeof(buffer),"L_%d-%m-%Y_%H:%M:%S.txt",timeinfo);
+    std::string fileName(buffer);
+    ofstream file(fileName,    ios::out | ::ios::trunc);
 
      for(int i=0; i<matrix_n_nonzeros; i++){
         file << std::setprecision(15) << MF[i] << endl;
      }
 
-     file.close();
-     */
+     file.close();*/
      
     //Temp data deallocation
     deallocate_data_on_dev(ia_dev,(max_cols+1)*sizeof(size_t));
@@ -3093,8 +3263,8 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
-    double gflops = FirstStageFactor_noCopyHost(logDet);
-    //double gflops = FirstStageFactor_noCopyHost_testV(logDet);
+    //double gflops = FirstStageFactor_noCopyHost(logDet);
+    double gflops = FirstStageFactor_noCopyHost_testV(logDet);
 
     //////// NEW /////////////
     //Data deallocation
@@ -3119,7 +3289,7 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
+double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, double& t_firstSecondStage, double& t_SecondStageBackPass)
 {
 
 #ifdef PRINT_MSG
@@ -3195,13 +3365,31 @@ double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
 
    // ************************************************************* // 
    //Computation Factorization + Forward Solve
-   double t_firstSecondStageFactor = get_time(0.0);
+   t_firstSecondStage = get_time(0.0);
 
    double gflops = FirstSecondStageFactor(nrhs);
    
-   t_firstSecondStageFactor = get_time(t_firstSecondStageFactor);
-   printf("time firstSecondStageFactor : %f\n", t_firstSecondStageFactor);
+   t_firstSecondStage = get_time(t_firstSecondStage);
+   printf("time firstSecondStageFactor : %f\n", t_firstSecondStage);
    // ************************************************************* // 
+
+   //std::string fileName = "L.txt"; 
+   time_t rawtime;
+   struct tm * timeinfo;
+   char buffer[80];
+
+   time (&rawtime);
+   timeinfo = localtime(&rawtime);
+
+   strftime(buffer,sizeof(buffer),"L_%d-%m-%Y_%H:%M:%S.txt",timeinfo);
+   std::string fileName(buffer);
+   ofstream file(fileName,    ios::out | ::ios::trunc);
+
+   for(int i=0; i<matrix_n_nonzeros; i++){
+      file << std::setprecision(15) << MF[i] << endl;
+   }
+
+   file.close();
 
    // contains solution vector from forward pass
    memcpy_to_host(rhs, rhs_dev,matrix_size*sizeof(T), NULL);
@@ -3216,8 +3404,12 @@ double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
    // Backward Solve on CPU
    // Second stage factor backward solve only ()
    // ************************************************************* // 
+    t_SecondStageBackPass = get_time(0.0);
 
     gflops += BackwardPassSolve(nrhs);
+
+    t_SecondStageBackPass = get_time(t_SecondStageBackPass);
+    printf("time backwardPassSolve : %f\n", t_SecondStageBackPass);
     // ***************************************************** //
     //Copy data
     memcpy(x,rhs,matrix_size*nrhs*sizeof(T));
@@ -3245,9 +3437,9 @@ double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs)
+double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs, double& t_secondStageForwardPass, double& t_secondStageBackwardPass)
 {
-    double gflops = solve(b, b, nrhs);
+    double gflops = solve(b, b, nrhs, t_secondStageForwardPass, t_secondStageBackwardPass);
 
     return gflops;
 }
@@ -3255,11 +3447,13 @@ double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
+double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass)
 {
 
+   double t_FSF;
+   
    if (!factorization_completed){
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
    }
    
    // check if solve is performed on the right matrix 
@@ -3296,7 +3490,7 @@ double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs)
     memcpy(rhs,b,matrix_size*nrhs*sizeof(T));
 
     //Computation
-    double gflops = SecondStageSolve(nrhs);
+    double gflops = SecondStageSolve(nrhs, t_secondStageForwardPass, t_secondStageBackwardPass);
 
     //Copy data
     memcpy(x,rhs,matrix_size*nrhs*sizeof(T));
@@ -3314,8 +3508,10 @@ template <class T>
 double RGF<T>::solve_d(size_t *ia, size_t *ja, float* a, float* x, float *b, size_t nrhs)
 {
 
+   double t_FSF;
+
    if (!factorization_completed){
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
    }
    
    // check if solve is performed on the right matrix 
@@ -3360,8 +3556,10 @@ template <class T>
 double RGF<T>::solve_s(size_t *ia, size_t *ja, double* a, double* x, double*b, size_t nrhs)
 {
 
+   double t_FSF;
+
    if (!factorization_completed){
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
    }
    
    // check if solve is performed on the right matrix 
@@ -3415,8 +3613,10 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
       //printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
+   double t_FSF;
+
    if (!factorization_completed)
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
 
    // check if number of nnz are the same to check if matrix is the same
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
@@ -3479,8 +3679,10 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
       //printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
+   double t_FSF;
+
    if (!factorization_completed)
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
 
    // check if number of nnz are the same to check if matrix is the same
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
@@ -3567,8 +3769,10 @@ double RGF<T>::RGFinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
 
    printf("!!!CAREFUL: RGFinvBlks function abandoned. Not sure if it gives correct results!!!\n");
 
+   double t_FSF;
+
    if (!factorization_completed)
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
 
    // check if number of nnz are the same to check if matrix is the same
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
@@ -3623,8 +3827,10 @@ double RGF<T>::RGFinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
 template <class T>
 T RGF<T>::logDet(size_t *ia, size_t *ja, T *a)
 {
+   double t_FSF;
+
     if (!factorization_completed)
-       factorize(ia, ja, a);
+       factorize(ia, ja, a, t_FSF);
 
     //Computation
     T det = T(0.0);
@@ -3730,7 +3936,7 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
 
     cudaMemsetAsync((void*)M_dev, 0, supernode_size*sizeof(T), stream );
 
-    //printf("in init supernode. a[0] = %f\n", matrix_a[supernode_offset]);
+    printf("in init supernode. a[0] = %f\n", matrix_a[supernode_offset]);
 
     memcpy_to_device( &matrix_ia[supernode_fc],     ia_dev, (cols+1)*sizeof(size_t),       stream );
     memcpy_to_device( &matrix_ja[supernode_offset], ja_dev,  supernode_nnz*sizeof(size_t), stream );
@@ -3738,9 +3944,9 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
         
     init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd, stream );
 
-    //double a_host;
-    //gpuErrchk(cudaMemcpy(&a_host, &M_dev[0], sizeof(double), cudaMemcpyDeviceToHost)); 
-    //printf("in init supernode. IB = %d, a[0] = %f\n", supernode, a_host);
+    double a_host;
+    gpuErrchk(cudaMemcpy(&a_host, &M_dev[0], sizeof(double), cudaMemcpyDeviceToHost)); 
+    printf("in init supernode. IB = %d, a[0] = %f\n", supernode, a_host);
 
 }
 
@@ -3853,9 +4059,12 @@ inline void RGF<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
    size_t cols = supernode_lc - supernode_fc;
 
 #ifdef PRINT_MSG
-   printf("In copy supernode to host.\n");
+   printf("In copy supernode to host write.\n");
    printf("size rows&cols = %ld, ind = %ld\n", rows*cols, ind);
 #endif
+
+   // initialize MF host in case not allocated
+   initialize_MF_host();
 
    memcpy_to_host(&MF[ind], M_dev, rows*cols*sizeof(T), NULL);
 

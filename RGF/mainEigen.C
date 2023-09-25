@@ -25,6 +25,7 @@ using Eigen::MatrixXd;
 typedef Eigen::VectorXd Vect;
 
 #define PRINT_MSG
+//#define RECORD_TIMES
 
 #if 0
 // ******************* 
@@ -562,7 +563,9 @@ std::string valueType;
     valueType = "single";
 #endif
 
-#if 0
+#if 1
+
+    std::string solver_type = "BTA";
 
     /*
     int ns=1;
@@ -579,8 +582,8 @@ std::string valueType;
 
     int ns=3;
     int nss=0;
-    int nt=7;
-    int nb=3;
+    int nt=4;
+    int nb=2;
     int n = ns*nt + nb;
 
     SpMat Q = gen_test_mat_base3(ns, nt, nb);
@@ -810,6 +813,7 @@ std::string valueType;
 
         //theta << 5, -10, 2.5, 1;
         theta << 1.386294, -5.882541,  1.039721,  3.688879; // equals 4,0,0,0 in param scale     
+        //theta << -1.998039, -9.828957,  1.981187,  8.288427;   
         //std::cout << "theta : " << theta.transpose() << std::endl;
 	    //theta = {3, -5, 1, 2};
 	    //theta.print();
@@ -817,6 +821,7 @@ std::string valueType;
         theta << 1.386796, -4.434666, 0.6711493, 1.632289, -5.058083, 2.664039;
   	}
 
+    std::cout << "theta: " << theta.transpose() << std::endl;
 
     printf("# threads: %d\n", omp_get_max_threads());
 
@@ -953,14 +958,10 @@ std::string valueType;
 
         printf("norm(invDiag_full_Qx) : %f\n", invQx_lower.diagonal().norm());
 
-
         std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQx_lower.diagonal() - invDiag_Qx_vec).norm() << std::endl;
-
 
         //Vect invDiag_Qx(nx);
         //solver_Qx->RGFdiag(ia_Qx, ja_Qx, a_Qx, invDiag_Qx);
-
-
 
         delete[] ia_Qx;
         delete[] ja_Qx;
@@ -980,12 +981,12 @@ std::string valueType;
 
 
 #if 1
-    int n = ns*nt + nss + nb;
+    /*int n = ns*nt + nss + nb;
     SpMat Q(n,n);
     Vect rhs(n);
     double exp_theta = exp(theta[0]);
     rhs = exp_theta*Ax.transpose()*y;
-    std::cout << "\nConstructing precision matrix Qxy. " << std::endl;
+    std::cout << "\nConstructing precision matrix Qxy. " << std::endl;*/
     //std::cout << "Setting Ax to zero." << std::endl;
     //Ax.makeCompressed();
     //Ax.setZero();
@@ -1044,8 +1045,10 @@ std::string valueType;
 
         //std::cout << "g1 dense : " << g1_dense << std::endl;
 #endif        
-
+        /*double t_constructQ = - omp_get_wtime();
         construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);        
+        t_constructQ += omp_get_wtime();
+        printf("time spent construct Q :  %f\n", t_constructQ);*/
         std::cout << "Q : \n" << Q.block(0,0,6,6) << std::endl;
 
         //SpMat epsId(n,n);
@@ -1197,30 +1200,49 @@ std::string valueType;
         Vect t_factorize_vec(m-1);
         T log_det;
 
-        for(int i=0; i<m; i++){
+        double t_firstStageFactor;
+        double t_secondStageForwardPass;
+        double t_secondStageBackwardPass1;
+        double t_firstSecondStage;
+        double t_secondStageBackwardPass2;
 
-            printf("i = %d\n", i);
+        double flops_factorize;
+
+#ifdef RECORD_TIMES
+        std::string log_file_name = "log_file_factorize_solve_" + solver_type + "_MAGMAnative_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(omp_get_max_threads()) + ".txt";
+        std::ofstream log_file(log_file_name);
+        log_file << "iter t_firstStageFactor t_secondStageForwardPass t_secondStageBackwardPass t_total_solveCPU t_firstSecondStage t_SecondStageBackPass t_total_solveHybrid" << std::endl;
+        log_file.close();
+#endif
+
+        for(int iter=0; iter<m; iter++){
+            printf("iter = %d\n", iter);
+
+            t_factorise = get_time(0.0);
+            flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
+            t_factorise = get_time(t_factorise);
+            printf("log det noCopyHost: %f\n", log_det);
+            printf("time factorize noCopyHost: %f\n", t_factorise);
+
+            exit(1);
+
             t_factorise = get_time(0.0);
             //solver->solve_equation(GR);
-            double flops_factorize = solver->factorize(ia, ja, a);
+            flops_factorize = solver->factorize(ia, ja, a, t_firstStageFactor);
             log_det = solver->logDet(ia, ja, a);
             printf("logdet: %f\n", log_det);
             t_factorise = get_time(t_factorise);
             //printf("time factorize:             %f\n", t_factorise);
 
-            if(i>0){
-                t_factorize_vec(i-1) = t_factorise;
-            }
-
             t_solve = get_time(0.0); 
-            double flops_solve = solver->solve(ia, ja, a, x, b, 1);
+            double flops_solve = solver->solve(ia, ja, a, x, b, 1, t_secondStageForwardPass, t_secondStageBackwardPass1);
             t_solve = get_time(t_solve);
 
-            /*printf("\nx(1:10) = ");
+            printf("\nx(1:10) = ");
             for(int i=0; i<10; i++){
                 printf(" %f", x[i]);
             }
-            printf("\n");*/
+            printf("\n");
             //printf("flops solve:     %f\n", flops_solve);
 
             //printf("time chol(Q): %lg\n",t_factorise);
@@ -1270,18 +1292,13 @@ std::string valueType;
             printf("\n");*/   
 #endif
 
-            t_factorise = get_time(0.0);
-            flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
-            t_factorise = get_time(t_factorise);
-            printf("log det noCopyHost: %f\n", log_det);
-            printf("time factorize noCopyHost: %f\n", t_factorise);
-
 #endif
 
+#if 0
       	    T *x_new = new T[n];
 
             t_factorise = get_time(0.0);
-            flops_factorize = solver->factorizeSolve(ia, ja, a, x_new, b, 1);
+            flops_factorize = solver->factorizeSolve(ia, ja, a, x_new, b, 1, t_firstSecondStage, t_secondStageBackwardPass2);
             t_factorise = get_time(t_factorise);
             log_det = solver->logDet(ia, ja, a);
 
@@ -1296,8 +1313,21 @@ std::string valueType;
 
             printf("log det factorizeSolve   : %f\n", log_det);
             printf("time factorizeSolve      : %f\n", t_factorise);
+#endif
 
+#ifdef RECORD_TIMES
+            // ========================================================================== 
+            //iter t_firstStageFactor t_secondStageForwardPass t_secondStageBackwardPass t_total_solveCPU t_firstSecondStage t_SecondStageBackPass t_total_solveHybrid
+            std::ofstream log_file(log_file_name, std::ios_base::app | std::ios_base::out);
+            log_file << iter << " " << t_firstStageFactor << " " << t_secondStageForwardPass << " " << t_secondStageBackwardPass1 << " " << t_firstStageFactor + t_secondStageForwardPass + t_secondStageBackwardPass1 << " ";
+            log_file << t_firstSecondStage << " " << t_secondStageBackwardPass2 << " " << t_firstSecondStage+t_secondStageBackwardPass2 << std::endl;
+	        log_file.close(); 
+            // ========================================================================== //
+#endif
             //printf("logdet: %f\n", log_det);
+
+            // write out results. collect:
+            // iter ns nt nb no t_factorize t_solve t_total_solveCPU t_factorizeForwardPass t_backwardPass t_total_solveHybrid
 
 
             // assign b to correct format
