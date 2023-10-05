@@ -521,8 +521,8 @@ int main(int argc, char* argv[])
         file_exists(extraCoeffVecLik_file);
         extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
 
-        //std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
-        std::string mean_latent_file        =  base_path + "/mean_latent_INLA_" + to_string(n) + "_1" + ".dat";
+        std::string mean_latent_file        =  base_path + "/mean_latent_original_" + to_string(n) + "_1" + ".dat";
+        //std::string mean_latent_file        =  base_path + "/mean_latent_INLA_" + to_string(n) + "_1" + ".dat";
 
         file_exists(mean_latent_file);
         mean_latent_original = read_matrix(mean_latent_file, n, 1);  
@@ -604,14 +604,14 @@ int main(int argc, char* argv[])
     } else if(ns == 0 && nt == 0 && likelihood.compare("poisson") == 0){
         printf("Poisson regression. No hyperparameters needed!\n");
 
-    } else if(ns > 0 && nt == 1  && likelihood.compare("gaussian") != 0){
+    } else if(ns > 0 && nt == 1 ){ // && likelihood.compare("gaussian") != 0
         if(MPI_rank == 0){ 
             std::cout << "using SYNTHETIC DATASET" << std::endl; 
         }
         dim_spatial_domain = 2; 
         // read in original theta for comparison. order: prec obs, range s, prec sigma u
-        //std::string theta_original_param_file        =  base_path + "/theta_interpretS_original_" + to_string(dim_th) + "_1" + ".dat";
-        std::string theta_original_param_file        =  base_path + "/theta_interpretS_INLA_" + to_string(dim_th) + "_1" + ".dat";
+        std::string theta_original_param_file        =  base_path + "/theta_interpretS_original_" + to_string(dim_th) + "_1" + ".dat";
+        //std::string theta_original_param_file        =  base_path + "/theta_interpretS_INLA_" + to_string(dim_th) + "_1" + ".dat";
         file_exists(theta_original_param_file); 
         theta_original_param = read_matrix(theta_original_param_file, dim_th, 1);
 
@@ -624,7 +624,9 @@ int main(int argc, char* argv[])
         //theta_prior_param << 1, -2.3, 2.1;
         //theta_prior_test.update_modelS(theta_prior_param);
         theta_param << theta_original_param + 2*Vect::Random(dim_th);
-        std::cout << "initial theta param : "  << theta_param.transpose() << std::endl;   
+        if(MPI_rank == 0){  
+            std::cout << "initial theta param : "  << theta_param.transpose() << std::endl;  
+        } 
 
     } else if (ns > 0 && nt > 1){
 
@@ -660,6 +662,7 @@ int main(int argc, char* argv[])
                 // sigma.e (noise observations), gamma_E, gamma_s, gamma_t
                 theta_original << 1.386294, -5.882541,  1.039721,  3.688879;  // here exact solution, here sigma.u = 4
                 //theta_prior << 1.386294, -5.594859,  1.039721,  3.688879; // here sigma.u = 3
+                theta_original_param << 1.38629400, -0.00000023, 2.30258418, 1.40625832;
                 //theta_original_test.update_modelS(theta_original);
                 //std::cout << "theta original test : " << theta_original_test.flatten_modelS().transpose() << std::endl;
 
@@ -675,7 +678,8 @@ int main(int argc, char* argv[])
 
             } else {
                 // order prec obs, lgamS for st , lgamT for st, lgamE for st, lgamE for s, lgamS for s
-                theta_original     << 1.386294, -3.870213, 0.6342557, 1.961659, -1.206621, -0.05889152;
+                theta_original       << 1.386294, -3.870213, 0.6342557, 1.961659, -1.206621, -0.05889152;
+                theta_original_param << 1.386, 0.405, 1.099, 1.386, -1.204, 1.099;
                 //theta_prior_param     << 1.386294,     -4.469624,      0.6342557,    1.673976, -4.607818, 2.243694;
                 // order: prec obs, range s for st, range t for st, prec sigma for st, range s for s, prec sigma for s
                 //theta_prior_param  << -log(0.01)/5, -log(0.01)*0.1, -log(0.01)*1, -log(0.01)/1, -log(0.01)*(3000.0/6371.0), -log(0.01)/5;
@@ -941,15 +945,15 @@ int main(int argc, char* argv[])
 
         // none-gaussian likelihood
         } else {
-            std::cout << "Spatial-Temporal model." << std::endl;
 
             if(MPI_rank == 0){ 
+                std::cout << "Spatial-Temporal model." << std::endl;
                 std::cout << "using SYNTHETIC DATASET" << std::endl; 
             }
             dim_spatial_domain = 2; 
             // read in original theta for comparison. order: prec obs, range s, prec sigma u
-            //std::string theta_original_param_file        =  base_path + "/theta_interpretS_original_" + to_string(dim_th) + "_1" + ".dat";
-            std::string theta_original_param_file        =  base_path + "/theta_interpretS_INLA_" + to_string(dim_th) + "_1" + ".dat";
+            std::string theta_original_param_file        =  base_path + "/theta_interpretS_original_" + to_string(dim_th) + "_1" + ".dat";
+            //std::string theta_original_param_file        =  base_path + "/theta_interpretS_INLA_" + to_string(dim_th) + "_1" + ".dat";
             file_exists(theta_original_param_file); 
             theta_original_param = read_matrix(theta_original_param_file, dim_th, 1);
 
@@ -962,8 +966,9 @@ int main(int argc, char* argv[])
             //theta_prior_param << 1, -2.3, 2.1;
             //theta_prior_test.update_modelS(theta_prior_param);
             theta_param << theta_original_param + 2*Vect::Random(dim_th);
-            std::cout << "initial theta param : "  << theta_param.transpose() << std::endl; 
-        
+            if(MPI_rank == 0){
+                std::cout << "initial theta param : "  << theta_param.transpose() << std::endl; 
+            }
 
         } // end if : gaussian / non-gaussian
 
@@ -1138,7 +1143,7 @@ int main(int argc, char* argv[])
 //exit(1);
 
 #if 1
-    if(MPI_rank == 0){
+    if(MPI_rank == 0 && likelihood.compare("gaussian") != 0){
         std::cout << "\n================== Testing inner Iteration. =====================\n" << std::endl;
 
         // read in original latent parameters

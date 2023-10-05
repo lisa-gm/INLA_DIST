@@ -348,8 +348,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 #ifdef PRINT_MSG
 	printf("logdet: %f\n", log_det);
 #endif
-
-
+    
   	double* b      = new double[n];
   	double* x      = new double[n];
 
@@ -360,10 +359,8 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
   	}
 
     t_condLatSolve = get_time(0.0);
-
   	double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
     //double gflops_solve = solver->solve(x, b, nrhs);
-
     t_condLatSolve = get_time(t_condLatSolve);
 
 #ifdef PRINT_MSG
@@ -378,12 +375,11 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 #endif
 
 	//std::cout << "In factorize_solve. hostname : " << processor_name << ", MPI_rank : " << MPI_rank << ", GPU rank : " << GPU_rank << ", time Chol : " << t_condLatChol << ", time Solve : " << t_condLatSolve << std::endl;
-
+    
   	// assign b to correct format
   	for (i = 0; i < n; i++){
 	    sol[i] = x[i];
   	}	
-
 
   	delete[] ia;
   	delete[] ja;

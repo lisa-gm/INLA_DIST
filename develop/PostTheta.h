@@ -138,12 +138,19 @@ class PostTheta{
     SpMat AxTAx;        /**< conmpute t(Ax)*Ax once. spat/spat temp model   */
     Vect mu_initial;
     Vect mu;            /**< conditional mean */
+    Vect mu_midpoint;    /**< conditional mean, at mid point \theta^k        */
+    // new attempt, store previous mu for each stencil point 
+    // figure out later what to do for Hessian ...
+    MatrixXd mu_matrix; /**< store all mu values from previous iteration,
+                             dim(mu_matrix) = (n, 2*dim_th+1)   */
+
     Vect t_grad;        /**< gradient of theta */
     double min_f_theta; /**< minimum of function*/
 
     double w_sum;       /**< only used if validate is true                  */
 
     int no_f_eval;      /**< number of function evaluations per iteration   */
+    ArrayXi task_to_rank_list_grad;
 
     MatrixXd G;         /**< orthonormal basis for finite difference stencil 
                               is Identity if smart gradient disabled        */
