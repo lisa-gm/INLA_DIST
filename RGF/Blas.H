@@ -6,8 +6,8 @@
 #include "CWC_utility.H"
 #include "magma_v2.h"
 
-//#define CUDA_POTRF
-#define MAGMA_EXPERT
+#define CUDA_POTRF
+//#define MAGMA_EXPERT
 
 #ifdef CUDA_POTRF
 #include "cusolverDn.h"
@@ -1096,44 +1096,48 @@ inline void tpotrf_dev_cuda(char uplo,int n,CPX *a,int lda,int *info, int *cuda_
 
 template <typename T>
 inline void magma_tpotrf_expert_wrapper(char uplo, int n, T* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, 
-                                        void* host_work, int *lwork_host, void* device_work, int *lwork_device,
+                                        void** host_work, int *lwork_host, void** device_work, int *lwork_device,
                                         magma_event_t events[2], magma_queue_t queues[2], int& init_flag){
     
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    //printf("in magma expert wrapper. init flag: %d\n", init_flag);
 
     if(init_flag < 1){
         *lwork_host   = -1;
         *lwork_device = -1;
-        printf("in initializing potrf expert gpu.\n");
 
         magma_tpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
                                                           host_work, lwork_host, device_work, lwork_device, events, queues);
-        printf("DPOTRF EXPERT WORK. Allocating %d of host memory. Allocating %d of device memory.\n", *lwork_host, *lwork_device);
+        //printf("DPOTRF EXPERT WORK. Allocating %d of host memory. Allocating %d of device memory.\n", *lwork_host, *lwork_device);
         
-        if(lwork_device > 0){
-            gpuErrchk(cudaMalloc((void**)&device_work,*lwork_device));
+        if(*lwork_device > 0){
+            gpuErrchk(cudaMalloc((void**)device_work,*lwork_device));
         }
 
-        if(lwork_host > 0){
-            gpuErrchk(cudaMallocHost((void**)&host_work,*lwork_host));    
+        if(*lwork_host > 0){
+            gpuErrchk(cudaMallocHost((void**)host_work,*lwork_host));    
         }
 
         init_flag = 1;
     }
 
+    //std::cout << "In magma expert wrapper. uplo: " << uplo << ", n = " << to_string(n) << ", lda = " << to_string(lda) << ", subN = " << to_string(subN);
+    //std::cout << ", subSubN = " << subSubN << ", lwork_host : " << to_string(*lwork_host) << ", lwork_device : " << to_string(*lwork_device) << std::endl;
+
     magma_tpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
                                  host_work, lwork_host, device_work, lwork_device, events, queues);
+                                 
 }
 
 template <typename T>
-inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, T* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void* host_work, magma_int_t *lwork_host, void* device_work, magma_int_t *lwork_device, magma_event_t events[2], magma_queue_t queues[2]);
+inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, T* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void** host_work, magma_int_t *lwork_host, void** device_work, magma_int_t *lwork_device, magma_event_t events[2], magma_queue_t queues[2]);
 
 // new magma -- double precision
 template <>
-inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, double* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void* host_work, int *lwork_host, void* device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
+inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, double* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void** host_work, int *lwork_host, void** device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
 {
     magma_int_t potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
-                                                        host_work, lwork_host, device_work, lwork_device, events, queues);    
+                                                        *host_work, lwork_host, *device_work, lwork_device, events, queues);    
     if(potrfErr != 0){
         std::cout << "in magma potrf expert work error = " << potrfErr << std::endl;
         exit(1);        
@@ -1142,10 +1146,10 @@ inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, double*
 
 // new magma -- single precision
 template <>
-inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, float* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void* host_work, int *lwork_host, void* device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
+inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, float* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void** host_work, int *lwork_host, void** device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
 {
     magma_int_t potrfErr = magma_spotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
-                                                        host_work, lwork_host, device_work, lwork_device, events, queues);    
+                                                        *host_work, lwork_host, *device_work, lwork_device, events, queues);    
     if(potrfErr != 0){
         std::cout << "in magma potrf expert work error = " << potrfErr << std::endl;
         exit(1);        
