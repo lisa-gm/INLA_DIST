@@ -1,29 +1,34 @@
 # Block Tridiagonal Arrowhead Solver
 
-subdirectory that contains everything related to BTA solver which has a standalone callable main. 
+subdirectory that contains everything related to BTA solver which has a standalone callable main otherwise it gets called from call_INLA.cpp from the develop subfolder, which is one of the main executables of the repository. 
 Main operations that can be performed:
 
 - Cholesky decomposition (GPU)
 - Forward-backward solve using Cholesky factor (CPU)
-- selected matrix inversion (GPU, exports diagonal of the inverse to CPU
-
+- selected matrix inversion (GPU)
+  
 Assumes matrix to be in right format, $n_t$ defines number of large diagonal blocks of size $n_s \times n_s$, $n_b$ number of rows/columns in arrowhead structure. Overall matrix size is thus $n = n_s \cdot n_t + n_b$. 
 
 ## Installation
 
-requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation, maybe this can be replaced). All paths related to GPU code are in `make.inc` (base_path of the user has to be set at the top of the file), rest in `Makefile`. Here MKLROOT & LAPACK path need to be set/known. 
+requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation). All paths related to GPU code are in `make.inc` (base_path of the user has to be set at the top of the file), rest in `Makefile`. Here MKLROOT & LAPACK path need to be set or known. 
 
 
 ## Running mainEigen.C
 
-contains if-statement section that just generates dummy matrix of small size (some parameters can be changed, not all) and can be run as 
+The executable requires information of where to find the data, including the FEM matrices of the spatial-temporal mesh. Examples of how this needs to be provided can be found in one of the different run scripts, for instance run_script.sh. It looks something like 
 
-`./mainEigen `
+```
+./mainEigen ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
+```
 
-without any additional inputs. When the else-section is active requires external .dat files to read in that have to follow specific naming policy. Calls look something like this
+Otherwise there is also if-statement section that just generates dummy matrix of small size (some parameters can be changed, not all).  
 
-`srun ./main ${folder_path} ${ns} ${nt} ${nb} ${no} `
+## Additional Information
 
-where folder_path describes the path to the data files, ns, nb and nt as above and no describes the number of observations. There are numerous run scripts e.g. in `run_script.sh` that can be adapted to automate this process. 
+We would like to express our gratitude for the initial software support on the selected block inversion from Prof. Mathieu Luisier. The [OMEN[^1]](https://doi.org/10.1109/NANO.2008.110) software infrastructure was used as a starting point to derive and implement the BTA solver.
+
+[^1]: M. Luisier and G. Klimeck, Omen an atomistic and full-band quantum transport simulator for post-CMOS nanodevices, in 2008 8th IEEE Conference on Nanotechnology, IEEE, 2008, pp. 354–357. 10.1109/NANO.2008.110.
+
 
 
