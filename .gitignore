@@ -34,5 +34,8 @@
 # ignoring object files
 *.o
 
+# ignoring error files
+*.err
+
 # ignoring nvidia profiler files
 *.nsys-rep
