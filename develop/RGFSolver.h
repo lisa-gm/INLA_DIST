@@ -69,6 +69,9 @@ class RGFSolver: public Solver {
 
         RGF<double> *solver;    /**< RGF solver object */
 
+        double dummy_time_1;
+        double dummy_time_2;
+
    	public:
    		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_, int thread_ID_);
 

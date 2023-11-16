@@ -38,11 +38,14 @@ using namespace std;
 #define scale_norm 1.0
 #endif
 
+// COMMENTED OUT, colliding with system implementation ...
+/*
 #ifndef __MINMAX
 #define __MINMAX
 #define min(a,b) (((a)<(b))?(a):(b))
 #define max(a,b) (((a)>(b))?(a):(b))
 #endif
+*/
 
 //#ifdef Add_
 #define fortran_name(x,y) (x ## _)

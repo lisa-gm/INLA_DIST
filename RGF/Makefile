@@ -1,5 +1,15 @@
 # compile into shared library and then include this in main makefile
+#
+#####################
+## PATHS TO BE ADAPTED
 
+# usually home directory
+BASE_PATH=/home/hpc/ihpc/ihpc060h
+
+
+
+######################
+# make sure MKLROOT is set
 MKLHOME       = $(MKLROOT)
 MKLHOME       = $(MKLROOT)/lib/intel64
 
@@ -11,8 +21,8 @@ include ./make.inc
 DEBUG       =  -lnvToolsExt #-O1 -g #-fsanitize=address,signed-integer-overflow #-Wall
 
 # for mainEigen
-INCEIGEN=-I/usr/include/eigen3
-#INCEIGEN=-I/home/hpc/ihpc/ihpc060h/applications/eigen
+#INCEIGEN=-I/usr/include/eigen3
+INCEIGEN=-I$(BASE_PATH)/applications/eigen
 
 ARMADILLO=-larmadillo
 
@@ -40,11 +50,6 @@ mainEigen: $(CC_FILES) $(CU_FILES)
 main: $(CC_FILES) $(CU_FILES)
 	$(RGF_MPICXX) $(DEBUG) $(RGF_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(OPENMP) $(LIBS) -lm -o $@ # $(RGF_LOADFLAGS)
 
-#librgf.a: $(CC_FILES) $(CU_FILES)
-#	ar rvs $@ $^
-
-#librgf.so: $(CC_FILES) $(CU_FILES)
-#	$(LOADER) --shared $(CC_FILES) $(CU_FILES) $(LOADFLAGS) $(LIBS) -lm -o $@ $(DEBUG) -fPIC
 
 .C.o:
 	$(CXX) -c $< $(RGF_CXXFLAGS) $(RGF_FLAGS) $(INCLUDEDIR) $(DEBUG) $(OPENMP) -fPIC
@@ -57,5 +62,3 @@ clean:
 	rm -f mainEigen
 	rm -f main
 
-#rm -f librgf.so
-#rm -f librgf.a

@@ -6,6 +6,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <iomanip>
 
 #include <Eigen/Core>
 #include <Eigen/Dense>
@@ -1224,7 +1225,7 @@ std::string valueType;
             printf("log det noCopyHost: %f\n", log_det);
             printf("time factorize noCopyHost: %f\n", t_factorise);
 
-            exit(1);
+            //exit(1);
 
             t_factorise = get_time(0.0);
             //solver->solve_equation(GR);

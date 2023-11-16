@@ -13,6 +13,7 @@
 
 // debug ...
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <ctime>
 
@@ -21,7 +22,7 @@
 #include "nvToolsExt.h"
 
 
-#define PRINT_MSG
+//#define PRINT_MSG
 
 template <class T>
 class RGF{
@@ -713,14 +714,11 @@ double RGF<T>::FirstStageFactor()
          magma_potrf_init_flag = 0;
        }
        copy_supernode_to_host_write(blockR_dev, IB);
-       sleep(2);
       //magma_potrf_init_flag = 0;
       magma_tpotrf_expert_wrapper('L', NR, blockR_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
                                   device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
       cudaDeviceSynchronize();   
-      sleep(2);                         
       copy_supernode_to_host_write(blockR_dev, IB);
-      exit(1);
 #else
       // how can I get the default stream to wait but make an exception for copyStream ?
        cudaDeviceSynchronize(); // TO BE REPLACED
@@ -1440,7 +1438,7 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
        tlacpy_dev('N', 2*NR, NR, blockR_dev, mf_block_lda(IB, IB), blockM_dev,  mf_block_lda(IB, IB), magma_queue_1);
        nvtxRangeEnd(id_cpyDevDev);
 
-       sleep(2);  
+       //sleep(2);  
        copy_supernode_to_host_write(blockM_dev, IB);
 
 #ifdef PRINT_MSG
@@ -1457,7 +1455,7 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 
 #elif defined(MAGMA_EXPERT)
       copy_supernode_to_host_write(blockM_dev, IB);
-      sleep(2);
+      //sleep(2);
       magma_tpotrf_expert_wrapper('L', NR, blockM_dev, mf_block_lda(IB, IB), magma_info, mode, subN, subSubN, host_work, &lwork_host, 
                                   device_work, &lwork_device, magma_events, magma_queues, magma_potrf_init_flag);
       copy_supernode_to_host_write(blockM_dev, IB);
@@ -1467,7 +1465,7 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 #endif
        nvtxRangeEnd(id_dpotrf);    
 
-       sleep(2);
+       //sleep(2);
        copy_supernode_to_host_write(blockM_dev, IB);
 
        id_cpyDevDev = nvtxRangeStartA("CopyDiagDevDev");  
@@ -3169,7 +3167,7 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFacto
     t_firstStageFactor = get_time(0.0);
     double gflops = FirstStageFactor();
     t_firstStageFactor = get_time(t_firstStageFactor);
-    printf("time firstStageFactor : %f\n", t_firstStageFactor);
+    //printf("time firstStageFactor : %f\n", t_firstStageFactor);
 
      //std::string fileName = "L.txt"; 
     /*time_t rawtime;
@@ -3263,8 +3261,8 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
-    //double gflops = FirstStageFactor_noCopyHost(logDet);
-    double gflops = FirstStageFactor_noCopyHost_testV(logDet);
+    double gflops = FirstStageFactor_noCopyHost(logDet);
+    //double gflops = FirstStageFactor_noCopyHost_testV(logDet);
 
     //////// NEW /////////////
     //Data deallocation
@@ -3936,7 +3934,7 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
 
     cudaMemsetAsync((void*)M_dev, 0, supernode_size*sizeof(T), stream );
 
-    printf("in init supernode. a[0] = %f\n", matrix_a[supernode_offset]);
+    //printf("in init supernode. a[0] = %f\n", matrix_a[supernode_offset]);
 
     memcpy_to_device( &matrix_ia[supernode_fc],     ia_dev, (cols+1)*sizeof(size_t),       stream );
     memcpy_to_device( &matrix_ja[supernode_offset], ja_dev,  supernode_nnz*sizeof(size_t), stream );
@@ -3944,9 +3942,9 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
         
     init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd, stream );
 
-    double a_host;
+    /*double a_host;
     gpuErrchk(cudaMemcpy(&a_host, &M_dev[0], sizeof(double), cudaMemcpyDeviceToHost)); 
-    printf("in init supernode. IB = %d, a[0] = %f\n", supernode, a_host);
+    printf("in init supernode. IB = %d, a[0] = %f\n", supernode, a_host);*/
 
 }
 

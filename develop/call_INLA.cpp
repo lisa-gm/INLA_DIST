@@ -725,7 +725,7 @@ int main(int argc, char* argv[])
                 for(int i = 0; i<num_constr; i++){
                     int i_start = tsPerConstr*i;
                     //std::cout << "i_start = " << i_start << std::endl;
-                    int i_end   = std::min(tsPerConstr*(i+1), (int) nt);
+                    int i_end   = min(tsPerConstr*(i+1), (int) nt);
                     //std::cout << "i_end = " << i_end << std::endl;
                     int num_elem = i_end - i_start;
 
