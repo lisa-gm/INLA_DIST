@@ -1,8 +1,8 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
-BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 ############# RGF ################
 
@@ -12,12 +12,12 @@ LAPHOME       = $(MKLHOME)
 SCAHOME       = $(MKLHOME)
 
 
-RGF_PATH      = ../RGF
+RGF_PATH      = ../BTA
 include $(RGF_PATH)/make.inc
 #############################################################################################################
 
-CXX=ccache mpic++    # kaust
-#CXX=mpicxx     # FAU
+#CXX=ccache mpic++    # kaust
+CXX=mpicxx     # FAU
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
 
 DEBUG       =  -lnvToolsExt #-O1 -g #-fsanitize=address,signed-integer-overflow #-Wall
@@ -36,7 +36,7 @@ LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
 #INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
+INCEIGEN=-I$(BASE_PATH)/applications/eigen
 INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 

@@ -4,7 +4,7 @@
 #include "mpi.h"
 
 #include "Solver.h"
-#include "../RGF/RGF.H"
+#include "../BTA/RGF.H"
 #include "helper_functions.h"
 //#include "RGF.H"
 

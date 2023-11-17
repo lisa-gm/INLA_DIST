@@ -13,7 +13,7 @@ LAPHOME       = $(MKLHOME)
 SCAHOME       = $(MKLHOME)
 
 
-BTA_PATH      = ../RGF
+BTA_PATH      = ../BTA
 include $(BTA_PATH)/make.inc
 #############################################################################################################
 

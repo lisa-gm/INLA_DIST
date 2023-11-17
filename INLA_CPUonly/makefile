@@ -35,7 +35,7 @@ $(info MKL      : $(MKLROOT))
 $(info EIGEN    : $(INCEIGEN))
 
 $(info )
-$(info ===== Compiling w/ RGF dummy version =======)
+$(info ===== Compiling w/ BTA dummy version =======)
 
 all: call_INLA
 
