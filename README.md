@@ -51,9 +51,9 @@ The implementation targets linux-based systems. Compile from the respective subf
 - [Armadillo](https://arma.sourceforge.net/) (only for reading in matrices in CSR format)
 
 #### INLA-SPDE optimization routine
-- [LBFGSpp](https://github.com/yixuan/LBFGSpp)
+- [adapted LBFGSpp](https://github.com/lisa-gm/adapted_LBFGSpp)
 
-Will build and then call either the BTA solver or PARDISO, depending on the choice of linear solver.
+Calls either the BTA solver or PARDISO, depending on the choice of linear solver.
 
 #### BTA Solver
 
