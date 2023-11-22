@@ -11,7 +11,7 @@ Assumes matrix to be in right format, $n_t$ defines number of large diagonal blo
 
 ## Installation
 
-requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation). All paths related to GPU code are in `make.inc` (base_path of the user has to be set at the top of the file), rest in `Makefile`. Here MKLROOT & LAPACK path need to be set or known. 
+requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation). All paths related to GPU code are in `make.inc` (base_path of the user has to be set at the top of the file), rest in `Makefile`. Here MKLROOT & LAPACK path need to be set or known. The same holds for CUDA (set ```CUDAHOME```), MAGMA (set ```MAGMA```), Eigen (set ```INCEIGEN``` (header only) and Armadillo.  
 
 
 ## Running mainEigen.C

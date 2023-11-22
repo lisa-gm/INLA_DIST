@@ -4,9 +4,10 @@
 ## PATHS TO BE ADAPTED
 
 # usually home directory
-BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/hpc/ihpc/ihpc060h
+BASE_PATH=/home/x_gaedkelb
 
-
+# also path to Eigen needs to be adapted below!
 
 ######################
 # make sure MKLROOT is set
@@ -22,7 +23,8 @@ DEBUG       =  -lnvToolsExt #-O1 -g #-fsanitize=address,signed-integer-overflow 
 
 # for mainEigen
 #INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
 
 ARMADILLO=-larmadillo
 
