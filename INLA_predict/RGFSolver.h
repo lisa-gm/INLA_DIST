@@ -4,7 +4,7 @@
 #include "mpi.h"
 
 #include "Solver.h"
-#include "../RGF/RGF.H"
+#include "../BTA/RGF.H"
 #include "helper_functions.h"
 //#include "RGF.H"
 
@@ -67,6 +67,9 @@ class RGFSolver: public Solver {
         double* x;              /**< placeholder for solution. */
 
         RGF<double> *solver;    /**< RGF solver object */
+
+        double dummy_time_1;
+        double dummy_time_2;
 
    	public:
    		RGFSolver(size_t ns_, size_t nt_, size_t nb_);

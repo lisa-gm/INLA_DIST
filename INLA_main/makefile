@@ -31,7 +31,7 @@ LIBMKL=-L$(MKLROOT)/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
 LIBCHOLMOD=-lcholmod
 ARMADILLO=-larmadillo
 
-LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
+LIBS=$(LIBPARDISO) $(LIBMKL) #$(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
 #INCEIGEN=-I/usr/include/eigen3

@@ -12,11 +12,15 @@
 // std::setwd print out
 #include <iomanip>
 
-// require armadillo for read dense matrix for now
-#include <armadillo>
-
 #include <Eigen/Sparse>
 #include <Eigen/Dense>
+
+// to load dense matrices. slightly faster than without.
+//#define ARMADILLO
+
+#ifdef ARMADILLO
+#include <armadillo>
+#endif
 
 using namespace Eigen;
 using namespace std;
@@ -158,15 +162,37 @@ SpMat read_sym_CSC(std::string filename)
 } 
 
 
+#ifdef ARMADILLO
 // for now use armadillo ... do better once we switch to binary
-
-MatrixXd read_matrix(const string filename,  int n_row, int n_col){
+MatrixXd read_matrix_arma(const string filename,  int n_row, int n_col){
 
     arma::mat X(n_row, n_col);
     X.load(filename, arma::raw_ascii);
     //X.print();
 
     return Eigen::Map<MatrixXd>(X.memptr(), X.n_rows, X.n_cols);
+}
+#endif
+
+MatrixXd read_matrix(const string filename, int rows, int cols) {
+    std::ifstream file(filename);
+    
+    if (!file.is_open()) {
+        throw std::runtime_error("Unable to open file: " + filename);
+    }
+
+    // Initialize the Eigen matrix with the correct size
+    Eigen::MatrixXd matrix(rows, cols);
+
+    // Read the matrix row-wise directly into the Eigen matrix
+    for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+            file >> matrix(i, j);
+        }
+    }
+
+    file.close();
+    return matrix;
 }
 
 

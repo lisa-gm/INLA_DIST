@@ -1598,12 +1598,12 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
        NR  = Bmax[IB]-Bmin[IB];
        NM  = Bmax[IB-1]-Bmin[IB-1];
 
-       printf("IB = %d. before copy supdernode to device in loop.\n", IB);
+       //printf("IB = %d. before copy supdernode to device in loop.\n", IB);
        cudaDeviceSynchronize();
        swap_pointers(&blockR_dev, &blockM_dev);
        cudaDeviceSynchronize();
        init_supernode(blockR_dev, IB, magma_cudaStream_1);
-       printf("IB = %d. after copy supernode to device in loop.\n", IB);
+       //printf("IB = %d. after copy supernode to device in loop.\n", IB);
 
        //cudaDeviceSynchronize();
        gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
