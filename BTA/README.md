@@ -11,7 +11,7 @@ Assumes matrix to be in right format, $n_t$ defines number of large diagonal blo
 
 ## Installation
 
-requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation). All paths related to GPU code are in `make.inc` (base_path of the user has to be set at the top of the file), rest in `Makefile`. Here MKLROOT & LAPACK path need to be set or known. 
+requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation). All paths related to GPU code are in `make.inc` (base_path of the user has to be set at the top of the file), rest in `Makefile`. Here MKLROOT & LAPACK path need to be set or known. The same holds for CUDA (set ```CUDAHOME```), MAGMA (set ```MAGMA```), Eigen (set ```INCEIGEN``` (header only) and Armadillo.  
 
 
 ## Running mainEigen.C
@@ -22,9 +22,9 @@ The executable requires information of where to find the data, including the FEM
 ./mainEigen ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 ```
 
-Otherwise there is also if-statement section that just generates dummy matrix of small size (some parameters can be changed, not all).  
+Otherwise there is also if-statement section that can be enabled and generates dummy matrix of small size (some parameters can be changed, not all).  
 
-## Additional Information
+## Acknowledgements
 
 We would like to express our gratitude for the initial software support on the selected block inversion from Prof. Mathieu Luisier. The [OMEN[^1]](https://doi.org/10.1109/NANO.2008.110) software infrastructure was used as a starting point to derive and implement the BTA solver.
 

@@ -4,9 +4,15 @@ Repository to host $\text{INLA}_{\text{DIST}}$. This code base provides a highly
 
 ## Overview of the different directories
 
-The main subdirectory is $\text{INLA}_{\text{MAIN}}$, which contains the majority of the source code of our method. 
-The BTA solver is in the BTA subdirectory. 
-subdirectories MPI_all_BFGS, develop and predict are 
+main directories which contains the majority of the source code of our method and in particular everything related to the INLA methodology:
+  - $\text{INLA}_{\text{MAIN}}$    : most general version, linear solver can be chosen at runtime.
+  - $\text{INLA}_{\text{CPUonly}}$ : CPU only version using PARDISO solver.
+  - $\text{INLA}_{\text{predict}}$ : new version under development with additional prediction features and accuracy measures.
+
+other directories:
+  - $\text{BTA}$ : contains all code related to the block tridiagonal arrowhead solver.
+  - Rscripts     : scripts for data preprocessing & generation of synthetic datasets. contains code to export to c-readable files.
+  - Test Scripts : small test scripts to develop and test features in the code. for development purposes. 
 
 #### 4.) $\text{INLA}_{\text{MAIN}}$
 
@@ -45,9 +51,9 @@ The implementation targets linux-based systems. Compile from the respective subf
 - [Armadillo](https://arma.sourceforge.net/) (only for reading in matrices in CSR format)
 
 #### INLA-SPDE optimization routine
-- [LBFGSpp](https://github.com/yixuan/LBFGSpp)
+- [adapted LBFGSpp](https://github.com/lisa-gm/adapted_LBFGSpp)
 
-Will build and then call either the BTA solver or PARDISO, depending on the choice of linear solver.
+Calls either the BTA solver or PARDISO, depending on the choice of linear solver.
 
 #### BTA Solver
 

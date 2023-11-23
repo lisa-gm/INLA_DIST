@@ -31,8 +31,8 @@ INCMAG            = -I$(BASE_PATH)/applications/magma-2.7.2/include
 MAGMA             = -L$(BASE_PATH)/applications/magma-2.7.2/magma/lib -lmagma
 
 
-#CUDAHOME          = /usr/local/cuda
-CUDAHOME          = $(CUDA_HOME)
+CUDAHOME          = /usr/local/cuda
+#CUDAHOME          = $(CUDA_HOME)
 INCCUD	          = -I$(CUDAHOME)/include
 CUDA              = -L/usr/lib64/ -L$(CUDAHOME)/lib64 -lcudart -lcublas -lcufft -lcusparse -lcusolver -Wl,-rpath,$(CUDAHOME)/lib64
 # CUDA              = -L/usr/lib64/ -L$(CUDAHOME)/lib64 -lcudart -lcublas -lcufft -lcusparse -Wl,-rpath,$(CUDAHOME)/lib64

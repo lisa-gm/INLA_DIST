@@ -4,9 +4,9 @@ MKLROOT?=$(shell echo $$MKLROOT)
 # PARDISO only -- doesn't require CUDA or MAGMA
 #############################################################################################################
 ### BASE_PATH TO BE ADAPTED
-#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/x_gaedkelb
 #BASE_PATH=/users/lgaedkem
-BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/hpc/ihpc/ihpc060h
 #############################################################################################################
 
 #CXX=CC     #mpic++
@@ -23,7 +23,8 @@ LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
 
 # INCLUDES
 #INCEIGEN=-I/usr/include/eigen3
-INCEIGEN=-I$(BASE_PATH)/applications/eigen
+INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen
 
 INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
