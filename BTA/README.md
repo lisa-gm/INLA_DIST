@@ -22,9 +22,9 @@ The executable requires information of where to find the data, including the FEM
 ./mainEigen ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 ```
 
-Otherwise there is also if-statement section that just generates dummy matrix of small size (some parameters can be changed, not all).  
+Otherwise there is also if-statement section that can be enabled and generates dummy matrix of small size (some parameters can be changed, not all).  
 
-## Additional Information
+## Acknowledgements
 
 We would like to express our gratitude for the initial software support on the selected block inversion from Prof. Mathieu Luisier. The [OMEN[^1]](https://doi.org/10.1109/NANO.2008.110) software infrastructure was used as a starting point to derive and implement the BTA solver.
 
