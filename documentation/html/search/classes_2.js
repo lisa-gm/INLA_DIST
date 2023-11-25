@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['hyperparameters_0',['Hyperparameters',['../classHyperparameters.html',1,'']]]
+  ['pardisosolver_0',['PardisoSolver',['../classPardisoSolver.html',1,'']]],
+  ['posttheta_1',['PostTheta',['../classPostTheta.html',1,'']]]
 ];

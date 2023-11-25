@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['bfgs_0',['BFGS',['../classBFGS.html',1,'']]]
+  ['eigencholsolver_0',['EigenCholSolver',['../classEigenCholSolver.html',1,'']]],
+  ['eigensolver_1',['EigenSolver',['../classEigenSolver.html',1,'']]]
 ];

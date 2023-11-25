@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['model_0',['Model',['../classModel.html',1,'']]]
+  ['rgfsolver_0',['RGFSolver',['../classRGFSolver.html',1,'']]]
 ];

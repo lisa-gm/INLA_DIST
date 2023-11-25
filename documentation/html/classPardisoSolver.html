@@ -88,14 +88,10 @@ Inheritance diagram for PardisoSolver:</div>
  <div class="center">
   <img src="classPardisoSolver.png" usemap="#PardisoSolver_map" alt=""/>
   <map id="PardisoSolver_map" name="PardisoSolver_map">
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,392,194,416"/>
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,336,194,360"/>
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,280,194,304"/>
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,224,194,248"/>
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,168,194,192"/>
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,112,194,136"/>
-<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,56,194,80"/>
+<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="0,0,92,24"/>
 <area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="102,0,194,24"/>
+<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="204,0,296,24"/>
+<area href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ..." alt="Solver" shape="rect" coords="306,0,398,24"/>
   </map>
 </div></div>
 <table class="memberdecls">
@@ -215,128 +211,6 @@ Public Member Functions</h2></td></tr>
 &#160;</td><td class="memItemRight" valign="bottom"><b>~PardisoSolver</b> ()</td></tr>
 <tr class="memdesc:a439990b46271ddd3b37c190a3b6561c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">class destructor. Frees memory allocated by pardiso. <br /></td></tr>
 <tr class="separator:a439990b46271ddd3b37c190a3b6561c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab9153ca8259b2bfbda49364a72ceef05" id="r_ab9153ca8259b2bfbda49364a72ceef05"><td class="memItemLeft" align="right" valign="top"><a id="ab9153ca8259b2bfbda49364a72ceef05" name="ab9153ca8259b2bfbda49364a72ceef05"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>PardisoSolver</b> ()</td></tr>
-<tr class="memdesc:ab9153ca8259b2bfbda49364a72ceef05"><td class="mdescLeft">&#160;</td><td class="mdescRight">constructor. initialises parameters, check pardiso license. <br /></td></tr>
-<tr class="separator:ab9153ca8259b2bfbda49364a72ceef05"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afba99923045305210246792d7cbdeea3" id="r_afba99923045305210246792d7cbdeea3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afba99923045305210246792d7cbdeea3">symbolic_factorization</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, int &amp;<a class="el" href="#a20a8e89d94d661aaa894f3d699313a4a">init</a>)</td></tr>
-<tr class="memdesc:afba99923045305210246792d7cbdeea3"><td class="mdescLeft">&#160;</td><td class="mdescRight">performs the symbolic factorisation.  <br /></td></tr>
-<tr class="separator:afba99923045305210246792d7cbdeea3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac0c6fd3fccc4db77470baa97f9f3bb31" id="r_ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac0c6fd3fccc4db77470baa97f9f3bb31">factorize</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="memdesc:ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="mdescLeft">&#160;</td><td class="mdescRight">numerical factorisation.  <br /></td></tr>
-<tr class="separator:ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9bf13e10522bd46bef21418c665b0ad0" id="r_a9bf13e10522bd46bef21418c665b0ad0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a9bf13e10522bd46bef21418c665b0ad0">factorize_solve</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vector &amp;<a class="el" href="classSolver.html#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, Vector &amp;<a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="memdesc:a9bf13e10522bd46bef21418c665b0ad0"><td class="mdescLeft">&#160;</td><td class="mdescRight">factorises and solves matrix in one call (to reuse pardiso objects)  <br /></td></tr>
-<tr class="separator:a9bf13e10522bd46bef21418c665b0ad0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa2d2ec373212c69b4cc94d3919eb3c6b" id="r_aa2d2ec373212c69b4cc94d3919eb3c6b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa2d2ec373212c69b4cc94d3919eb3c6b">selected_inversion</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vector &amp;inv_diag)</td></tr>
-<tr class="memdesc:aa2d2ec373212c69b4cc94d3919eb3c6b"><td class="mdescLeft">&#160;</td><td class="mdescRight">selected inversion of the diagonal elements of Q.  <br /></td></tr>
-<tr class="separator:aa2d2ec373212c69b4cc94d3919eb3c6b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0619e73e3ace9662c82854c0a15305a4" id="r_a0619e73e3ace9662c82854c0a15305a4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0619e73e3ace9662c82854c0a15305a4">compute_inverse_pardiso</a> (MatrixXd &amp;H, MatrixXd &amp;C)</td></tr>
-<tr class="memdesc:a0619e73e3ace9662c82854c0a15305a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side.  <br /></td></tr>
-<tr class="separator:a0619e73e3ace9662c82854c0a15305a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a439990b46271ddd3b37c190a3b6561c8" id="r_a439990b46271ddd3b37c190a3b6561c8"><td class="memItemLeft" align="right" valign="top"><a id="a439990b46271ddd3b37c190a3b6561c8" name="a439990b46271ddd3b37c190a3b6561c8"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>~PardisoSolver</b> ()</td></tr>
-<tr class="memdesc:a439990b46271ddd3b37c190a3b6561c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">class destructor. Frees memory allocated by pardiso. <br /></td></tr>
-<tr class="separator:a439990b46271ddd3b37c190a3b6561c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab9153ca8259b2bfbda49364a72ceef05" id="r_ab9153ca8259b2bfbda49364a72ceef05"><td class="memItemLeft" align="right" valign="top"><a id="ab9153ca8259b2bfbda49364a72ceef05" name="ab9153ca8259b2bfbda49364a72ceef05"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>PardisoSolver</b> ()</td></tr>
-<tr class="memdesc:ab9153ca8259b2bfbda49364a72ceef05"><td class="mdescLeft">&#160;</td><td class="mdescRight">constructor. initialises parameters, check pardiso license. <br /></td></tr>
-<tr class="separator:ab9153ca8259b2bfbda49364a72ceef05"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afba99923045305210246792d7cbdeea3" id="r_afba99923045305210246792d7cbdeea3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afba99923045305210246792d7cbdeea3">symbolic_factorization</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, int &amp;<a class="el" href="#a20a8e89d94d661aaa894f3d699313a4a">init</a>)</td></tr>
-<tr class="memdesc:afba99923045305210246792d7cbdeea3"><td class="mdescLeft">&#160;</td><td class="mdescRight">performs the symbolic factorisation.  <br /></td></tr>
-<tr class="separator:afba99923045305210246792d7cbdeea3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac0c6fd3fccc4db77470baa97f9f3bb31" id="r_ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac0c6fd3fccc4db77470baa97f9f3bb31">factorize</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="memdesc:ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="mdescLeft">&#160;</td><td class="mdescRight">numerical factorisation.  <br /></td></tr>
-<tr class="separator:ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a436c8cf471b8fbbe8e97c59974e1122c" id="r_a436c8cf471b8fbbe8e97c59974e1122c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a436c8cf471b8fbbe8e97c59974e1122c">factorize_solve</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;<a class="el" href="classSolver.html#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, Vect &amp;<a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="memdesc:a436c8cf471b8fbbe8e97c59974e1122c"><td class="mdescLeft">&#160;</td><td class="mdescRight">factorises and solves matrix in one call (to reuse pardiso objects)  <br /></td></tr>
-<tr class="separator:a436c8cf471b8fbbe8e97c59974e1122c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a68d808fdc1958192e498d058800cb3c2" id="r_a68d808fdc1958192e498d058800cb3c2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a68d808fdc1958192e498d058800cb3c2">selected_inversion</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;inv_diag)</td></tr>
-<tr class="memdesc:a68d808fdc1958192e498d058800cb3c2"><td class="mdescLeft">&#160;</td><td class="mdescRight">selected inversion of the diagonal elements of Q.  <br /></td></tr>
-<tr class="separator:a68d808fdc1958192e498d058800cb3c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0619e73e3ace9662c82854c0a15305a4" id="r_a0619e73e3ace9662c82854c0a15305a4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0619e73e3ace9662c82854c0a15305a4">compute_inverse_pardiso</a> (MatrixXd &amp;H, MatrixXd &amp;C)</td></tr>
-<tr class="memdesc:a0619e73e3ace9662c82854c0a15305a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side.  <br /></td></tr>
-<tr class="separator:a0619e73e3ace9662c82854c0a15305a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a439990b46271ddd3b37c190a3b6561c8" id="r_a439990b46271ddd3b37c190a3b6561c8"><td class="memItemLeft" align="right" valign="top"><a id="a439990b46271ddd3b37c190a3b6561c8" name="a439990b46271ddd3b37c190a3b6561c8"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>~PardisoSolver</b> ()</td></tr>
-<tr class="memdesc:a439990b46271ddd3b37c190a3b6561c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">class destructor. Frees memory allocated by pardiso. <br /></td></tr>
-<tr class="separator:a439990b46271ddd3b37c190a3b6561c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a95abed34672fd9dc3bcabc4eca43dcea" id="r_a95abed34672fd9dc3bcabc4eca43dcea"><td class="memItemLeft" align="right" valign="top"><a id="a95abed34672fd9dc3bcabc4eca43dcea" name="a95abed34672fd9dc3bcabc4eca43dcea"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>PardisoSolver</b> (int <a class="el" href="#a954b3aea843bb36012788ca946694d6f">MPI_rank</a>)</td></tr>
-<tr class="memdesc:a95abed34672fd9dc3bcabc4eca43dcea"><td class="mdescLeft">&#160;</td><td class="mdescRight">constructor. initialises parameters, check pardiso license. <br /></td></tr>
-<tr class="separator:a95abed34672fd9dc3bcabc4eca43dcea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afba99923045305210246792d7cbdeea3" id="r_afba99923045305210246792d7cbdeea3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afba99923045305210246792d7cbdeea3">symbolic_factorization</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, int &amp;<a class="el" href="#a20a8e89d94d661aaa894f3d699313a4a">init</a>)</td></tr>
-<tr class="memdesc:afba99923045305210246792d7cbdeea3"><td class="mdescLeft">&#160;</td><td class="mdescRight">performs the symbolic factorisation.  <br /></td></tr>
-<tr class="separator:afba99923045305210246792d7cbdeea3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac0c6fd3fccc4db77470baa97f9f3bb31" id="r_ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ac0c6fd3fccc4db77470baa97f9f3bb31">factorize</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="memdesc:ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="mdescLeft">&#160;</td><td class="mdescRight">numerical factorisation.  <br /></td></tr>
-<tr class="separator:ac0c6fd3fccc4db77470baa97f9f3bb31"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a60310ff235094571fc42e308f46d3d0c" id="r_a60310ff235094571fc42e308f46d3d0c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a60310ff235094571fc42e308f46d3d0c">factorize_w_constr</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, bool constr, MatrixXd &amp;D, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, MatrixXd &amp;V)</td></tr>
-<tr class="separator:a60310ff235094571fc42e308f46d3d0c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a436c8cf471b8fbbe8e97c59974e1122c" id="r_a436c8cf471b8fbbe8e97c59974e1122c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a436c8cf471b8fbbe8e97c59974e1122c">factorize_solve</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;<a class="el" href="classSolver.html#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, Vect &amp;<a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="memdesc:a436c8cf471b8fbbe8e97c59974e1122c"><td class="mdescLeft">&#160;</td><td class="mdescRight">factorises and solves matrix in one call (to reuse pardiso objects)  <br /></td></tr>
-<tr class="separator:a436c8cf471b8fbbe8e97c59974e1122c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a86902bda5ede21c5df1031809ba029dc" id="r_a86902bda5ede21c5df1031809ba029dc"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a86902bda5ede21c5df1031809ba029dc">factorize_solve_w_constr</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;<a class="el" href="classSolver.html#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, bool constr, MatrixXd &amp;Dxy, double &amp;log_det_Q, Vect &amp;<a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a>, MatrixXd &amp;V)</td></tr>
-<tr class="separator:a86902bda5ede21c5df1031809ba029dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a68d808fdc1958192e498d058800cb3c2" id="r_a68d808fdc1958192e498d058800cb3c2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a68d808fdc1958192e498d058800cb3c2">selected_inversion</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;inv_diag)</td></tr>
-<tr class="memdesc:a68d808fdc1958192e498d058800cb3c2"><td class="mdescLeft">&#160;</td><td class="mdescRight">selected inversion of the diagonal elements of Q.  <br /></td></tr>
-<tr class="separator:a68d808fdc1958192e498d058800cb3c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0619e73e3ace9662c82854c0a15305a4" id="r_a0619e73e3ace9662c82854c0a15305a4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0619e73e3ace9662c82854c0a15305a4">compute_inverse_pardiso</a> (MatrixXd &amp;H, MatrixXd &amp;C)</td></tr>
-<tr class="memdesc:a0619e73e3ace9662c82854c0a15305a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side.  <br /></td></tr>
-<tr class="separator:a0619e73e3ace9662c82854c0a15305a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a439990b46271ddd3b37c190a3b6561c8" id="r_a439990b46271ddd3b37c190a3b6561c8"><td class="memItemLeft" align="right" valign="top"><a id="a439990b46271ddd3b37c190a3b6561c8" name="a439990b46271ddd3b37c190a3b6561c8"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>~PardisoSolver</b> ()</td></tr>
-<tr class="memdesc:a439990b46271ddd3b37c190a3b6561c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">class destructor. Frees memory allocated by pardiso. <br /></td></tr>
-<tr class="separator:a439990b46271ddd3b37c190a3b6561c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afec4b1aab7b377e40300fdbc3d35444c" id="r_afec4b1aab7b377e40300fdbc3d35444c"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afec4b1aab7b377e40300fdbc3d35444c">PardisoSolver</a> (int n_, int *ia_, int *ja_, double *a_)</td></tr>
-<tr class="separator:afec4b1aab7b377e40300fdbc3d35444c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af909e9b4ad027e85ce9e814242504cd1" id="r_af909e9b4ad027e85ce9e814242504cd1"><td class="memItemLeft" align="right" valign="top"><a id="af909e9b4ad027e85ce9e814242504cd1" name="af909e9b4ad027e85ce9e814242504cd1"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize</b> (int *<a class="el" href="#a62c017586f74a01e2b95e3fe22e6dd05">ia</a>, int *<a class="el" href="#a40772a601483fabeae6a6157b5506806">ja</a>, double *<a class="el" href="#ad4b141f4db88dad05154ccd3835bfd75">a</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="separator:af909e9b4ad027e85ce9e814242504cd1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a38daa296fba874038a05cfc7eedef09a" id="r_a38daa296fba874038a05cfc7eedef09a"><td class="memItemLeft" align="right" valign="top"><a id="a38daa296fba874038a05cfc7eedef09a" name="a38daa296fba874038a05cfc7eedef09a"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize_solve</b> (int *<a class="el" href="#a62c017586f74a01e2b95e3fe22e6dd05">ia</a>, int *<a class="el" href="#a40772a601483fabeae6a6157b5506806">ja</a>, double *<a class="el" href="#ad4b141f4db88dad05154ccd3835bfd75">a</a>, double *<a class="el" href="#a1e417b852f8acbc10df4d374322ca5b1">b</a>, double *<a class="el" href="#a8a13c1319a2309f6baabbce5decf6673">x</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>)</td></tr>
-<tr class="separator:a38daa296fba874038a05cfc7eedef09a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aacb36646c6c251b38f1921a845e2952d" id="r_aacb36646c6c251b38f1921a845e2952d"><td class="memItemLeft" align="right" valign="top"><a id="aacb36646c6c251b38f1921a845e2952d" name="aacb36646c6c251b38f1921a845e2952d"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>selected_inversion</b> (int *<a class="el" href="#a62c017586f74a01e2b95e3fe22e6dd05">ia</a>, int *<a class="el" href="#a40772a601483fabeae6a6157b5506806">ja</a>, double *<a class="el" href="#ad4b141f4db88dad05154ccd3835bfd75">a</a>, double *inv_diag)</td></tr>
-<tr class="separator:aacb36646c6c251b38f1921a845e2952d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaaa5799647e17f83bfe85ae8033cd1db" id="r_aaaa5799647e17f83bfe85ae8033cd1db"><td class="memItemLeft" align="right" valign="top"><a id="aaaa5799647e17f83bfe85ae8033cd1db" name="aaaa5799647e17f83bfe85ae8033cd1db"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>release_memory</b> ()</td></tr>
-<tr class="separator:aaaa5799647e17f83bfe85ae8033cd1db"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0578e69df1753b13ba70c319b96036ba" id="r_a0578e69df1753b13ba70c319b96036ba"><td class="memItemLeft" align="right" valign="top"><a id="a0578e69df1753b13ba70c319b96036ba" name="a0578e69df1753b13ba70c319b96036ba"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>PardisoSolver</b> (int <a class="el" href="#a954b3aea843bb36012788ca946694d6f">MPI_rank</a>, int threads_level1, int threads_level2)</td></tr>
-<tr class="memdesc:a0578e69df1753b13ba70c319b96036ba"><td class="mdescLeft">&#160;</td><td class="mdescRight">constructor. initialises parameters, check pardiso license. <br /></td></tr>
-<tr class="separator:a0578e69df1753b13ba70c319b96036ba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afba99923045305210246792d7cbdeea3" id="r_afba99923045305210246792d7cbdeea3"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#afba99923045305210246792d7cbdeea3">symbolic_factorization</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, int &amp;<a class="el" href="#a20a8e89d94d661aaa894f3d699313a4a">init</a>)</td></tr>
-<tr class="memdesc:afba99923045305210246792d7cbdeea3"><td class="mdescLeft">&#160;</td><td class="mdescRight">performs the symbolic factorisation.  <br /></td></tr>
-<tr class="separator:afba99923045305210246792d7cbdeea3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab02bffd0e3eaa886aaeb5a7d4cab11e9" id="r_ab02bffd0e3eaa886aaeb5a7d4cab11e9"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">factorize</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, double &amp;t_priorLatChol)</td></tr>
-<tr class="memdesc:ab02bffd0e3eaa886aaeb5a7d4cab11e9"><td class="mdescLeft">&#160;</td><td class="mdescRight">numerical factorisation.  <br /></td></tr>
-<tr class="separator:ab02bffd0e3eaa886aaeb5a7d4cab11e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a430cb0192d7a00d3b3c9cb91c22a4e81" id="r_a430cb0192d7a00d3b3c9cb91c22a4e81"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a430cb0192d7a00d3b3c9cb91c22a4e81">factorize_w_constr</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, const MatrixXd &amp;D, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, MatrixXd &amp;V)</td></tr>
-<tr class="separator:a430cb0192d7a00d3b3c9cb91c22a4e81"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae157a134c6483640bf4af96e0360340d" id="r_ae157a134c6483640bf4af96e0360340d"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae157a134c6483640bf4af96e0360340d">factorize_solve</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;<a class="el" href="classSolver.html#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, Vect &amp;<a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a>, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, double &amp;t_condLatChol, double &amp;t_condLatSolve)</td></tr>
-<tr class="memdesc:ae157a134c6483640bf4af96e0360340d"><td class="mdescLeft">&#160;</td><td class="mdescRight">factorises and solves matrix in one call (to reuse pardiso objects)  <br /></td></tr>
-<tr class="separator:ae157a134c6483640bf4af96e0360340d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1182c0a5f8ef7e98c7e807bd44cb0c43" id="r_a1182c0a5f8ef7e98c7e807bd44cb0c43"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">factorize_solve_w_constr</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;<a class="el" href="classSolver.html#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, const MatrixXd &amp;Dxy, double &amp;<a class="el" href="classSolver.html#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, Vect &amp;<a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a>, MatrixXd &amp;V)</td></tr>
-<tr class="separator:a1182c0a5f8ef7e98c7e807bd44cb0c43"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a68d808fdc1958192e498d058800cb3c2" id="r_a68d808fdc1958192e498d058800cb3c2"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a68d808fdc1958192e498d058800cb3c2">selected_inversion</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, Vect &amp;inv_diag)</td></tr>
-<tr class="memdesc:a68d808fdc1958192e498d058800cb3c2"><td class="mdescLeft">&#160;</td><td class="mdescRight">selected inversion of the diagonal elements of Q.  <br /></td></tr>
-<tr class="separator:a68d808fdc1958192e498d058800cb3c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6e73aafe7a66a3952d886801dce9411b" id="r_a6e73aafe7a66a3952d886801dce9411b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a6e73aafe7a66a3952d886801dce9411b">selected_inversion_w_constr</a> (SpMat &amp;<a class="el" href="#a8adb0e3a5b3c2768219a01febb780fcb">Q</a>, const MatrixXd &amp;D, Vect &amp;inv_diag, MatrixXd &amp;V)</td></tr>
-<tr class="separator:a6e73aafe7a66a3952d886801dce9411b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0619e73e3ace9662c82854c0a15305a4" id="r_a0619e73e3ace9662c82854c0a15305a4"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0619e73e3ace9662c82854c0a15305a4">compute_inverse_pardiso</a> (MatrixXd &amp;H, MatrixXd &amp;C)</td></tr>
-<tr class="memdesc:a0619e73e3ace9662c82854c0a15305a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side.  <br /></td></tr>
-<tr class="separator:a0619e73e3ace9662c82854c0a15305a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a439990b46271ddd3b37c190a3b6561c8" id="r_a439990b46271ddd3b37c190a3b6561c8"><td class="memItemLeft" align="right" valign="top"><a id="a439990b46271ddd3b37c190a3b6561c8" name="a439990b46271ddd3b37c190a3b6561c8"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>~PardisoSolver</b> ()</td></tr>
-<tr class="memdesc:a439990b46271ddd3b37c190a3b6561c8"><td class="mdescLeft">&#160;</td><td class="mdescRight">class destructor. Frees memory allocated by pardiso. <br /></td></tr>
-<tr class="separator:a439990b46271ddd3b37c190a3b6561c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="inherit_header pub_methods_classSolver"><td colspan="2" onclick="javascript:dynsection.toggleInherit('pub_methods_classSolver')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classSolver.html">Solver</a></td></tr>
-<tr class="memitem:a69b718e64599e7085f2db8138caf67b4 inherit pub_methods_classSolver" id="r_a69b718e64599e7085f2db8138caf67b4"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSolver.html#a69b718e64599e7085f2db8138caf67b4">compute_full_inverse</a> (MatrixXd &amp;H, MatrixXd &amp;C)=0</td></tr>
-<tr class="separator:a69b718e64599e7085f2db8138caf67b4 inherit pub_methods_classSolver"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aae0ff9a7d37344aaa8a60c0edc904e69 inherit pub_methods_classSolver" id="r_aae0ff9a7d37344aaa8a60c0edc904e69"><td class="memItemLeft" align="right" valign="top">
-double&#160;</td><td class="memItemRight" valign="bottom"><b>factorize</b> (Vect theta)</td></tr>
-<tr class="separator:aae0ff9a7d37344aaa8a60c0edc904e69 inherit pub_methods_classSolver"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pri-attribs" name="pri-attribs"></a>
 Private Attributes</h2></td></tr>
@@ -405,25 +279,6 @@ long unsigned int&#160;</td><td class="memItemRight" valign="bottom"><b>l</b></t
 <tr class="separator:a20a8e89d94d661aaa894f3d699313a4a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a41f77ad74a1178acd7d030474826a59d" id="r_a41f77ad74a1178acd7d030474826a59d"><td class="memItemLeft" align="right" valign="top">long unsigned int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a41f77ad74a1178acd7d030474826a59d">nnz</a></td></tr>
 <tr class="separator:a41f77ad74a1178acd7d030474826a59d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0a78ec03c58f1f006e6a47d73a060c9a" id="r_a0a78ec03c58f1f006e6a47d73a060c9a"><td class="memItemLeft" align="right" valign="top">unsigned int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a0a78ec03c58f1f006e6a47d73a060c9a">nnz</a></td></tr>
-<tr class="separator:a0a78ec03c58f1f006e6a47d73a060c9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a437b4a38ec5219a7591b83b4283bbd05" id="r_a437b4a38ec5219a7591b83b4283bbd05"><td class="memItemLeft" align="right" valign="top">int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a437b4a38ec5219a7591b83b4283bbd05">nrhs</a></td></tr>
-<tr class="separator:a437b4a38ec5219a7591b83b4283bbd05"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3705006ac9e8cb72dd14241148a00513" id="r_a3705006ac9e8cb72dd14241148a00513"><td class="memItemLeft" align="right" valign="top"><a id="a3705006ac9e8cb72dd14241148a00513" name="a3705006ac9e8cb72dd14241148a00513"></a>
-MatrixXd&#160;</td><td class="memItemRight" valign="bottom"><b>D</b></td></tr>
-<tr class="separator:a3705006ac9e8cb72dd14241148a00513"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad747a7da828aa5989ff375943dcd1ac6" id="r_ad747a7da828aa5989ff375943dcd1ac6"><td class="memItemLeft" align="right" valign="top"><a id="ad747a7da828aa5989ff375943dcd1ac6" name="ad747a7da828aa5989ff375943dcd1ac6"></a>
-MatrixXd&#160;</td><td class="memItemRight" valign="bottom"><b>V</b></td></tr>
-<tr class="separator:ad747a7da828aa5989ff375943dcd1ac6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6001fc24d59d309b3042bb7406cac52f" id="r_a6001fc24d59d309b3042bb7406cac52f"><td class="memItemLeft" align="right" valign="top"><a id="a6001fc24d59d309b3042bb7406cac52f" name="a6001fc24d59d309b3042bb7406cac52f"></a>
-char *&#160;</td><td class="memItemRight" valign="bottom"><b>var</b></td></tr>
-<tr class="separator:a6001fc24d59d309b3042bb7406cac52f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1fd9da1f8cffd899cb33f622774927d8" id="r_a1fd9da1f8cffd899cb33f622774927d8"><td class="memItemLeft" align="right" valign="top"><a id="a1fd9da1f8cffd899cb33f622774927d8" name="a1fd9da1f8cffd899cb33f622774927d8"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><b>b</b> [8]</td></tr>
-<tr class="separator:a1fd9da1f8cffd899cb33f622774927d8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aecc55529a5c4424ba27d597e4ab532c0" id="r_aecc55529a5c4424ba27d597e4ab532c0"><td class="memItemLeft" align="right" valign="top"><a id="aecc55529a5c4424ba27d597e4ab532c0" name="aecc55529a5c4424ba27d597e4ab532c0"></a>
-double&#160;</td><td class="memItemRight" valign="bottom"><b>x</b> [8]</td></tr>
-<tr class="separator:aecc55529a5c4424ba27d597e4ab532c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="inherited" name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
@@ -438,67 +293,11 @@ Additional Inherited Members</h2></td></tr>
 <tr class="separator:ad2e11288194f48c67229ec05182c3cc8 inherit pro_attribs_classSolver"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af478cb2375c0804ecd8218774a683f8b inherit pro_attribs_classSolver" id="r_af478cb2375c0804ecd8218774a683f8b"><td class="memItemLeft" align="right" valign="top">Vect&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classSolver.html#af478cb2375c0804ecd8218774a683f8b">sol</a></td></tr>
 <tr class="separator:af478cb2375c0804ecd8218774a683f8b inherit pro_attribs_classSolver"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a25db35ebf6da0c321c80352fe6cff1fd inherit pro_attribs_classSolver" id="r_a25db35ebf6da0c321c80352fe6cff1fd"><td class="memItemLeft" align="right" valign="top">
-Vector&#160;</td><td class="memItemRight" valign="bottom"><b>rhs</b></td></tr>
-<tr class="separator:a25db35ebf6da0c321c80352fe6cff1fd inherit pro_attribs_classSolver"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a17bfa58c00fc7758edce6fdeb2d45c30 inherit pro_attribs_classSolver" id="r_a17bfa58c00fc7758edce6fdeb2d45c30"><td class="memItemLeft" align="right" valign="top">
-Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
-<tr class="separator:a17bfa58c00fc7758edce6fdeb2d45c30 inherit pro_attribs_classSolver"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>creates solver class using pardiso for factorising, solving and selectively inverting linear system. </p>
 <p>divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation &amp; solve and selected inversion (of the diagonal elements) </p>
-</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
-<a id="afec4b1aab7b377e40300fdbc3d35444c" name="afec4b1aab7b377e40300fdbc3d35444c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afec4b1aab7b377e40300fdbc3d35444c">&#9670;&#160;</a></span>PardisoSolver()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">PardisoSolver::PardisoSolver </td>
-          <td>(</td>
-          <td class="paramtype">int&#160;</td>
-          <td class="paramname"><em>n_</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int *&#160;</td>
-          <td class="paramname"><em>ia_</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int *&#160;</td>
-          <td class="paramname"><em>ja_</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double *&#160;</td>
-          <td class="paramname"><em>a_</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-<p>constructor pardiso init </p>
-
-</div>
-</div>
-<h2 class="groupheader">Member Function Documentation</h2>
+</div><h2 class="groupheader">Member Function Documentation</h2>
 <a id="a9434e3273c1cf0bb01c3bb8dd02aa6b8" name="a9434e3273c1cf0bb01c3bb8dd02aa6b8"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a9434e3273c1cf0bb01c3bb8dd02aa6b8">&#9670;&#160;</a></span>compute_full_inverse()</h2>
 
@@ -547,7 +346,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[1/7]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[1/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -584,7 +383,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[2/7]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[2/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -621,155 +420,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[3/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::compute_inverse_pardiso </td>
-          <td>(</td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>H</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>C</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">H</td><td>dense matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">C</td><td>inverse of H. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[4/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::compute_inverse_pardiso </td>
-          <td>(</td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>H</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>C</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">H</td><td>dense matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">C</td><td>inverse of H. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[5/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::compute_inverse_pardiso </td>
-          <td>(</td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>H</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>C</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">H</td><td>dense matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">C</td><td>inverse of H. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[6/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::compute_inverse_pardiso </td>
-          <td>(</td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>H</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>C</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-
-<p>inversion of the entire matrix (only meant for small matrices) by means of using identity right-hand side. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">H</td><td>dense matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">C</td><td>inverse of H. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="a0619e73e3ace9662c82854c0a15305a4" name="a0619e73e3ace9662c82854c0a15305a4"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[7/7]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a0619e73e3ace9662c82854c0a15305a4">&#9670;&#160;</a></span>compute_inverse_pardiso() <span class="overload">[3/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -806,13 +457,10 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="ac0c6fd3fccc4db77470baa97f9f3bb31" name="ac0c6fd3fccc4db77470baa97f9f3bb31"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac0c6fd3fccc4db77470baa97f9f3bb31">&#9670;&#160;</a></span>factorize() <span class="overload">[1/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ac0c6fd3fccc4db77470baa97f9f3bb31">&#9670;&#160;</a></span>factorize() <span class="overload">[1/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
       <table class="memname">
         <tr>
           <td class="memname">void PardisoSolver::factorize </td>
@@ -832,11 +480,6 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
           <td></td><td></td>
         </tr>
       </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
 </div><div class="memdoc">
 
 <p>numerical factorisation. </p>
@@ -847,154 +490,11 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
   </table>
   </dd>
 </dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="ac0c6fd3fccc4db77470baa97f9f3bb31" name="ac0c6fd3fccc4db77470baa97f9f3bb31"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac0c6fd3fccc4db77470baa97f9f3bb31">&#9670;&#160;</a></span>factorize() <span class="overload">[2/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>numerical factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>computes log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="ac0c6fd3fccc4db77470baa97f9f3bb31" name="ac0c6fd3fccc4db77470baa97f9f3bb31"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac0c6fd3fccc4db77470baa97f9f3bb31">&#9670;&#160;</a></span>factorize() <span class="overload">[3/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>numerical factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>computes log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="ac0c6fd3fccc4db77470baa97f9f3bb31" name="ac0c6fd3fccc4db77470baa97f9f3bb31"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ac0c6fd3fccc4db77470baa97f9f3bb31">&#9670;&#160;</a></span>factorize() <span class="overload">[4/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>numerical factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>computes log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
 
 </div>
 </div>
 <a id="ab02bffd0e3eaa886aaeb5a7d4cab11e9" name="ab02bffd0e3eaa886aaeb5a7d4cab11e9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[5/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[2/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1047,7 +547,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="ab02bffd0e3eaa886aaeb5a7d4cab11e9" name="ab02bffd0e3eaa886aaeb5a7d4cab11e9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[6/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[3/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1100,60 +600,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="ab02bffd0e3eaa886aaeb5a7d4cab11e9" name="ab02bffd0e3eaa886aaeb5a7d4cab11e9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[7/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_priorLatChol</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>numerical factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>computes log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="ab02bffd0e3eaa886aaeb5a7d4cab11e9" name="ab02bffd0e3eaa886aaeb5a7d4cab11e9"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[8/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ab02bffd0e3eaa886aaeb5a7d4cab11e9">&#9670;&#160;</a></span>factorize() <span class="overload">[4/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1206,13 +653,10 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a436c8cf471b8fbbe8e97c59974e1122c" name="a436c8cf471b8fbbe8e97c59974e1122c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a436c8cf471b8fbbe8e97c59974e1122c">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[1/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a436c8cf471b8fbbe8e97c59974e1122c">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[1/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
       <table class="memname">
         <tr>
           <td class="memname">void PardisoSolver::factorize_solve </td>
@@ -1244,11 +688,6 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
           <td></td><td></td>
         </tr>
       </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
 </div><div class="memdoc">
 
 <p>factorises and solves matrix in one call (to reuse pardiso objects) </p>
@@ -1261,135 +700,11 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
   </table>
   </dd>
 </dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a436c8cf471b8fbbe8e97c59974e1122c" name="a436c8cf471b8fbbe8e97c59974e1122c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a436c8cf471b8fbbe8e97c59974e1122c">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[2/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_solve </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>factorises and solves matrix in one call (to reuse pardiso objects) </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">rhs</td><td>right-hand side of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">sol</td><td>solution of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a436c8cf471b8fbbe8e97c59974e1122c" name="a436c8cf471b8fbbe8e97c59974e1122c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a436c8cf471b8fbbe8e97c59974e1122c">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[3/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_solve </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>factorises and solves matrix in one call (to reuse pardiso objects) </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">rhs</td><td>right-hand side of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">sol</td><td>solution of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
 
 </div>
 </div>
 <a id="ae157a134c6483640bf4af96e0360340d" name="ae157a134c6483640bf4af96e0360340d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[4/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[2/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1462,7 +777,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="ae157a134c6483640bf4af96e0360340d" name="ae157a134c6483640bf4af96e0360340d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[5/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[3/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1535,7 +850,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="ae157a134c6483640bf4af96e0360340d" name="ae157a134c6483640bf4af96e0360340d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[6/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[4/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1607,210 +922,8 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 
 </div>
 </div>
-<a id="ae157a134c6483640bf4af96e0360340d" name="ae157a134c6483640bf4af96e0360340d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae157a134c6483640bf4af96e0360340d">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[7/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_solve </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_condLatChol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_condLatSolve</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>factorises and solves matrix in one call (to reuse pardiso objects) </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">rhs</td><td>right-hand side of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">sol</td><td>solution of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a9bf13e10522bd46bef21418c665b0ad0" name="a9bf13e10522bd46bef21418c665b0ad0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9bf13e10522bd46bef21418c665b0ad0">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[8/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_solve </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vector &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vector &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>factorises and solves matrix in one call (to reuse pardiso objects) </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in]</td><td class="paramname">rhs</td><td>right-hand side of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">sol</td><td>solution of the system. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">log_det</td><td>log determinant of Q. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a86902bda5ede21c5df1031809ba029dc" name="a86902bda5ede21c5df1031809ba029dc"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a86902bda5ede21c5df1031809ba029dc">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[1/5]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_solve_w_constr </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>constr</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>Dxy</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det_Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>V</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
 <a id="a1182c0a5f8ef7e98c7e807bd44cb0c43" name="a1182c0a5f8ef7e98c7e807bd44cb0c43"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[2/5]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[1/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1872,7 +985,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a1182c0a5f8ef7e98c7e807bd44cb0c43" name="a1182c0a5f8ef7e98c7e807bd44cb0c43"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[3/5]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[2/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1934,7 +1047,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a1182c0a5f8ef7e98c7e807bd44cb0c43" name="a1182c0a5f8ef7e98c7e807bd44cb0c43"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[4/5]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[3/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1995,126 +1108,8 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 
 </div>
 </div>
-<a id="a1182c0a5f8ef7e98c7e807bd44cb0c43" name="a1182c0a5f8ef7e98c7e807bd44cb0c43"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1182c0a5f8ef7e98c7e807bd44cb0c43">&#9670;&#160;</a></span>factorize_solve_w_constr() <span class="overload">[5/5]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_solve_w_constr </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>Dxy</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>V</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a60310ff235094571fc42e308f46d3d0c" name="a60310ff235094571fc42e308f46d3d0c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a60310ff235094571fc42e308f46d3d0c">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[1/5]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_w_constr </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">bool&#160;</td>
-          <td class="paramname"><em>constr</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>D</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>V</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
 <a id="a430cb0192d7a00d3b3c9cb91c22a4e81" name="a430cb0192d7a00d3b3c9cb91c22a4e81"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[2/5]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[1/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2164,7 +1159,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a430cb0192d7a00d3b3c9cb91c22a4e81" name="a430cb0192d7a00d3b3c9cb91c22a4e81"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[3/5]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[2/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2214,57 +1209,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a430cb0192d7a00d3b3c9cb91c22a4e81" name="a430cb0192d7a00d3b3c9cb91c22a4e81"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[4/5]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::factorize_w_constr </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>D</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>V</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a430cb0192d7a00d3b3c9cb91c22a4e81" name="a430cb0192d7a00d3b3c9cb91c22a4e81"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[5/5]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a430cb0192d7a00d3b3c9cb91c22a4e81">&#9670;&#160;</a></span>factorize_w_constr() <span class="overload">[3/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2314,7 +1259,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a68d808fdc1958192e498d058800cb3c2" name="a68d808fdc1958192e498d058800cb3c2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[1/7]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[1/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2361,7 +1306,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a68d808fdc1958192e498d058800cb3c2" name="a68d808fdc1958192e498d058800cb3c2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[2/7]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[2/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2408,7 +1353,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a68d808fdc1958192e498d058800cb3c2" name="a68d808fdc1958192e498d058800cb3c2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[3/7]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[3/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2426,194 +1371,6 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>selected inversion of the diagonal elements of Q. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">inv_diag</td><td>inverse diagonal to hold the solution vector. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a68d808fdc1958192e498d058800cb3c2" name="a68d808fdc1958192e498d058800cb3c2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[4/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::selected_inversion </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>selected inversion of the diagonal elements of Q. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">inv_diag</td><td>inverse diagonal to hold the solution vector. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a68d808fdc1958192e498d058800cb3c2" name="a68d808fdc1958192e498d058800cb3c2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[5/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::selected_inversion </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>selected inversion of the diagonal elements of Q. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">inv_diag</td><td>inverse diagonal to hold the solution vector. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a68d808fdc1958192e498d058800cb3c2" name="a68d808fdc1958192e498d058800cb3c2"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a68d808fdc1958192e498d058800cb3c2">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[6/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::selected_inversion </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>selected inversion of the diagonal elements of Q. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">inv_diag</td><td>inverse diagonal to hold the solution vector. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="aa2d2ec373212c69b4cc94d3919eb3c6b" name="aa2d2ec373212c69b4cc94d3919eb3c6b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa2d2ec373212c69b4cc94d3919eb3c6b">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[7/7]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::selected_inversion </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vector &amp;&#160;</td>
           <td class="paramname"><em>inv_diag</em>&#160;</td>
         </tr>
         <tr>
@@ -2828,7 +1585,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a6e73aafe7a66a3952d886801dce9411b" name="a6e73aafe7a66a3952d886801dce9411b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6e73aafe7a66a3952d886801dce9411b">&#9670;&#160;</a></span>selected_inversion_w_constr() <span class="overload">[1/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a6e73aafe7a66a3952d886801dce9411b">&#9670;&#160;</a></span>selected_inversion_w_constr() <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2878,57 +1635,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a6e73aafe7a66a3952d886801dce9411b" name="a6e73aafe7a66a3952d886801dce9411b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6e73aafe7a66a3952d886801dce9411b">&#9670;&#160;</a></span>selected_inversion_w_constr() <span class="overload">[2/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::selected_inversion_w_constr </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>D</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>V</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="a6e73aafe7a66a3952d886801dce9411b" name="a6e73aafe7a66a3952d886801dce9411b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a6e73aafe7a66a3952d886801dce9411b">&#9670;&#160;</a></span>selected_inversion_w_constr() <span class="overload">[3/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a6e73aafe7a66a3952d886801dce9411b">&#9670;&#160;</a></span>selected_inversion_w_constr() <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -2978,7 +1685,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[1/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[1/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3026,7 +1733,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[2/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[2/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3074,7 +1781,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[3/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[3/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3122,199 +1829,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[4/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::symbolic_factorization </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int &amp;&#160;</td>
-          <td class="paramname"><em>init</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>performs the symbolic factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">init</td><td>integer value indicating status of symbolic factorisation. Changed to one at the end of the function.</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>For each <a class="el" href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system.">PardisoSolver</a> object symbolic factorisation only needs to be performed once as sparsity patters if assumed to remain the same. </p>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[5/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::symbolic_factorization </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int &amp;&#160;</td>
-          <td class="paramname"><em>init</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>performs the symbolic factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">init</td><td>integer value indicating status of symbolic factorisation. Changed to one at the end of the function.</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>For each <a class="el" href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system.">PardisoSolver</a> object symbolic factorisation only needs to be performed once as sparsity patters if assumed to remain the same. </p>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[6/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::symbolic_factorization </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int &amp;&#160;</td>
-          <td class="paramname"><em>init</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>performs the symbolic factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">init</td><td>integer value indicating status of symbolic factorisation. Changed to one at the end of the function.</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>For each <a class="el" href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system.">PardisoSolver</a> object symbolic factorisation only needs to be performed once as sparsity patters if assumed to remain the same. </p>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[7/8]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">void PardisoSolver::symbolic_factorization </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int &amp;&#160;</td>
-          <td class="paramname"><em>init</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>performs the symbolic factorisation. </p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramdir">[in]</td><td class="paramname">Q</td><td>precision matrix to be factorised. </td></tr>
-    <tr><td class="paramdir">[in,out]</td><td class="paramname">init</td><td>integer value indicating status of symbolic factorisation. Changed to one at the end of the function.</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>For each <a class="el" href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system.">PardisoSolver</a> object symbolic factorisation only needs to be performed once as sparsity patters if assumed to remain the same. </p>
-
-<p>Implements <a class="el" href="classSolver.html">Solver</a>.</p>
-
-</div>
-</div>
-<a id="afba99923045305210246792d7cbdeea3" name="afba99923045305210246792d7cbdeea3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[8/8]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#afba99923045305210246792d7cbdeea3">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[4/4]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3593,7 +2108,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a41f77ad74a1178acd7d030474826a59d" name="a41f77ad74a1178acd7d030474826a59d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a41f77ad74a1178acd7d030474826a59d">&#9670;&#160;</a></span>nnz <span class="overload">[1/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a41f77ad74a1178acd7d030474826a59d">&#9670;&#160;</a></span>nnz <span class="overload">[1/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3616,7 +2131,7 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </div>
 </div>
 <a id="a41f77ad74a1178acd7d030474826a59d" name="a41f77ad74a1178acd7d030474826a59d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a41f77ad74a1178acd7d030474826a59d">&#9670;&#160;</a></span>nnz <span class="overload">[2/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a41f77ad74a1178acd7d030474826a59d">&#9670;&#160;</a></span>nnz <span class="overload">[2/2]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -3635,52 +2150,6 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 </table>
 </div><div class="memdoc">
 <p>number of nonzeros </p>
-
-</div>
-</div>
-<a id="a0a78ec03c58f1f006e6a47d73a060c9a" name="a0a78ec03c58f1f006e6a47d73a060c9a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0a78ec03c58f1f006e6a47d73a060c9a">&#9670;&#160;</a></span>nnz <span class="overload">[3/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">unsigned int PardisoSolver::nnz</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">private</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-<p>number of nonzeros </p>
-
-</div>
-</div>
-<a id="a437b4a38ec5219a7591b83b4283bbd05" name="a437b4a38ec5219a7591b83b4283bbd05"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a437b4a38ec5219a7591b83b4283bbd05">&#9670;&#160;</a></span>nrhs</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">int PardisoSolver::nrhs</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">private</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-<p>number of rhs. </p>
 
 </div>
 </div>
@@ -3781,19 +2250,10 @@ Vector&#160;</td><td class="memItemRight" valign="bottom"><b>sol</b></td></tr>
 <li>INLA_CPUonly/<a class="el" href="PardisoSolver__dummy_8h_source.html">PardisoSolver_dummy.h</a></li>
 <li>INLA_main/<a class="el" href="INLA__main_2PardisoSolver_8h_source.html">PardisoSolver.h</a></li>
 <li>INLA_predict/<a class="el" href="INLA__predict_2PardisoSolver_8h_source.html">PardisoSolver.h</a></li>
-<li>test_scripts/class_inheritance/<a class="el" href="test__scripts_2class__inheritance_2PardisoSolver_8h_source.html">PardisoSolver.h</a></li>
-<li>test_scripts/multi_GPU/<a class="el" href="test__scripts_2multi__GPU_2PardisoSolver_8h_source.html">PardisoSolver.h</a></li>
-<li>test_scripts/pardiso_log_det/<a class="el" href="test__scripts_2pardiso__log__det_2PardisoSolver_8h_source.html">PardisoSolver.h</a></li>
-<li>test_scripts/<b>pardiso_reuse_symf_ex1.cpp</b></li>
-<li>test_scripts/RGF_memInit/<a class="el" href="test__scripts_2RGF__memInit_2PardisoSolver_8h_source.html">PardisoSolver.h</a></li>
 <li>INLA_CPUonly/<b>PardisoSolver.cpp</b></li>
 <li>INLA_CPUonly/<b>PardisoSolver_dummy.cpp</b></li>
 <li>INLA_main/<b>PardisoSolver.cpp</b></li>
 <li>INLA_predict/<b>PardisoSolver.cpp</b></li>
-<li>test_scripts/class_inheritance/<b>PardisoSolver.cpp</b></li>
-<li>test_scripts/multi_GPU/<b>PardisoSolver.cpp</b></li>
-<li>test_scripts/pardiso_log_det/<b>PardisoSolver.cpp</b></li>
-<li>test_scripts/RGF_memInit/<b>PardisoSolver.cpp</b></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->
