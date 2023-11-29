@@ -1,0 +1,5 @@
+var searchData=
+[
+  ['hess_5feval_0',['hess_eval',['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a3507f9afff34433fbec653cc82e0bee0',1,'PostTheta::hess_eval(Vect theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)']]],
+  ['hyperparameters_1',['Hyperparameters',['../classHyperparameters.html',1,'']]]
+];

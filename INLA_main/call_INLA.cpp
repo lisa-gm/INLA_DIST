@@ -32,8 +32,6 @@
 #include <unsupported/Eigen/KroneckerProduct>
 #include <Eigen/SparseCholesky>
 
-
-#include <armadillo>
 #include <LBFGS.h>
 
 #include "PostTheta.h"

@@ -116,7 +116,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb) : ns_t(ns), nt_t(nt), nb_t
     std::cout << "RGF constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
 #endif	
     
-    solver = new RGF<double>(ns_t, nt_t, nb_t);
+    solver = new RGF<double>(ns_t, nt_t, nb_t, MPI_rank);
  
 #ifdef PRINT_MSG    
     if(MPI_rank == 0)
@@ -259,7 +259,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
 #endif
 
     double t_factorise = get_time(0.0);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     t_factorise = get_time(t_factorise);
 
     log_det = solver->logDet(ia, ja, a);
@@ -284,7 +284,7 @@ void RGFSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
     memcpy(b, Dt.data(), n*nrhs*sizeof(double));
 
     double t_solve = get_time(0.0); 
-    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, dummy_time_1, dummy_time_2);
     t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
@@ -372,7 +372,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 
     t_condLatChol = get_time(0.0);
 
-	double gflops_factorize = solver->factorize(ia, ja, a);
+	double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     //double gflops_factorize = solver->factorize();
 
     t_condLatChol = get_time(t_condLatChol);
@@ -403,7 +403,7 @@ void RGFSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 
     t_condLatSolve = get_time(0.0);
 
-  	double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+  	double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, dummy_time_1, dummy_time_2);
     //double gflops_solve = solver->solve(x, b, nrhs);
 
     t_condLatSolve = get_time(t_condLatSolve);
@@ -488,7 +488,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
 
     double t_factorise = get_time(0.0);
     //solver->solve_equation(GR);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     t_factorise = get_time(t_factorise);
 
     log_det = solver->logDet(ia, ja, a);
@@ -508,7 +508,7 @@ void RGFSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
     memcpy(b + n, Dt.data(), n*Dxy.rows()*sizeof(double));
 
     double t_solve = get_time(0.0); 
-    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, dummy_time_1, dummy_time_2);
     t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
@@ -581,7 +581,7 @@ void RGFSolver::selected_inversion_diag(SpMat& Q, Vect& inv_diag) {
     double t_factorise, t_inv;
 
     t_factorise = get_time(0.0);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
@@ -667,7 +667,7 @@ void RGFSolver::selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Ve
     double t_factorise, t_solve, t_inv;
 
     t_factorise = get_time(0.0);
-    double flops_factorize = solver->factorize(ia, ja, a);
+    double flops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
@@ -675,7 +675,7 @@ void RGFSolver::selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Ve
 #endif
 
     t_solve = get_time(0.0); 
-    double flops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double flops_solve = solver->solve(ia, ja, a, x, b, nrhs, dummy_time_1, dummy_time_2);
     t_solve = get_time(t_solve);
 
 //#ifdef PRINT_MSG
@@ -764,7 +764,7 @@ void RGFSolver::selected_inversion_full(SpMat& Q, SpMat& Qinv) {
     double t_factorise, t_inv;
 
     t_factorise = get_time(0.0);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
@@ -864,7 +864,7 @@ void RGFSolver::compute_full_inverse(SpMat& Q, MatrixXd& Qinv) {
 
     double t_condLatChol = get_time(0.0);
 
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
     //double gflops_factorize = solver->factorize();
 
     t_condLatChol = get_time(t_condLatChol);
@@ -902,7 +902,7 @@ void RGFSolver::compute_full_inverse(SpMat& Q, MatrixXd& Qinv) {
 
     double t_condLatSolve = get_time(0.0);
 
-    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, dummy_time_1, dummy_time_2);
     //double gflops_solve = solver->solve(x, b, nrhs);
 
     t_condLatSolve = get_time(t_condLatSolve);

@@ -38,7 +38,7 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
             printf("Careful! GPU rank hard coded to machine: kw60890!\n");
         }
 
-    } else {
+    } else if(noGPUs == 8) {
         if(MPI_rank == 0){
             printf("assuming I'm on ALEX!\n"); 
         }   
@@ -60,6 +60,10 @@ RGFSolver::RGFSolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
             exit(1);
         }
       
+    } else {
+        cudaGetDevice(&GPU_rank);
+        printf("nummber of available GPUs: %d, currently set device: %d\n", noGPUs, GPU_rank);
+
     }
     //GPU_rank = MPI_rank % noGPUs;
     cudaError_t cudaErr = cudaSetDevice(GPU_rank);
