@@ -39,7 +39,7 @@ no=$((2*${ns}*${nt}))
 
 #solver_type=$1
 solver_type=PARDISO
-#solver_type=RGF
+#solver_type=BTA
 
 data_type=synthetic
 

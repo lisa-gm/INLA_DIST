@@ -1,5 +1,5 @@
-#ifndef __RGF
-#define __RGF
+#ifndef __BTA
+#define __BTA
 
 #include <string.h>
 #include <omp.h>
@@ -25,13 +25,13 @@
 //#define PRINT_MSG
 
 template <class T>
-class RGF{
+class BTA{
 	
 public:
 
-    RGF(size_t,size_t,size_t, int);
+    BTA(size_t,size_t,size_t, int);
 
-    ~RGF();
+    ~BTA();
     double factorize(size_t* ia, size_t* ja, T* a, double& t_firstStageFactor);
     double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet);
     double factorizeSolve(size_t* ia, size_t* ja, T* a, T* x, T* rhs,size_t nrhs, double& t_firstSecondStage, double& t_SecondStageBackPass);
@@ -41,9 +41,9 @@ public:
     double solve_s(size_t*, size_t*, double*, double*,double*,size_t);
     // double precision solve but assuming single precision input
     double solve_d(size_t*, size_t*, float*, float*,float*,size_t); 
-    double RGFdiag(size_t*, size_t*, T*, T*);
-    double RGFinvBlks(size_t*, size_t*, T*, T*);
-    double RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ);
+    double BTAdiag(size_t*, size_t*, T*, T*);
+    double BTAinvBlks(size_t*, size_t*, T*, T*);
+    double BTAselInv(size_t *ia, size_t *ja, T *a, T *invQ);
     T logDet(size_t*, size_t*, T*);
     double residualNorm(T*,T*);
     double residualNormNormalized(T*,T*);
@@ -163,7 +163,7 @@ private:
     double SecondStageSolve_s(size_t, float* rhs_s);
     // double precision solve with single precision factor
     double SecondStageSolve_d(size_t, double* rhs_d);
-    double ThirdStageRGF(T*,T*, int);
+    double ThirdStageBTA(T*,T*, int);
     //void create_blocks();
     void initialize_MF_host();
     void initialize_invBlks_host();
@@ -192,7 +192,7 @@ private:
 /************************************************************************************************/
 
 template <class T>
-RGF<T>::RGF(size_t ns, size_t nt, size_t nd, int GPU_rank_)
+BTA<T>::BTA(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 {
    if(ns == 0){
       printf("ns = %ld, nt = %ld. no spatial field. Just fixed effects. Consider using a different solver!\n", ns, nt);
@@ -351,10 +351,10 @@ RGF<T>::RGF(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 /************************************************************************************************/
 
 template <class T>
-RGF<T>::~RGF()
+BTA<T>::~BTA()
 {
 #ifdef PRINT_MSG
-   std::cout << "In RGF destructor. MF_allocated : " << MF_allocated << std::endl;
+   std::cout << "In BTA destructor. MF_allocated : " << MF_allocated << std::endl;
 #endif 
 
    // in case that only factorize_noCopyHost is called MF not allocated ...
@@ -419,7 +419,7 @@ RGF<T>::~RGF()
 /************************************************************************************************/
 
 template <class T>
-inline size_t RGF<T>::mf_block_index(size_t r, size_t c)
+inline size_t BTA<T>::mf_block_index(size_t r, size_t c)
 {
    //printf("r = %ld, c = %ld, c*matrix_ns = %ld, (r-c)*matrix_ns = %ld, diag_pos[c*matrix_ns]+(r-c)*matrix_ns = %ld\n", r, c, c*matrix_ns, (r-c)*matrix_ns, diag_pos[c*matrix_ns]+(r-c)*matrix_ns);
    return diag_pos[c*matrix_ns] + (r-c)*matrix_ns;
@@ -428,7 +428,7 @@ inline size_t RGF<T>::mf_block_index(size_t r, size_t c)
 /************************************************************************************************/
 
 template <class T>
-inline size_t RGF<T>::mf_block_lda(size_t r, size_t c)
+inline size_t BTA<T>::mf_block_lda(size_t r, size_t c)
 {
    //return matrix->index_i[c*b_size];
    // two blocks
@@ -445,7 +445,7 @@ inline size_t RGF<T>::mf_block_lda(size_t r, size_t c)
 /************************************************************************************************/
 
 template <class T>
-inline size_t RGF<T>::mf_dense_block_index(size_t i)
+inline size_t BTA<T>::mf_dense_block_index(size_t i)
 {
    if (i < matrix_nt-1)
       return diag_pos[i*matrix_ns] + 2*matrix_ns;
@@ -458,7 +458,7 @@ inline size_t RGF<T>::mf_dense_block_index(size_t i)
 /************************************************************************************************/
 
 template <class T>
-inline size_t RGF<T>::mf_dense_block_offset(size_t i)
+inline size_t BTA<T>::mf_dense_block_offset(size_t i)
 {
    if (i < matrix_nt-1)
       return 2*matrix_ns;
@@ -471,7 +471,7 @@ inline size_t RGF<T>::mf_dense_block_offset(size_t i)
 /************************************************************************************************/
 
 template <class T>
-inline size_t RGF<T>::mf_dense_block_lda(size_t i)
+inline size_t BTA<T>::mf_dense_block_lda(size_t i)
 {
    return mf_block_lda(i, i);;
 }
@@ -482,7 +482,7 @@ inline size_t RGF<T>::mf_dense_block_lda(size_t i)
 // total size (ns+nd)*ns*nt + nb^2
 
 template <class T>
-inline size_t RGF<T>::invblks_diag_block_index(size_t i)
+inline size_t BTA<T>::invblks_diag_block_index(size_t i)
 {
    // out-of-bounds check for i which represents time step
    if(i > matrix_nt){
@@ -495,7 +495,7 @@ inline size_t RGF<T>::invblks_diag_block_index(size_t i)
 
 
 template <class T>
-inline size_t RGF<T>::invblks_dense_block_index(size_t i)
+inline size_t BTA<T>::invblks_dense_block_index(size_t i)
 {
    // out-of-bounds check for i which represents time step
    if(i > matrix_nt){
@@ -509,7 +509,7 @@ inline size_t RGF<T>::invblks_dense_block_index(size_t i)
 
 
 template <class T>
-double RGF<T>::FirstStageFactor()
+double BTA<T>::FirstStageFactor()
 {
 
 #ifdef PRINT_MSG
@@ -922,7 +922,7 @@ double RGF<T>::FirstStageFactor()
 // combine first & second Stage factor to do forward solve directly on GPU, i.e. L L^T x = b, solve L y = b 
 // directly when computing L recursively
 template <class T>
-double RGF<T>::FirstSecondStageFactor(size_t nrhs)
+double BTA<T>::FirstSecondStageFactor(size_t nrhs)
 {
 
 #ifdef PRINT_MSG
@@ -1403,7 +1403,7 @@ double RGF<T>::FirstSecondStageFactor(size_t nrhs)
 // dummy function to check calls
 
 template <class T>
-double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
+double BTA<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 
     printf("In Factorize noCopyHost test version.\n");
 
@@ -1497,7 +1497,7 @@ double RGF<T>::FirstStageFactor_noCopyHost_testV(double &logDet){
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
+double BTA<T>::FirstStageFactor_noCopyHost(T &logDet)
 {
 
    //std::cout << "In FirstStageFactor_noCopyHost(), omp get thread num = " << omp_get_thread_num() << std::endl;
@@ -1834,7 +1834,7 @@ double RGF<T>::FirstStageFactor_noCopyHost(T &logDet)
 // divide SecondStageSolve into ForwardPass & BackwardPass to make functions usable separately
 
 template <class T>
-double RGF<T>::ForwardPassSolve(size_t nrhs){
+double BTA<T>::ForwardPassSolve(size_t nrhs){
 
    int info;
    size_t IB;
@@ -1900,7 +1900,7 @@ double RGF<T>::ForwardPassSolve(size_t nrhs){
 
 // assumes rhs to contain the result from forward pass
 template <class T>
-double RGF<T>::BackwardPassSolve(size_t nrhs){
+double BTA<T>::BackwardPassSolve(size_t nrhs){
 
    int info;
    size_t IB;
@@ -1968,7 +1968,7 @@ double RGF<T>::BackwardPassSolve(size_t nrhs){
 }
 
 template <class T>
-double RGF<T>::SecondStageSolve(size_t nrhs,  double& t_secondStageForwardPass,  double& t_secondStageBackwardPass)
+double BTA<T>::SecondStageSolve(size_t nrhs,  double& t_secondStageForwardPass,  double& t_secondStageBackwardPass)
 {
    size_t gflops = 0;
 
@@ -1987,7 +1987,7 @@ double RGF<T>::SecondStageSolve(size_t nrhs,  double& t_secondStageForwardPass, 
 #if 0 
 // After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
 template <class T>
-double RGF<T>::SecondStageSolve(size_t nrhs)
+double BTA<T>::SecondStageSolve(size_t nrhs)
 {
     int info;
     size_t IB;
@@ -2113,7 +2113,7 @@ double RGF<T>::SecondStageSolve(size_t nrhs)
 
 // After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
 template <class T>
-double RGF<T>::SecondStageSolve_d(size_t nrhs, double* rhs_d)
+double BTA<T>::SecondStageSolve_d(size_t nrhs, double* rhs_d)
 {
     printf("in SecondStageSolve_d()\n");
 
@@ -2257,7 +2257,7 @@ double RGF<T>::SecondStageSolve_d(size_t nrhs, double* rhs_d)
 
 // After factorisation of A = L*L^T solve (L*L^T) x = b by : forward pass L*y = b, backward pass L^T x = y
 template <class T>
-double RGF<T>::SecondStageSolve_s(size_t nrhs, float* rhs_s)
+double BTA<T>::SecondStageSolve_s(size_t nrhs, float* rhs_s)
 {
     printf("in SecondStageSolve_s()\n");
 
@@ -2398,7 +2398,7 @@ double RGF<T>::SecondStageSolve_s(size_t nrhs, float* rhs_s)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
+double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 {
    int info;
    size_t IB;
@@ -3029,7 +3029,7 @@ double RGF<T>::ThirdStageRGF(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 } // end thirdstageFactor
 
 template <class T>
-void RGF<T>::initialize_MF_host(){
+void BTA<T>::initialize_MF_host(){
 
 #ifdef PRINT_MSG
    std::cout << "in initialize MF host. MF allocated : " << MF_allocated << std::endl;
@@ -3053,7 +3053,7 @@ void RGF<T>::initialize_MF_host(){
 
 
 template <class T>
-void RGF<T>::initialize_invBlks_host(){
+void BTA<T>::initialize_invBlks_host(){
 
 #ifdef PRINT_MSG
    std::cout << "in initialize invBlks host" << std::endl;
@@ -3080,7 +3080,7 @@ void RGF<T>::initialize_invBlks_host(){
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFactor)
+double BTA<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFactor)
 {
 
 #ifdef PRINT_MSG
@@ -3205,7 +3205,7 @@ double RGF<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFacto
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
+double BTA<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
 {
 
 #ifdef PRINT_MSG	
@@ -3287,7 +3287,7 @@ double RGF<T>::factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, double& t_firstSecondStage, double& t_SecondStageBackPass)
+double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, double& t_firstSecondStage, double& t_SecondStageBackPass)
 {
 
 #ifdef PRINT_MSG
@@ -3435,7 +3435,7 @@ double RGF<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs, double& t_secondStageForwardPass, double& t_secondStageBackwardPass)
+double BTA<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs, double& t_secondStageForwardPass, double& t_secondStageBackwardPass)
 {
     double gflops = solve(b, b, nrhs, t_secondStageForwardPass, t_secondStageBackwardPass);
 
@@ -3445,7 +3445,7 @@ double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *b, size_t nrhs, double& t_
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass)
+double BTA<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass)
 {
 
    double t_FSF;
@@ -3503,7 +3503,7 @@ double RGF<T>::solve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t nrhs, doub
 // COPY -- DOUBLE PRECISION but assuming SINGLE precision input
 #if 1
 template <class T>
-double RGF<T>::solve_d(size_t *ia, size_t *ja, float* a, float* x, float *b, size_t nrhs)
+double BTA<T>::solve_d(size_t *ia, size_t *ja, float* a, float* x, float *b, size_t nrhs)
 {
 
    double t_FSF;
@@ -3551,7 +3551,7 @@ double RGF<T>::solve_d(size_t *ia, size_t *ja, float* a, float* x, float *b, siz
 // COPY -- SINGLE PRECISION but assuming double precision input
 #if 1
 template <class T>
-double RGF<T>::solve_s(size_t *ia, size_t *ja, double* a, double* x, double*b, size_t nrhs)
+double BTA<T>::solve_s(size_t *ia, size_t *ja, double* a, double* x, double*b, size_t nrhs)
 {
 
    double t_FSF;
@@ -3598,14 +3598,14 @@ double RGF<T>::solve_s(size_t *ia, size_t *ja, double* a, double* x, double*b, s
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
+double BTA<T>::BTAdiag(size_t *ia, size_t *ja, T *a, T *diag)
 {
    // check current device. set appropriately.
    int GPU_currRank;
    cudaGetDevice(&GPU_currRank);
 
    if(GPU_currRank != GPU_rank){
-      //printf("in RGFdiag. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
+      //printf("in BTAdiag. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
       //printf("updated GPU rank is: %d.\n", GPU_currRank);   
@@ -3630,7 +3630,7 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     T *tmp2_dev;
 
 #ifdef PRINT_MSG
-    printf("\nRGFSelInv: before allocating data on device now. CPY indicator %d\n", cpy_indicator);
+    printf("\nBTASelInv: before allocating data on device now. CPY indicator %d\n", cpy_indicator);
 #endif
 
     allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
@@ -3646,7 +3646,7 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
     memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t), NULL );
 
     //Computation
-    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
+    double gflops = ThirdStageBTA(tmp1_dev,tmp2_dev, cpy_indicator);
 
     //Copy data to host
     memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T), NULL );
@@ -3665,13 +3665,13 @@ double RGF<T>::RGFdiag(size_t *ia, size_t *ja, T *a, T *diag)
 }
 
 template <class T>
-double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
+double BTA<T>::BTAselInv(size_t *ia, size_t *ja, T *a, T *invQ)
 {  
    int GPU_currRank;
    cudaGetDevice(&GPU_currRank);
 
    if(GPU_currRank != GPU_rank){
-      //printf("in RGFselInv. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
+      //printf("in BTAselInv. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
       //printf("updated GPU rank is: %d.\n", GPU_currRank);   
@@ -3704,7 +3704,7 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     size_t max_cols = max(matrix_ns, matrix_nd);
 
 #ifdef PRINT_MSG
-    printf("\nRGFSelInv: allocating data on device now. CPY indicator %d\n", cpy_indicator);
+    printf("\nBTASelInv: allocating data on device now. CPY indicator %d\n", cpy_indicator);
 #endif
 
     //allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
@@ -3728,7 +3728,7 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     allocate_data_on_device((void**)&inv_a_dev,max_supernode_nnz*sizeof(T));
 
     //Computation
-    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
+    double gflops = ThirdStageBTA(tmp1_dev,tmp2_dev, cpy_indicator);
 
    factorization_completed = false; // we have overwritten the Cholesky factor
 
@@ -3762,10 +3762,10 @@ double RGF<T>::RGFselInv(size_t *ia, size_t *ja, T *a, T *invQ)
 }
 
 template <class T>
-double RGF<T>::RGFinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
+double BTA<T>::BTAinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
 {
 
-   printf("!!!CAREFUL: RGFinvBlks function abandoned. Not sure if it gives correct results!!!\n");
+   printf("!!!CAREFUL: BTAinvBlks function abandoned. Not sure if it gives correct results!!!\n");
 
    double t_FSF;
 
@@ -3800,7 +3800,7 @@ double RGF<T>::RGFinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
     //memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
 
     //Computation
-    double gflops = ThirdStageRGF(tmp1_dev,tmp2_dev, cpy_indicator);
+    double gflops = ThirdStageBTA(tmp1_dev,tmp2_dev, cpy_indicator);
 
     //CAREFUL: invBlks are on CPU but not as contiguous array, block-wise !!
     //memcpy_to_host(diag,diag_dev,matrix_size*sizeof(T));
@@ -3823,7 +3823,7 @@ double RGF<T>::RGFinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
 /************************************************************************************************/
 
 template <class T>
-T RGF<T>::logDet(size_t *ia, size_t *ja, T *a)
+T BTA<T>::logDet(size_t *ia, size_t *ja, T *a)
 {
    double t_FSF;
 
@@ -3840,7 +3840,7 @@ T RGF<T>::logDet(size_t *ia, size_t *ja, T *a)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::residualNorm(T *x, T *b)
+double BTA<T>::residualNorm(T *x, T *b)
 {
    T *r = new T[matrix_size];
 
@@ -3868,7 +3868,7 @@ double RGF<T>::residualNorm(T *x, T *b)
 /************************************************************************************************/
 
 template <class T>
-double RGF<T>::residualNormNormalized(T *x, T *b)
+double BTA<T>::residualNormNormalized(T *x, T *b)
 {
    return residualNorm(x, b) / c_dtnrm2(matrix_size, b, 1);
 }
@@ -3877,7 +3877,7 @@ double RGF<T>::residualNormNormalized(T *x, T *b)
 
 /*
 template <class T>
-void RGF<T>::create_blocks()
+void BTA<T>::create_blocks()
 {
     size_t IB;
 
@@ -3896,7 +3896,7 @@ void RGF<T>::create_blocks()
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::get_max_supernode_nnz()
+inline void BTA<T>::get_max_supernode_nnz()
 {
     // compute maximum number of nnz over all supernodes
     // only works because only the last set of columns is not of size matrix_ns ...
@@ -3921,7 +3921,7 @@ inline void RGF<T>::get_max_supernode_nnz()
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stream)
+inline void BTA<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stream)
 {
 
     size_t supernode_fc = supernode * matrix_ns;
@@ -3954,7 +3954,7 @@ inline void RGF<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
 // M_dev is local, all entries of 1 supernode
 // a_dev is local -> all nnz entries of a in that supernode
 template <class T>
-inline void RGF<T>::extract_nnzA(T *M_dev, size_t supernode)
+inline void BTA<T>::extract_nnzA(T *M_dev, size_t supernode)
 {
    // only works because only the last set of columns is not of size matrix_ns ...
    size_t supernode_fc = supernode * matrix_ns;
@@ -4027,7 +4027,7 @@ inline void RGF<T>::extract_nnzA(T *M_dev, size_t supernode)
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode, cudaStream_t stream)
+inline void BTA<T>::copy_supernode_to_host(T *M_dev, size_t supernode, cudaStream_t stream)
 {
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
@@ -4048,7 +4048,7 @@ inline void RGF<T>::copy_supernode_to_host(T *M_dev, size_t supernode, cudaStrea
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
+inline void BTA<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
 {
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
@@ -4092,7 +4092,7 @@ inline void RGF<T>::copy_supernode_to_host_write(T *M_dev, size_t supernode)
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode, cudaStream_t stream)
+inline void BTA<T>::copy_supernode_to_device(T *M_dev, size_t supernode, cudaStream_t stream)
 {
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
@@ -4107,7 +4107,7 @@ inline void RGF<T>::copy_supernode_to_device(T *M_dev, size_t supernode, cudaStr
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::copy_supernode_diag(T *src, size_t supernode)
+inline void BTA<T>::copy_supernode_diag(T *src, size_t supernode)
 {
    size_t supernode_fc = supernode * matrix_ns;
    size_t supernode_lc = supernode < matrix_nt ? (supernode+1) * matrix_ns : matrix_ns * matrix_nt + matrix_nd;
@@ -4122,7 +4122,7 @@ inline void RGF<T>::copy_supernode_diag(T *src, size_t supernode)
 /************************************************************************************************/
 
 template <class T>
-inline void RGF<T>::swap_pointers(T **ptr1, T **ptr2)
+inline void BTA<T>::swap_pointers(T **ptr1, T **ptr2)
 {
 
    T *tmp = *ptr1;
@@ -4135,20 +4135,20 @@ inline void RGF<T>::swap_pointers(T **ptr1, T **ptr2)
 
 // added inline here and in the next 3 functions to avoid compiler issues! 
 template <>
-inline CPX RGF<CPX>::f_one()
+inline CPX BTA<CPX>::f_one()
 {
     return CPX(1.0, 0.0);
 }
 
 template <>
-inline double RGF<double>::f_one()
+inline double BTA<double>::f_one()
 {
     return 1.0;
 }
 
 // new SINGLE PRECISION
 template <>
-inline float RGF<float>::f_one()
+inline float BTA<float>::f_one()
 {
     return 1.0;
 }
@@ -4156,20 +4156,20 @@ inline float RGF<float>::f_one()
 /************************************************************************************************/
 
 template <>
-inline CPX RGF<CPX>::f_zero()
+inline CPX BTA<CPX>::f_zero()
 {
     return CPX(0.0, 0.0);
 }
 
 template <>
-inline double RGF<double>::f_zero()
+inline double BTA<double>::f_zero()
 {
     return 0.0;
 }
 
 // new SINGLE PRECISION
 template <>
-inline float RGF<float>::f_zero()
+inline float BTA<float>::f_zero()
 {
     return 0.0;
 }

@@ -1,8 +1,8 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
-BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/home/x_gaedkelb
+BASE_PATH=/home/hpc/ihpc/ihpc060h
 #BASE_PATH=/users/lgaedkem
 
 ############# BTA ################
@@ -34,8 +34,8 @@ ARMADILLO=-larmadillo
 LIBS=$(LIBPARDISO) $(LIBMKL) #$(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
-INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
-#INCEIGEN=-I$(BASE_PATH)/applications/eigen
+#INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
+INCEIGEN=-I$(BASE_PATH)/applications/eigen
 INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 INCCHOLMOD= -I$(BASE_PATH)/applications/SuiteSparse/CHOLMOD/Include
@@ -76,7 +76,7 @@ $(BTA_PATH)/Utilities.o: $(BTA_PATH)/Utilities.C
 $(BTA_PATH)/CWC_utility.o: $(BTA_PATH)/CWC_utility.cu
 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver.o EigenCholSolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
+call_INLA: call_INLA.o PostTheta.o PardisoSolver.o BTASolver.o EigenCholSolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
 	$(CXX) $^ $(LIBS) $(BTA_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp

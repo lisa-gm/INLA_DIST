@@ -12,10 +12,10 @@
 #define DATA_SYNTHETIC
 //#define DATA_TEMPERATURE
 
-// enable RGF solver or not
-#define RGF_SOLVER
+// enable BTA solver or not
+#define BTA_SOLVER
 
-#ifdef RGF_SOLVER
+#ifdef BTA_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
     	threads_level2 = 1;
     }
 
-    // overwrite in case RGF is used
+    // overwrite in case BTA is used
     int noGPUs;
    
     if(MPI_rank == 0){
@@ -194,11 +194,11 @@ int main(int argc, char* argv[])
         printf("OMP threads level 1 : %d\n", threads_level1);
         //printf("OMP threads level 2 : %d\n", threads_level2);
 	printf("OMP threads level 2 FIXED TO 1!!\n");
-#ifdef RGF_SOLVER
+#ifdef BTA_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
 #else
-	printf("RGF dummy version\n");
+	printf("BTA dummy version\n");
     noGPUs = 0;
 #endif
     }  
@@ -222,7 +222,7 @@ int main(int argc, char* argv[])
         std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
 
         std::cerr << "[string:base_path]          path to folder containing matrix files " << std::endl;
-        std::cerr << "[string:solver_type]        BTA or PARDISO" << std::endl;
+        std::cerr << "[string:solver_type]        BTA, PARDISO or Eigen" << std::endl;
 
         exit(1);
     }
@@ -270,7 +270,7 @@ int main(int argc, char* argv[])
     std::string base_path   = argv[8];    
     std::string solver_type = argv[9];
 
-    // check if solver type is neither PARDISO nor RGF :
+    // check if solver type is neither PARDISO nor BTA :
     if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
         std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
         exit(1);

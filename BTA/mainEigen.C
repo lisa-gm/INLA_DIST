@@ -18,7 +18,7 @@
 #include "../read_write_functions.cpp"
 #include "helper_functions.h"
 
-#include "RGF.H"
+#include "BTA.H"
 
 using Eigen::VectorXd;
 using Eigen::MatrixXd;
@@ -833,8 +833,8 @@ std::string valueType;
     SpMat Qx(nx, nx);
 
     double t_Qx_factorise;
-    RGF<T> *solver_Qx;
-    solver_Qx = new RGF<T>(ns, nt, nss);
+    BTA<T> *solver_Qx;
+    solver_Qx = new BTA<T>(ns, nt, nss);
 
     double log_det_Qx;
 
@@ -939,7 +939,7 @@ std::string valueType;
         printf("time chol(Qx): %lg\n",t_Qx_factorise);
 
         T *invDiag_Qx = new T[nx];
-        solver_Qx->RGFdiag(ia_Qx, ja_Qx, a_Qx, invDiag_Qx);
+        solver_Qx->BTAdiag(ia_Qx, ja_Qx, a_Qx, invDiag_Qx);
 
         Vect invDiag_Qx_vec(nx);
         for(int i=0; i<nx; i++){
@@ -949,7 +949,7 @@ std::string valueType;
         printf("norm(invDiag_Qx)      : %f\n", invDiag_Qx_vec.norm());
         
         T *invQa = new T[Qx_lower.nonZeros()];
-        solver_Qx->RGFselInv(ia_Qx, ja_Qx, a_Qx, invQa);
+        solver_Qx->BTAselInv(ia_Qx, ja_Qx, a_Qx, invQa);
 
         SpMat invQx_lower = Eigen::Map<Eigen::SparseMatrix<double> >(nx,nx,Qx_lower.nonZeros(),Qx_lower.outerIndexPtr(), // read-write
                                Qx_lower.innerIndexPtr(),invQa);
@@ -962,7 +962,7 @@ std::string valueType;
         std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQx_lower.diagonal() - invDiag_Qx_vec).norm() << std::endl;
 
         //Vect invDiag_Qx(nx);
-        //solver_Qx->RGFdiag(ia_Qx, ja_Qx, a_Qx, invDiag_Qx);
+        //solver_Qx->BTAdiag(ia_Qx, ja_Qx, a_Qx, invDiag_Qx);
 
         delete[] ia_Qx;
         delete[] ja_Qx;
@@ -1193,9 +1193,9 @@ std::string valueType;
         std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
         // *********************************************** //
 
-        printf("call RGF constructor. nt = %ld\n", nt); 
-        RGF<T> *solver;
-        solver = new RGF<T>(ns, nt, nss+nb, GPU_rank);
+        printf("call BTA constructor. nt = %ld\n", nt); 
+        BTA<T> *solver;
+        solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
 
         int m = 2;
         Vect t_factorize_vec(m-1);
@@ -1364,30 +1364,30 @@ std::string valueType;
 
     double t_invDiag;
     t_invDiag = get_time(0.0);
-    double flops_invDiag = solver->RGFdiag(ia, ja, a, invDiag);
+    double flops_invDiag = solver->BTAdiag(ia, ja, a, invDiag);
     t_invDiag = get_time(t_invDiag);
-    double log_detRGFdiag = solver->logDet(ia, ja, a);
+    double log_detBTAdiag = solver->logDet(ia, ja, a);
 
     if(n < 25){
-        printf("\nRGFinvDiag: ");
+        printf("\nBTAinvDiag: ");
         for(i=0; i<n; i++){
             printf(" %f", invDiag[i]);
         }
         printf("\n");
     }
 
-    //printf("computed RGFdiag\n");
+    //printf("computed BTAdiag\n");
 
     //printf("flops inv:      %f\n", flops_invDiag);
 
     //solver->init_supernode()
     T* invQa;
     invQa = new T[nnz];
-    //printf("before rgfselinv\n");
-    double flops_invQa = solver->RGFselInv(ia, ja, a, invQa);
+    //printf("before BTAselinv\n");
+    double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
 
     //printf("before logDetselInv\n");
-    T log_detRGFselInv = solver->logDet(ia, ja, a);
+    T log_detBTAselInv = solver->logDet(ia, ja, a);
 
     double* invQa_d = new double[nnz];
     for(int i=0; i<nnz; i++){
@@ -1402,7 +1402,7 @@ std::string valueType;
         printf("\n");
     }
 
-    //printf("computed RGFselInv\n");
+    //printf("computed BTAselInv\n");
 
     SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
                                Q_lower.innerIndexPtr(),invQa_d);
@@ -1463,14 +1463,14 @@ std::string valueType;
 #endif 
     /*
     t_invBlks = get_time(0.0);
-    double flops_invBlks = solver->RGFinvBlks(ia, ja, a, invBlks);
+    double flops_invBlks = solver->BTAinvBlks(ia, ja, a, invBlks);
     t_invBlks= get_time(t_invBlks);
-    std::cout << "diff Log Dets : " << log_detRGFdiag - log_detRGFselInv << std::endl;
+    std::cout << "diff Log Dets : " << log_detBTAdiag - log_detBTAselInv << std::endl;
 
-    printf("RGF factorise time: %lg\n",t_factorise);
-    printf("RGF solve     time: %lg\n",t_solve);
-    printf("RGF inv Diag  time: %lg\n",t_invDiag);
-    printf("RGF inv Blks  time: %lg\n",t_invBlks);
+    printf("BTA factorise time: %lg\n",t_factorise);
+    printf("BTA solve     time: %lg\n",t_solve);
+    printf("BTA inv Diag  time: %lg\n",t_invDiag);
+    printf("BTA inv Blks  time: %lg\n",t_invBlks);
     */
 
     // now assemble invBlks to correct sparse matrix -> column major -> iterate through columns
@@ -1512,7 +1512,7 @@ std::string valueType;
 
     // print/write diag 
     /*
-    string sel_inv_file_name = "sel_inv_RGF_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ to_string(nb) + "_no" + to_string(no) +".dat";
+    string sel_inv_file_name = "sel_inv_BTA_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ to_string(nb) + "_no" + to_string(no) +".dat";
     cout << sel_inv_file_name << endl;
     ofstream sel_inv_file(sel_inv_file_name,    ios::out | ::ios::trunc);
 

@@ -1,12 +1,12 @@
-#ifndef RGFSOLVER_H
-#define RGFSOLVER_H
+#ifndef BTASOLVER_H
+#define BTASOLVER_H
 
 #include "mpi.h"
 
 #include "Solver.h"
-#include "../BTA/RGF.H"
+#include "../BTA/BTA.H"
 #include "helper_functions.h"
-//#include "RGF.H"
+//#include "BTA.H"
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
@@ -24,13 +24,13 @@ typedef double T;
 
 
  /**
- * @brief creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system.
+ * @brief creates solver class using BTA-GPU for factorising, solving and selectively inverting linear system.
  * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
  * and selected inversion (of the diagonal elements)
- * @note in each RGFSolver function call factorise, selected_inversion etc. class RGF gets created. Is this the best
+ * @note in each BTASolver function call factorise, selected_inversion etc. class BTA gets created. Is this the best
  * way to handle things. Potentially merge them somehow? Maybe actually does not take any time.
  */
-class RGFSolver: public Solver {
+class BTASolver: public Solver {
 
     private:
 
@@ -50,7 +50,7 @@ class RGFSolver: public Solver {
         size_t i;
 
         int GPU_rank;
-        // pardiso wants integer, RGF wants size_t, recast for now
+        // pardiso wants integer, BTA wants size_t, recast for now
         size_t ns_t;
         size_t nt_t;
         size_t nb_t;
@@ -67,16 +67,16 @@ class RGFSolver: public Solver {
         double* b;              /**< right-hand side. */
         double* x;              /**< placeholder for solution. */
 
-        RGF<double> *solver;    /**< RGF solver object */
+        BTA<double> *solver;    /**< BTA solver object */
 
         double dummy_time_1;
         double dummy_time_2;
 
    	public:
-   		RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_, int thread_ID_);
+   		BTASolver(size_t ns_, size_t nt_, size_t nb_, size_t no_, int thread_ID_);
 
         /**
-         * @brief not used for RGFSolver, only in PARDISO
+         * @brief not used for BTASolver, only in PARDISO
          */
 		void symbolic_factorization(SpMat& Q, int& init);
 
@@ -117,9 +117,9 @@ class RGFSolver: public Solver {
         // OR not? Eigen function is probably fine, most likely also using lapack.
 
         /**
-         * @brief class destructor. Frees memory allocated by RGF.
+         * @brief class destructor. Frees memory allocated by BTA.
          */
-      	~RGFSolver();
+      	~BTASolver();
 
 };
 

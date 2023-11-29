@@ -11,10 +11,10 @@
 #define DATA_SYNTHETIC
 //#define DATA_TEMPERATURE
 
-// enable RGF solver or not
-//#define RGF_SOLVER
+// enable BTA solver or not
+//#define BTA_SOLVER
 
-#ifdef RGF_SOLVER
+#ifdef BTA_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
         threads_level2 = omp_get_max_threads();
     }
 
-    // overwrite in case RGF is used
+    // overwrite in case BTA is used
     int noGPUs;
    
     if(MPI_rank == 0){
@@ -146,11 +146,11 @@ int main(int argc, char* argv[])
         printf("total no MPI ranks  : %d\n", MPI_size);
         printf("OMP threads level 1 : %d\n", threads_level1);
         printf("OMP threads level 2 : %d\n", threads_level2);
-#ifdef RGF_SOLVER
+#ifdef BTA_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
 #else
-	printf("RGF dummy version\n");
+	printf("BTA dummy version\n");
     noGPUs = 0;
 #endif
     }  
@@ -202,9 +202,9 @@ int main(int argc, char* argv[])
 
     std::string solver_type = argv[6];
 
-    // check if solver type is neither PARDISO nor RGF :
-    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("RGF") != 0){
-        std::cout << "Unknown solver type. Available options are :\nPARDISO\nRGF" << std::endl;
+    // check if solver type is neither PARDISO nor BTA :
+    if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
+        std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
         exit(1);
     }
 
@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
     }
 
     // we have two cholesky factors ...
-    if(MPI_rank == 0 && solver_type.compare("RGF") == 0){
+    if(MPI_rank == 0 && solver_type.compare("BTA") == 0){
         // required memory on CPU to store Cholesky factor
         double mem_gb = (2*(nt-1)*ns*ns + ns*ns + (ns*nt+nb)*nb) * sizeof(double) / pow(10.0,9.0);
         printf("Memory Usage of each Cholesky factor on CPU = %f GB\n\n", mem_gb);

@@ -33,11 +33,11 @@ $(info MKL      : $(MKLROOT))
 $(info EIGEN    : $(INCEIGEN))
 
 $(info )
-$(info ===== Compiling w/ RGF dummy version =======)
+$(info ===== Compiling w/ BTA dummy version =======)
 
 all: call_INLA
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver.o RGFSolver_dummy.o
+call_INLA: call_INLA.o PostTheta.o PardisoSolver.o BTASolver_dummy.o
 	$(CXX) $^ $(LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp

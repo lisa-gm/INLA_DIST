@@ -1,22 +1,22 @@
-// RGFSolver_dummy
+// BTASolver_dummy
 
-#ifndef RGFSOLVER_DUMMY_H
-#define RGFSOLVER_DUMMY_H
+#ifndef BTASOLVER_DUMMY_H
+#define BTASOLVER_DUMMY_H
 
-//#include "../RGF/RGF.H"
+//#include "../BTA/BTA.H"
 
 #include "Solver.h"
 
 //extern "C" double 
 
  /**
- * @brief creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system.
+ * @brief creates solver class using BTA-GPU for factorising, solving and selectively inverting linear system.
  * @details divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation & solve 
  * and selected inversion (of the diagonal elements)
- * @note in each RGFSolver function call factorise, selected_inversion etc. class RGF gets created. Is this the best
+ * @note in each BTASolver function call factorise, selected_inversion etc. class BTA gets created. Is this the best
  * way to handle things. Potentially merge them somehow? Maybe actually does not take any time.
  */
-class RGFSolver: public Solver {
+class BTASolver: public Solver {
 
     private:
 
@@ -27,7 +27,7 @@ class RGFSolver: public Solver {
         // to avoid redeclaration every time
         size_t i;
 
-        // pardiso wants integer, RGF wants size_t, recast for now
+        // pardiso wants integer, BTA wants size_t, recast for now
         size_t ns_t;
         size_t nt_t;
         size_t nb_t;
@@ -43,10 +43,10 @@ class RGFSolver: public Solver {
         double* x;              /**< placeholder for solution. */
 
    	public:
-        RGFSolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
+        BTASolver(size_t ns_, size_t nt_, size_t nb_, size_t no_);
 
         /**
-         * @brief not used for RGFSolver, only in PARDISO
+         * @brief not used for BTASolver, only in PARDISO
          */
         void symbolic_factorization(SpMat& Q, int& init);
 
@@ -87,9 +87,9 @@ class RGFSolver: public Solver {
         // OR not? Eigen function is probably fine, most likely also using lapack.
 
         /**
-         * @brief class destructor. Frees memory allocated by RGF.
+         * @brief class destructor. Frees memory allocated by BTA.
          */
-        ~RGFSolver();
+        ~BTASolver();
 
 };
 

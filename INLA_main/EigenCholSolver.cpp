@@ -34,7 +34,7 @@ void EigenCholSolver::symbolic_factorization(SpMat& Q, int& init){
 
 
 void EigenCholSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol){
-    //printf("in factorize Eigen solver.\n");
+    printf("in factorize Eigen solver.\n");
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -51,7 +51,7 @@ void EigenCholSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatCho
 #endif
 
     t_priorLatChol += omp_get_wtime();
-    //std::cout << "log det = " << log(solverEigenQ.determinant()) << ", comp = " << log_det << std::endl;
+    std::cout << "log det = " << log(solverEigenQ.determinant()) << ", comp = " << log_det << std::endl;
 }
 
 
@@ -61,7 +61,7 @@ void EigenCholSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& lo
 }
 
 void EigenCholSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve){
-    //printf("in factorize solve Eigen solver.\n");
+    printf("in factorize solve Eigen solver.\n");
 
     if(init == 0){
         symbolic_factorization(Q, init);

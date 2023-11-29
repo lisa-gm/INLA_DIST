@@ -47,9 +47,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	if(solver_type == "PARDISO"){
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
-	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-		solverQst = new RGFSolver(ns, nt, 0, no);
+	} else if(solver_type == "BTA"){
+		solverQ   = new BTASolver(ns, nt, nb, no);
+		solverQst = new BTASolver(ns, nt, 0, no);
 	} 
 
 	prior = "gaussian";
@@ -118,9 +118,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	if(solver_type == "PARDISO"){
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
-	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-		solverQst = new RGFSolver(ns, nt, 0, no);
+	} else if(solver_type == "BTA"){
+		solverQ   = new BTASolver(ns, nt, nb, no);
+		solverQst = new BTASolver(ns, nt, 0, no);
 	}  
 
 	prior = "gaussian";
@@ -225,9 +225,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	if(solver_type == "PARDISO"){
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
-	} else if(solver_type == "RGF"){
-		solverQ   = new RGFSolver(ns, nt, nb, no);
-		solverQst = new RGFSolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 
+	} else if(solver_type == "BTA"){
+		solverQ   = new BTASolver(ns, nt, nb, no);
+		solverQst = new BTASolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 
 	} 
 
 	// set prior to be gaussian

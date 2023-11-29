@@ -31,29 +31,29 @@ num_ranks=1
 #no=$((2*${ns}*${ntFit}))
 
 
-ns=425
+ns=42
 #nss=1442
 #ns=20252
 #ns=16002
 #ntFit=60
 nss=0
 #ns=642
-ntFit=0
+ntFit=3
 ntPred=0
 nt=$((${ntFit}+${ntPred}))
 #nss=642
 #nt=30
 #nb=2
-nb=3
+nb=2
 #no=7872
 #no=$((2*${ns}*${ntFit}))
 #noPerTs=$((2*${ns}))
-no=595
+no=126
 
 #solver_type=$1
 #solver_type=PARDISO
-solver_type=BTA
-#solver_type=Eigen
+#solver_type=BTA
+solver_type=Eigen
 
 data_type=synthetic
 #data_type=regression
