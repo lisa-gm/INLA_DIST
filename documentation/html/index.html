@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.10.0"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>INLA_DIST: Block Tridiagonal Arrowhead Solver</title>
+<title>INLA_DIST: $\text{INLA}_{\text{DIST}}$</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -13,6 +13,13 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  extensions: ["tex2jax.js"],
+  jax: ["input/TeX","output/HTML-CSS"],
+});
+</script>
+<script type="text/javascript" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
@@ -70,30 +77,49 @@ $(function() {
 </div>
 
 <div><div class="header">
-  <div class="headertitle"><div class="title">Block Tridiagonal Arrowhead <a class="el" href="classSolver.html" title="abstract base solver class to enable to be able two switch between solvers (current options: PARDISO ...">Solver</a> </div></div>
+  <div class="headertitle"><div class="title">$\text{INLA}_{\text{DIST}}$ </div></div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><p><a class="anchor" id="md_BTA_2README"></a> subdirectory that contains everything related to BTA solver which has a standalone callable main otherwise it gets called from call_INLA.cpp from the develop subfolder, which is one of the main executables of the repository. Main operations that can be performed:</p>
-<ul>
-<li>Cholesky decomposition (GPU)</li>
-<li>Forward-backward solve using Cholesky factor (CPU)</li>
-<li>selected matrix inversion (GPU)</li>
-</ul>
-<p>Assumes matrix to be in right format, $n_t$ defines number of large diagonal blocks of size $n_s \times n_s$, $n_b$ number of rows/columns in arrowhead structure. Overall matrix size is thus $n = n_s \cdot n_t + n_b$.</p>
+<div class="textblock"><p><a class="anchor" id="_"></a>{\text{DIST}}$} md_README</p>
+<p>Repository to host $\text{INLA}_{\text{DIST}}$. This code base provides a highly scalable approach to Bayesian spatial-temporal modeling. It relies on the methodology of integrated nested Laplace approximations, in combination with the stochastic partial differential equations approach to provide an efficient framework for performing inference, leveraging sparse representations of the underlying processes. Building upon the INLA-SPDE approach, the main focus of the current implementation is on non-separable spatial-temporal model, derived from a partial differential equation equation. This family of physically inspired models captures the spatial-temporal behavior of the underlying physical process. We tackle the challenge of higher model complexity by developing a solution method which exploits the underlying model sparsity, utilizes parallelism and leverages the strengths of modern compute architectures. Details can be found in <a href="https://arxiv.org/abs/2303.15254">Integrated Nested Laplace Approximations for Large-Scale Spatial-Temporal Bayesian Modeling</a>.</p>
 <h1><a class="anchor" id="autotoc_md1"></a>
-Installation</h1>
-<p>requires CUDA, MAGMA, Eigen, Armadillo (just for 1 read file operation). All paths related to GPU code are in <code>make.inc</code> (base_path of the user has to be set at the top of the file), rest in <code>Makefile</code>. Here MKLROOT &amp; LAPACK path need to be set or known. The same holds for CUDA (set <code>CUDAHOME</code>), MAGMA (set <code>MAGMA</code>), Eigen (set <code>INCEIGEN</code> (header only) and Armadillo. <br  />
-</p>
-<h1><a class="anchor" id="autotoc_md2"></a>
-Running mainEigen.C</h1>
-<p>The executable requires information of where to find the data, including the FEM matrices of the spatial-temporal mesh. Examples of how this needs to be provided can be found in one of the different run scripts, for instance run_script.sh. It looks something like</p>
-<div class="fragment"><div class="line">./mainEigen ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}</div>
-</div><!-- fragment --><p>Otherwise there is also if-statement section that can be enabled and generates dummy matrix of small size (some parameters can be changed, not all). <br  />
-</p>
-<h1><a class="anchor" id="autotoc_md3"></a>
-Acknowledgements</h1>
-<p>We would like to express our gratitude for the initial software support on the selected block inversion from Prof. Mathieu Luisier. The <a href="https://doi.org/10.1109/NANO.2008.110">OMEN[^1]</a> software infrastructure was used as a starting point to derive and implement the BTA solver.</p>
-<p>[^1]: M. Luisier and G. Klimeck, Omen an atomistic and full-band quantum transport simulator for post-CMOS nanodevices, in 2008 8th IEEE Conference on Nanotechnology, IEEE, 2008, pp. 354–357. 10.1109/NANO.2008.110. </p>
+Overview of the different directories</h1>
+<p>main directories which contains the majority of the source code of our method and in particular everything related to the INLA methodology:</p><ul>
+<li>$\text{INLA}_{\text{MAIN}}$ : most general version, linear solver can be chosen at runtime.</li>
+<li>$\text{INLA}_{\text{CPUonly}}$ : CPU only version using PARDISO solver.</li>
+<li>$\text{INLA}_{\text{predict}}$ : new version under development with additional prediction features and accuracy measures.</li>
+</ul>
+<p>other directories:</p><ul>
+<li>$\text{<a class="el" href="classBTA.html" title="Template class for Block Triangular Arrowhead Solver.">BTA</a>}$ : contains all code related to the block tridiagonal arrowhead solver.</li>
+<li>Rscripts : scripts for data preprocessing &amp; generation of synthetic datasets. contains code to export to c-readable files.</li>
+<li>Test Scripts : small test scripts to develop and test features in the code. for development purposes.</li>
+</ul>
+<p>Detailed documentation of the code can be found <a href="https://lisa-gm.github.io/INLA_DIST/documentation/html/index.html">here</a>.</p>
+<h5></h5>
+<h2><a class="anchor" id="autotoc_md2"></a>
+Installation</h2>
+<p>The implementation targets linux-based systems. Compile from the respective subfolder you are interested in using the provided <code>makefile</code>, potentially adapting some of the provided paths. The following additional software libraries or packages are needed:</p>
+<ul>
+<li><a href="https://eigen.tuxfamily.org">Eigen</a></li>
+<li><a href="https://arma.sourceforge.net/">Armadillo</a> (only for reading in matrices in CSR format)</li>
+</ul>
+<h3><a class="anchor" id="autotoc_md3"></a>
+INLA-SPDE optimization routine</h3>
+<ul>
+<li><a href="https://github.com/lisa-gm/adapted_LBFGSpp">adapted LBFGSpp</a></li>
+</ul>
+<p>Calls either the <a class="el" href="classBTA.html" title="Template class for Block Triangular Arrowhead Solver.">BTA</a> solver or PARDISO, depending on the choice of linear solver.</p>
+<h3><a class="anchor" id="autotoc_md4"></a>
+BTA Solver</h3>
+<ul>
+<li><a href="https://icl.utk.edu/magma/">MAGMA</a></li>
+<li><a href="https://developer.nvidia.com/cuda-toolkit">CUDA</a></li>
+</ul>
+<p>The <a class="el" href="classBTA.html" title="Template class for Block Triangular Arrowhead Solver.">BTA</a> solver can be compiled independently from the RGF subdirectory. It has its own <code>makefile</code> and a <code>mainEigen.C</code> which can be executed using one the provided run scripts.</p>
+<h5></h5>
+<h2><a class="anchor" id="autotoc_md5"></a>
+Running</h2>
+<p>Please check the respective subfolders for detailed instructions depending on what you would like to do. </p>
 </div></div><!-- PageDoc -->
 </div><!-- contents -->
 <!-- start footer part -->

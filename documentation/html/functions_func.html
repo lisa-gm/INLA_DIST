@@ -13,6 +13,13 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  extensions: ["tex2jax.js"],
+  jax: ["input/TeX","output/HTML-CSS"],
+});
+</script>
+<script type="text/javascript" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
@@ -72,11 +79,17 @@ $(function() {
 <div class="contents">
 <div class="textblock">Here is a list of all documented functions with links to the class documentation for each member:</div>
 
+<h3><a id="index_b" name="index_b"></a>- b -</h3><ul>
+<li>BTA()&#160;:&#160;<a class="el" href="classBTA.html#a895c33cbe45bf38bea69c8cb1c2e2da5">BTA&lt; T &gt;</a></li>
+<li>BTAdiag()&#160;:&#160;<a class="el" href="classBTA.html#a06dfca25b5888d4f7f609e72ced256f3">BTA&lt; T &gt;</a></li>
+<li>BTAselInv()&#160;:&#160;<a class="el" href="classBTA.html#a26d3044b55d8a3c330d2dde7b598907f">BTA&lt; T &gt;</a></li>
+</ul>
+
+
 <h3><a id="index_c" name="index_c"></a>- c -</h3><ul>
 <li>check_pos_def()&#160;:&#160;<a class="el" href="classPostTheta.html#a240a43fde6a2e26c30275b24f99f5d4e">PostTheta</a></li>
-<li>compute_full_inverse()&#160;:&#160;<a class="el" href="classEigenCholSolver.html#a6cd7fb9657442e2d22df1607b4409e46">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#ad12c1343fa52088c9e2cd5a972b2942a">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#a9434e3273c1cf0bb01c3bb8dd02aa6b8">PardisoSolver</a></li>
+<li>compute_full_inverse()&#160;:&#160;<a class="el" href="classEigenCholSolver.html#a6cd7fb9657442e2d22df1607b4409e46">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#ad12c1343fa52088c9e2cd5a972b2942a">EigenSolver</a></li>
 <li>compute_inverse_pardiso()&#160;:&#160;<a class="el" href="classPardisoSolver.html#a0619e73e3ace9662c82854c0a15305a4">PardisoSolver</a></li>
-<li>compute_marginals_y()&#160;:&#160;<a class="el" href="classPostTheta.html#a3e35cd65f1a96171c9bb2eb51197e054">PostTheta</a></li>
 <li>computeG()&#160;:&#160;<a class="el" href="classPostTheta.html#a33a7918139c515f19f4663057ca3e5cc">PostTheta</a></li>
 <li>cond_LogPoisLik()&#160;:&#160;<a class="el" href="classPostTheta.html#af4ccd433b0980957378ce768d1edd1fa">PostTheta</a></li>
 <li>cond_LogPriorLat()&#160;:&#160;<a class="el" href="classPostTheta.html#acab609440015d89151088d88d22743a9">PostTheta</a></li>
@@ -86,16 +99,102 @@ $(function() {
 <li>cond_negLogPois()&#160;:&#160;<a class="el" href="classPostTheta.html#a4f55646f57619e97c20489ec846c984f">PostTheta</a></li>
 <li>cond_negLogPoisLik()&#160;:&#160;<a class="el" href="classPostTheta.html#aebfe9fe1b43f43755e663c10b539b4df">PostTheta</a></li>
 <li>construct_b()&#160;:&#160;<a class="el" href="classPostTheta.html#af69559f2f98cbdd4b844a9e0c571d64d">PostTheta</a></li>
-<li>construct_Q()&#160;:&#160;<a class="el" href="classPostTheta.html#acb642337f6f4db477be2318bb9796f2c">PostTheta</a></li>
+<li>construct_Q()&#160;:&#160;<a class="el" href="classPostTheta.html#a75d95efb35ba09080558cb9817deed67">PostTheta</a></li>
 <li>construct_Q_spat_temp()&#160;:&#160;<a class="el" href="classPostTheta.html#ac41faf4a6b8b2a30168f35805c2c7b3f">PostTheta</a></li>
 <li>construct_Q_spatial()&#160;:&#160;<a class="el" href="classPostTheta.html#a2ceec7e512bf71ca7267f01733ec8719">PostTheta</a></li>
-<li>construct_Qprior()&#160;:&#160;<a class="el" href="classPostTheta.html#aacf285fc1b81d2b4f694a3fa1d92c5b8">PostTheta</a></li>
-<li>convert_interpret2theta()&#160;:&#160;<a class="el" href="classPostTheta.html#ada9c36637820d3eaad19d4b3449c98ad">PostTheta</a></li>
 <li>convert_interpret2theta_spat()&#160;:&#160;<a class="el" href="classPostTheta.html#a1106be4ac083bf08aa93fd38e7a24764">PostTheta</a></li>
 <li>convert_interpret2theta_spatTemp()&#160;:&#160;<a class="el" href="classPostTheta.html#a9fecf779db9e24870fa0c21ac556399e">PostTheta</a></li>
-<li>convert_theta2interpret()&#160;:&#160;<a class="el" href="classPostTheta.html#adfdc66118e93525b7814f53c6b50e652">PostTheta</a></li>
 <li>convert_theta2interpret_spat()&#160;:&#160;<a class="el" href="classPostTheta.html#ae9138a56d91cdca73cc350d3d5011734">PostTheta</a></li>
 <li>convert_theta2interpret_spatTemp()&#160;:&#160;<a class="el" href="classPostTheta.html#aed82a7d83d895a856f6841b9ef701783">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_d" name="index_d"></a>- d -</h3><ul>
+<li>diagHess_cond_negLogPoisLik()&#160;:&#160;<a class="el" href="classPostTheta.html#ada8322161a4b456296baa49a3b02c159">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_e" name="index_e"></a>- e -</h3><ul>
+<li>EigenCholSolver()&#160;:&#160;<a class="el" href="classEigenCholSolver.html#ab900608acc8567fc1c8e5b5bef924596">EigenCholSolver</a></li>
+<li>EigenSolver()&#160;:&#160;<a class="el" href="classEigenSolver.html#a16dcb31c308a115afcce6e9f99a0d5ea">EigenSolver</a></li>
+<li>eval_denominator()&#160;:&#160;<a class="el" href="classPostTheta.html#a5af7519622a314b59a75f5b84f15ad9a">PostTheta</a></li>
+<li>eval_likelihood()&#160;:&#160;<a class="el" href="classPostTheta.html#ae938a9d6de15e0512300f8ce00d8ffea">PostTheta</a></li>
+<li>eval_log_gaussian_prior_hp()&#160;:&#160;<a class="el" href="classPostTheta.html#a97c18f0138b2cce7d71181bf57261bf5">PostTheta</a></li>
+<li>eval_log_pc_prior_hp()&#160;:&#160;<a class="el" href="classPostTheta.html#a66f7a4987eeb15a84b1af7c784c3b6ff">PostTheta</a></li>
+<li>eval_log_prior_lat()&#160;:&#160;<a class="el" href="classPostTheta.html#a39be6fb891850dcb5d3042fc20cf9e51">PostTheta</a></li>
+<li>eval_post_theta()&#160;:&#160;<a class="el" href="classPostTheta.html#a437a6716c8fe32396f0643f3dba43e5b">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_f" name="index_f"></a>- f -</h3><ul>
+<li>factorize()&#160;:&#160;<a class="el" href="classBTA.html#a02a0e465b64d694cc9692b398889fe73">BTA&lt; T &gt;</a>, <a class="el" href="classBTASolver.html#a7cdfbba8365fb5350c1fbddebd208959">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a03b84b7fcffaf40bdf1d471ef4d24895">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#af074c0a27255c6278aaae63f0e11fd65">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a></li>
+<li>factorize_noCopyHost()&#160;:&#160;<a class="el" href="classBTA.html#a4d360b7d9f7d520be79c24ff25ab103b">BTA&lt; T &gt;</a></li>
+<li>factorize_solve()&#160;:&#160;<a class="el" href="classBTASolver.html#ac11dd6655173adcdbfec4ef020f58583">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a336cc9710ecdc7d2d1aaf1b13b16b251">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6b484e77d43cfa1488292af9b4916228">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a></li>
+<li>factorizeSolve()&#160;:&#160;<a class="el" href="classBTA.html#a9a734016b920e254d5615b48c6ef810d">BTA&lt; T &gt;</a></li>
+<li>FD_diag_hessian()&#160;:&#160;<a class="el" href="classPostTheta.html#a94652237d86e5b575f65b7bdaf97b02e">PostTheta</a></li>
+<li>FD_gradient()&#160;:&#160;<a class="el" href="classPostTheta.html#a7787133900ea7bed116af5ea6cf46d91">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_g" name="index_g"></a>- g -</h3><ul>
+<li>get_Covariance()&#160;:&#160;<a class="el" href="classPostTheta.html#ab8824cb165bee60e50b66f0b753428ed">PostTheta</a></li>
+<li>get_fullFact_marginals_f()&#160;:&#160;<a class="el" href="classPostTheta.html#afe3237450eed420a2a2bb8217afaa428">PostTheta</a></li>
+<li>get_grad()&#160;:&#160;<a class="el" href="classPostTheta.html#a6b59d9c23fb21cf517f281ae48ac970d">PostTheta</a></li>
+<li>get_marginals_f()&#160;:&#160;<a class="el" href="classPostTheta.html#a59a304945cc0ac88a80717dfd2f6975a">PostTheta</a></li>
+<li>get_mu()&#160;:&#160;<a class="el" href="classPostTheta.html#a67817f8f6c3b54ccdeee1dafd20d124b">PostTheta</a></li>
+<li>grad_cond_negLogPoisLik()&#160;:&#160;<a class="el" href="classPostTheta.html#a9869ed1f62b2833100e38412658fdd64">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_h" name="index_h"></a>- h -</h3><ul>
+<li>hess_eval()&#160;:&#160;<a class="el" href="classPostTheta.html#a3507f9afff34433fbec653cc82e0bee0">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_l" name="index_l"></a>- l -</h3><ul>
+<li>link_f_sigmoid()&#160;:&#160;<a class="el" href="classPostTheta.html#a25b31d37c9d4ac9caffc332132b39e80">PostTheta</a></li>
+<li>logDet()&#160;:&#160;<a class="el" href="classBTA.html#a6d72d9b4cdf6fab7bcc0b07e9d9c5d4e">BTA&lt; T &gt;</a></li>
+</ul>
+
+
+<h3><a id="index_n" name="index_n"></a>- n -</h3><ul>
+<li>NewtonIter()&#160;:&#160;<a class="el" href="classPostTheta.html#add8b0bea25da71ca6071a3a3fc2fa1ea">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_o" name="index_o"></a>- o -</h3><ul>
+<li>operator()()&#160;:&#160;<a class="el" href="classPostTheta.html#a42c031e4b1773db975d3038ac01b0977">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_p" name="index_p"></a>- p -</h3><ul>
+<li>PardisoSolver()&#160;:&#160;<a class="el" href="classPardisoSolver.html#a80ba40bbc188f29b571fad9ac92b6a1d">PardisoSolver</a></li>
+<li>PostTheta()&#160;:&#160;<a class="el" href="classPostTheta.html#ad45441d61f13cadb72c8fd19ba7047c9">PostTheta</a></li>
+</ul>
+
+
+<h3><a id="index_r" name="index_r"></a>- r -</h3><ul>
+<li>residualNorm()&#160;:&#160;<a class="el" href="classBTA.html#a7ee6c6fba8e294aeff422d0cc8ff6f09">BTA&lt; T &gt;</a></li>
+<li>residualNormNormalized()&#160;:&#160;<a class="el" href="classBTA.html#a8132d195b76d14cd434d3075faafe000">BTA&lt; T &gt;</a></li>
+</ul>
+
+
+<h3><a id="index_s" name="index_s"></a>- s -</h3><ul>
+<li>selected_inversion()&#160;:&#160;<a class="el" href="classBTASolver.html#a95eeda9f8835d624f823610d62d250dc">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a4d08f670effe50f6b896efc70a0ca8e2">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#ab0c7bb69897e2fc498ba607074193842">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a></li>
+<li>solve()&#160;:&#160;<a class="el" href="classBTA.html#a382f537155040b9c7667af77c6b1d03a">BTA&lt; T &gt;</a></li>
+<li>solve_d()&#160;:&#160;<a class="el" href="classBTA.html#aab68e01915a562d18b83be5d4017cc37">BTA&lt; T &gt;</a></li>
+<li>solve_s()&#160;:&#160;<a class="el" href="classBTA.html#a4da3ac3d12ad0f3f1ce59c744063f651">BTA&lt; T &gt;</a></li>
+<li>symbolic_factorization()&#160;:&#160;<a class="el" href="classBTASolver.html#afb0700ff21350cf4c647c48f56b4ee50">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a3600a8e3b26e2cb77c28bbb38f4e39b3">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6d6c05aebcd6029024746b23de381670">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a></li>
+</ul>
+
+
+<h3><a id="index__7E" name="index__7E"></a>- ~ -</h3><ul>
+<li>~BTA()&#160;:&#160;<a class="el" href="classBTA.html#af6574583ea4010a9650acb84308a9b3d">BTA&lt; T &gt;</a></li>
+<li>~BTASolver()&#160;:&#160;<a class="el" href="classBTASolver.html#a35e806fab1c28afc3fada9af604f1132">BTASolver</a></li>
+<li>~EigenCholSolver()&#160;:&#160;<a class="el" href="classEigenCholSolver.html#ae467bff72d23a9041d9e87053324c1e0">EigenCholSolver</a></li>
+<li>~EigenSolver()&#160;:&#160;<a class="el" href="classEigenSolver.html#ab057ac6281e132eb435356663272e080">EigenSolver</a></li>
+<li>~PardisoSolver()&#160;:&#160;<a class="el" href="classPardisoSolver.html#a439990b46271ddd3b37c190a3b6561c8">PardisoSolver</a></li>
+<li>~PostTheta()&#160;:&#160;<a class="el" href="classPostTheta.html#a72d5640ff12bb9e2828559153c61f352">PostTheta</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

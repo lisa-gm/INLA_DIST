@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['list_0',['Todo List',['../todo.html',1,'']]]
+  ['dist_20_24_0',['$\text{INLA}_{\text{DIST}}$',['../index.html',1,'']]]
 ];

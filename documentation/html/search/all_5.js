@@ -1,9 +1,12 @@
 var searchData=
 [
-  ['a_0',['a',['../classPardisoSolver.html#ad4b141f4db88dad05154ccd3835bfd75',1,'PardisoSolver::a'],['../classRGFSolver.html#ad0c6b0af3b76fc4f1cb70e2b362440c9',1,'RGFSolver::a'],['../classEigenSolver.html#a2c42da6e6747216fccd4c8749e943037',1,'EigenSolver::a']]],
-  ['acknowledgements_1',['Acknowledgements',['../index.html#autotoc_md3',1,'']]],
-  ['arrowhead_20solver_2',['Block Tridiagonal Arrowhead Solver',['../index.html',1,'']]],
-  ['ax_3',['ax',['../classPostTheta.html#a87a3adb6b92056e8dacea22fa894300a',1,'PostTheta::Ax'],['../classPostTheta.html#a64a371018f008f587f38fa300abe20e5',1,'PostTheta::Ax']]],
-  ['axtax_4',['AxTAx',['../classPostTheta.html#a423fd45045112bcccaa7d7cc33028f20',1,'PostTheta']]],
-  ['axty_5',['AxTy',['../classPostTheta.html#a72ecb0734ae1e5128bf5f92221ef3b19',1,'PostTheta']]]
+  ['ddum_0',['ddum',['../classPardisoSolver.html#ad88f546b964dc078a007022abe248e41',1,'PardisoSolver']]],
+  ['diaghess_5fcond_5fneglogpoislik_1',['diagHess_cond_negLogPoisLik',['../classPostTheta.html#ada8322161a4b456296baa49a3b02c159',1,'PostTheta']]],
+  ['different_20directories_2',['Overview of the different directories',['../index.html#autotoc_md1',1,'']]],
+  ['dim_5fgrad_5floop_3',['dim_grad_loop',['../classPostTheta.html#a040086750ffc42de18082b4c8a82ac76',1,'PostTheta']]],
+  ['dim_5fth_4',['dim_th',['../classPostTheta.html#a7cd9b90c897f00da9792dbfda210ac2b',1,'PostTheta']]],
+  ['directories_5',['Overview of the different directories',['../index.html#autotoc_md1',1,'']]],
+  ['dist_20_24_6',['$\text{INLA}_{\text{DIST}}$',['../index.html',1,'']]],
+  ['dx_7',['Dx',['../classPostTheta.html#af80d7b7e847c30706a826a1c6d7c2fc1',1,'PostTheta']]],
+  ['dxy_8',['Dxy',['../classPostTheta.html#a5a765bc4a434d2c4926b7c035984dd66',1,'PostTheta']]]
 ];

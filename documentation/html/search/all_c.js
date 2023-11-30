@@ -1,5 +1,8 @@
 var searchData=
 [
-  ['hess_5feval_0',['hess_eval',['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a3507f9afff34433fbec653cc82e0bee0',1,'PostTheta::hess_eval(Vect theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)'],['../classPostTheta.html#a8ba126f6b1bc95b8815465debaedd650',1,'PostTheta::hess_eval(Vect &amp;theta, double eps)']]],
-  ['hyperparameters_1',['Hyperparameters',['../classHyperparameters.html',1,'']]]
+  ['likelihood_0',['likelihood',['../classPostTheta.html#ae3a7060408a27de614cc1cc8c8bdbd7c',1,'PostTheta']]],
+  ['link_5ff_5fsigmoid_1',['link_f_sigmoid',['../classPostTheta.html#a25b31d37c9d4ac9caffc332132b39e80',1,'PostTheta']]],
+  ['list_2',['Todo List',['../todo.html',1,'']]],
+  ['log_5fdet_3',['log_det',['../classSolver.html#a04c048df3296a372d0b9a2aca966dc17',1,'Solver']]],
+  ['logdet_4',['logDet',['../classBTA.html#a6d72d9b4cdf6fab7bcc0b07e9d9c5d4e',1,'BTA']]]
 ];

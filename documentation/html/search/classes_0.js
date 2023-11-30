@@ -1,5 +1,6 @@
 var searchData=
 [
-  ['eigencholsolver_0',['EigenCholSolver',['../classEigenCholSolver.html',1,'']]],
-  ['eigensolver_1',['EigenSolver',['../classEigenSolver.html',1,'']]]
+  ['bta_0',['BTA',['../classBTA.html',1,'']]],
+  ['bta_3c_20double_20_3e_1',['BTA&lt; double &gt;',['../classBTA.html',1,'']]],
+  ['btasolver_2',['BTASolver',['../classBTASolver.html',1,'']]]
 ];

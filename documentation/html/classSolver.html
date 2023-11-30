@@ -13,6 +13,13 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  extensions: ["tex2jax.js"],
+  jax: ["input/TeX","output/HTML-CSS"],
+});
+</script>
+<script type="text/javascript" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
@@ -81,23 +88,17 @@ $(function() {
 <p>abstract base solver class to enable to be able two switch between solvers (current options: PARDISO &amp; GPU) at run time.  
  <a href="#details">More...</a></p>
 
-<p><code>#include &lt;<a class="el" href="INLA__CPUonly_2Solver_8h_source.html">Solver.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="Solver_8h_source.html">Solver.h</a>&gt;</code></p>
 <div class="dynheader">
 Inheritance diagram for Solver:</div>
 <div class="dyncontent">
  <div class="center">
   <img src="classSolver.png" usemap="#Solver_map" alt=""/>
   <map id="Solver_map" name="Solver_map">
+<area href="classBTASolver.html" title="creates solver class using BTA-GPU for factorising, solving and selectively inverting linear system." alt="BTASolver" shape="rect" coords="0,56,107,80"/>
 <area href="classEigenCholSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="EigenCholSolver" shape="rect" coords="117,56,224,80"/>
-<area href="classEigenSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="EigenSolver" shape="rect" coords="117,112,224,136"/>
-<area href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="PardisoSolver" shape="rect" coords="117,168,224,192"/>
-<area href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="PardisoSolver" shape="rect" coords="117,224,224,248"/>
-<area href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="PardisoSolver" shape="rect" coords="117,280,224,304"/>
-<area href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="PardisoSolver" shape="rect" coords="117,336,224,360"/>
-<area href="classRGFSolver.html" title="creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system." alt="RGFSolver" shape="rect" coords="117,392,224,416"/>
-<area href="classRGFSolver.html" title="creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system." alt="RGFSolver" shape="rect" coords="117,448,224,472"/>
-<area href="classRGFSolver.html" title="creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system." alt="RGFSolver" shape="rect" coords="117,504,224,528"/>
-<area href="classRGFSolver.html" title="creates solver class using RGF-GPU for factorising, solving and selectively inverting linear system." alt="RGFSolver" shape="rect" coords="117,560,224,584"/>
+<area href="classEigenSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="EigenSolver" shape="rect" coords="234,56,341,80"/>
+<area href="classPardisoSolver.html" title="creates solver class using pardiso for factorising, solving and selectively inverting linear system." alt="PardisoSolver" shape="rect" coords="351,56,458,80"/>
   </map>
 </div></div>
 <table class="memberdecls">
@@ -120,48 +121,6 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize_sol
 <tr class="memitem:a9ba771f5ec6d498dc29065b382fb3642" id="r_a9ba771f5ec6d498dc29065b382fb3642"><td class="memItemLeft" align="right" valign="top"><a id="a9ba771f5ec6d498dc29065b382fb3642" name="a9ba771f5ec6d498dc29065b382fb3642"></a>
 virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>selected_inversion_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, const MatrixXd &amp;D, Vect &amp;inv_diag, MatrixXd &amp;V)=0</td></tr>
 <tr class="separator:a9ba771f5ec6d498dc29065b382fb3642"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa8c9adf9ad592b8fd06139fd121b38a6" id="r_aa8c9adf9ad592b8fd06139fd121b38a6"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa8c9adf9ad592b8fd06139fd121b38a6">symbolic_factorization</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, int &amp;<a class="el" href="#a803d2e274657300ed7df217a729003cb">init</a>)=0</td></tr>
-<tr class="separator:aa8c9adf9ad592b8fd06139fd121b38a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae70df2bb11c8268d9c075d913b80292c" id="r_ae70df2bb11c8268d9c075d913b80292c"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae70df2bb11c8268d9c075d913b80292c">factorize</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, double &amp;t_priorLatChol)=0</td></tr>
-<tr class="separator:ae70df2bb11c8268d9c075d913b80292c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0d60df6f8271babd4c32d1fbd5058d22" id="r_a0d60df6f8271babd4c32d1fbd5058d22"><td class="memItemLeft" align="right" valign="top"><a id="a0d60df6f8271babd4c32d1fbd5058d22" name="a0d60df6f8271babd4c32d1fbd5058d22"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, const MatrixXd &amp;D, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:a0d60df6f8271babd4c32d1fbd5058d22"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa8733952bd4deab69728cdc8b324181b" id="r_aa8733952bd4deab69728cdc8b324181b"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa8733952bd4deab69728cdc8b324181b">factorize_solve</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, Vect &amp;<a class="el" href="#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, Vect &amp;<a class="el" href="#af478cb2375c0804ecd8218774a683f8b">sol</a>, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, double &amp;t_condLatChol, double &amp;t_condLatSolve)=0</td></tr>
-<tr class="separator:aa8733952bd4deab69728cdc8b324181b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aff7783b69bdf12bb51fd95098166c34a" id="r_aff7783b69bdf12bb51fd95098166c34a"><td class="memItemLeft" align="right" valign="top"><a id="aff7783b69bdf12bb51fd95098166c34a" name="aff7783b69bdf12bb51fd95098166c34a"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize_solve_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, Vect &amp;<a class="el" href="#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, const MatrixXd &amp;Dxy, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, Vect &amp;<a class="el" href="#af478cb2375c0804ecd8218774a683f8b">sol</a>, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:aff7783b69bdf12bb51fd95098166c34a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a47e0664602a7b2cb2bb596d48b45836b" id="r_a47e0664602a7b2cb2bb596d48b45836b"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a47e0664602a7b2cb2bb596d48b45836b">selected_inversion</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, Vect &amp;inv_diag)=0</td></tr>
-<tr class="separator:a47e0664602a7b2cb2bb596d48b45836b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9ba771f5ec6d498dc29065b382fb3642" id="r_a9ba771f5ec6d498dc29065b382fb3642"><td class="memItemLeft" align="right" valign="top"><a id="a9ba771f5ec6d498dc29065b382fb3642" name="a9ba771f5ec6d498dc29065b382fb3642"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>selected_inversion_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, const MatrixXd &amp;D, Vect &amp;inv_diag, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:a9ba771f5ec6d498dc29065b382fb3642"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa8c9adf9ad592b8fd06139fd121b38a6" id="r_aa8c9adf9ad592b8fd06139fd121b38a6"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa8c9adf9ad592b8fd06139fd121b38a6">symbolic_factorization</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, int &amp;<a class="el" href="#a803d2e274657300ed7df217a729003cb">init</a>)=0</td></tr>
-<tr class="separator:aa8c9adf9ad592b8fd06139fd121b38a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae70df2bb11c8268d9c075d913b80292c" id="r_ae70df2bb11c8268d9c075d913b80292c"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ae70df2bb11c8268d9c075d913b80292c">factorize</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, double &amp;t_priorLatChol)=0</td></tr>
-<tr class="separator:ae70df2bb11c8268d9c075d913b80292c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0d60df6f8271babd4c32d1fbd5058d22" id="r_a0d60df6f8271babd4c32d1fbd5058d22"><td class="memItemLeft" align="right" valign="top"><a id="a0d60df6f8271babd4c32d1fbd5058d22" name="a0d60df6f8271babd4c32d1fbd5058d22"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, const MatrixXd &amp;D, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:a0d60df6f8271babd4c32d1fbd5058d22"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa8733952bd4deab69728cdc8b324181b" id="r_aa8733952bd4deab69728cdc8b324181b"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#aa8733952bd4deab69728cdc8b324181b">factorize_solve</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, Vect &amp;<a class="el" href="#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, Vect &amp;<a class="el" href="#af478cb2375c0804ecd8218774a683f8b">sol</a>, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, double &amp;t_condLatChol, double &amp;t_condLatSolve)=0</td></tr>
-<tr class="separator:aa8733952bd4deab69728cdc8b324181b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aff7783b69bdf12bb51fd95098166c34a" id="r_aff7783b69bdf12bb51fd95098166c34a"><td class="memItemLeft" align="right" valign="top"><a id="aff7783b69bdf12bb51fd95098166c34a" name="aff7783b69bdf12bb51fd95098166c34a"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>factorize_solve_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, Vect &amp;<a class="el" href="#ad2e11288194f48c67229ec05182c3cc8">rhs</a>, const MatrixXd &amp;Dxy, double &amp;<a class="el" href="#a04c048df3296a372d0b9a2aca966dc17">log_det</a>, Vect &amp;<a class="el" href="#af478cb2375c0804ecd8218774a683f8b">sol</a>, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:aff7783b69bdf12bb51fd95098166c34a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab18a8c30f03d4dc39ed74d3a487cb422" id="r_ab18a8c30f03d4dc39ed74d3a487cb422"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#ab18a8c30f03d4dc39ed74d3a487cb422">selected_inversion_diag</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, Vect &amp;inv_diag)=0</td></tr>
-<tr class="separator:ab18a8c30f03d4dc39ed74d3a487cb422"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8f60b7c92276ab53a34c7bcfde609381" id="r_a8f60b7c92276ab53a34c7bcfde609381"><td class="memItemLeft" align="right" valign="top"><a id="a8f60b7c92276ab53a34c7bcfde609381" name="a8f60b7c92276ab53a34c7bcfde609381"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>selected_inversion_diag_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, const MatrixXd &amp;D, Vect &amp;inv_diag, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:a8f60b7c92276ab53a34c7bcfde609381"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae8e7bb763518d588fab76d9828a3e784" id="r_ae8e7bb763518d588fab76d9828a3e784"><td class="memItemLeft" align="right" valign="top"><a id="ae8e7bb763518d588fab76d9828a3e784" name="ae8e7bb763518d588fab76d9828a3e784"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>selected_inversion_full</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, SpMat &amp;Qinv)=0</td></tr>
-<tr class="separator:ae8e7bb763518d588fab76d9828a3e784"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a48fb9f65cae36328e436ed73fdf254bf" id="r_a48fb9f65cae36328e436ed73fdf254bf"><td class="memItemLeft" align="right" valign="top"><a id="a48fb9f65cae36328e436ed73fdf254bf" name="a48fb9f65cae36328e436ed73fdf254bf"></a>
-virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>selected_inversion_full_w_constr</b> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, const MatrixXd &amp;D, SpMat &amp;Qinv, MatrixXd &amp;V)=0</td></tr>
-<tr class="separator:a48fb9f65cae36328e436ed73fdf254bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a794062ed08e90ae8b8c5944c6c1ab990" id="r_a794062ed08e90ae8b8c5944c6c1ab990"><td class="memItemLeft" align="right" valign="top">virtual void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="#a794062ed08e90ae8b8c5944c6c1ab990">compute_full_inverse</a> (SpMat &amp;<a class="el" href="#ac33505bee8c22005b0a56e51bfa4db8e">Q</a>, MatrixXd &amp;Qinv)=0</td></tr>
-<tr class="separator:a794062ed08e90ae8b8c5944c6c1ab990"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pro-attribs" name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
@@ -180,46 +139,8 @@ Protected Attributes</h2></td></tr>
 <div class="textblock"><p>abstract base solver class to enable to be able two switch between solvers (current options: PARDISO &amp; GPU) at run time. </p>
 <p>divided into set up, symbolic factorisation, numerical factorisation, numerical factorisation &amp; solve and selected inversion (of the diagonal elements) </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
-<a id="a794062ed08e90ae8b8c5944c6c1ab990" name="a794062ed08e90ae8b8c5944c6c1ab990"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a794062ed08e90ae8b8c5944c6c1ab990">&#9670;&#160;</a></span>compute_full_inverse()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::compute_full_inverse </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">MatrixXd &amp;&#160;</td>
-          <td class="paramname"><em>Qinv</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#a9434e3273c1cf0bb01c3bb8dd02aa6b8">PardisoSolver</a>.</p>
-
-</div>
-</div>
 <a id="ae70df2bb11c8268d9c075d913b80292c" name="ae70df2bb11c8268d9c075d913b80292c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae70df2bb11c8268d9c075d913b80292c">&#9670;&#160;</a></span>factorize() <span class="overload">[1/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#ae70df2bb11c8268d9c075d913b80292c">&#9670;&#160;</a></span>factorize()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -258,100 +179,12 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implemented in <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a03b84b7fcffaf40bdf1d471ef4d24895">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#af074c0a27255c6278aaae63f0e11fd65">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="ae70df2bb11c8268d9c075d913b80292c" name="ae70df2bb11c8268d9c075d913b80292c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae70df2bb11c8268d9c075d913b80292c">&#9670;&#160;</a></span>factorize() <span class="overload">[2/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::factorize </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_priorLatChol</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a03b84b7fcffaf40bdf1d471ef4d24895">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#af074c0a27255c6278aaae63f0e11fd65">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="ae70df2bb11c8268d9c075d913b80292c" name="ae70df2bb11c8268d9c075d913b80292c"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae70df2bb11c8268d9c075d913b80292c">&#9670;&#160;</a></span>factorize() <span class="overload">[3/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::factorize </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_priorLatChol</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a03b84b7fcffaf40bdf1d471ef4d24895">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#af074c0a27255c6278aaae63f0e11fd65">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a06ae5907c24ffa9987cff0fa66abca93">RGFSolver</a>.</p>
+<p>Implemented in <a class="el" href="classBTASolver.html#a7cdfbba8365fb5350c1fbddebd208959">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a03b84b7fcffaf40bdf1d471ef4d24895">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#af074c0a27255c6278aaae63f0e11fd65">EigenSolver</a>, and <a class="el" href="classPardisoSolver.html#ab02bffd0e3eaa886aaeb5a7d4cab11e9">PardisoSolver</a>.</p>
 
 </div>
 </div>
 <a id="aa8733952bd4deab69728cdc8b324181b" name="aa8733952bd4deab69728cdc8b324181b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8733952bd4deab69728cdc8b324181b">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[1/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#aa8733952bd4deab69728cdc8b324181b">&#9670;&#160;</a></span>factorize_solve()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -408,136 +241,12 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implemented in <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a336cc9710ecdc7d2d1aaf1b13b16b251">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6b484e77d43cfa1488292af9b4916228">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="aa8733952bd4deab69728cdc8b324181b" name="aa8733952bd4deab69728cdc8b324181b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8733952bd4deab69728cdc8b324181b">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[2/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::factorize_solve </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_condLatChol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_condLatSolve</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a336cc9710ecdc7d2d1aaf1b13b16b251">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6b484e77d43cfa1488292af9b4916228">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="aa8733952bd4deab69728cdc8b324181b" name="aa8733952bd4deab69728cdc8b324181b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8733952bd4deab69728cdc8b324181b">&#9670;&#160;</a></span>factorize_solve() <span class="overload">[3/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::factorize_solve </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>rhs</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>sol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>log_det</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_condLatChol</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double &amp;&#160;</td>
-          <td class="paramname"><em>t_condLatSolve</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a336cc9710ecdc7d2d1aaf1b13b16b251">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6b484e77d43cfa1488292af9b4916228">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a1056b62e92b0bb46120f66cf27d94853">RGFSolver</a>.</p>
+<p>Implemented in <a class="el" href="classBTASolver.html#ac11dd6655173adcdbfec4ef020f58583">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a336cc9710ecdc7d2d1aaf1b13b16b251">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6b484e77d43cfa1488292af9b4916228">EigenSolver</a>, and <a class="el" href="classPardisoSolver.html#ae157a134c6483640bf4af96e0360340d">PardisoSolver</a>.</p>
 
 </div>
 </div>
 <a id="a47e0664602a7b2cb2bb596d48b45836b" name="a47e0664602a7b2cb2bb596d48b45836b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a47e0664602a7b2cb2bb596d48b45836b">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[1/2]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#a47e0664602a7b2cb2bb596d48b45836b">&#9670;&#160;</a></span>selected_inversion()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -570,88 +279,12 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implemented in <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>, <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a766b3d4a600a31769dc75b4c205841d4">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a766b3d4a600a31769dc75b4c205841d4">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a4d08f670effe50f6b896efc70a0ca8e2">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#ab0c7bb69897e2fc498ba607074193842">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a766b3d4a600a31769dc75b4c205841d4">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="a47e0664602a7b2cb2bb596d48b45836b" name="a47e0664602a7b2cb2bb596d48b45836b"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a47e0664602a7b2cb2bb596d48b45836b">&#9670;&#160;</a></span>selected_inversion() <span class="overload">[2/2]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::selected_inversion </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>, <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a766b3d4a600a31769dc75b4c205841d4">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a766b3d4a600a31769dc75b4c205841d4">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a4d08f670effe50f6b896efc70a0ca8e2">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#ab0c7bb69897e2fc498ba607074193842">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a766b3d4a600a31769dc75b4c205841d4">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="ab18a8c30f03d4dc39ed74d3a487cb422" name="ab18a8c30f03d4dc39ed74d3a487cb422"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab18a8c30f03d4dc39ed74d3a487cb422">&#9670;&#160;</a></span>selected_inversion_diag()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::selected_inversion_diag </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">Vect &amp;&#160;</td>
-          <td class="paramname"><em>inv_diag</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#a24b2c96a0206651bb68aa15bae9aae82">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a54f3bf3d6a5f7d519b058860ed73cac7">RGFSolver</a>.</p>
+<p>Implemented in <a class="el" href="classBTASolver.html#a95eeda9f8835d624f823610d62d250dc">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a4d08f670effe50f6b896efc70a0ca8e2">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#ab0c7bb69897e2fc498ba607074193842">EigenSolver</a>, and <a class="el" href="classPardisoSolver.html#a68d808fdc1958192e498d058800cb3c2">PardisoSolver</a>.</p>
 
 </div>
 </div>
 <a id="aa8c9adf9ad592b8fd06139fd121b38a6" name="aa8c9adf9ad592b8fd06139fd121b38a6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8c9adf9ad592b8fd06139fd121b38a6">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[1/3]</span></h2>
+<h2 class="memtitle"><span class="permalink"><a href="#aa8c9adf9ad592b8fd06139fd121b38a6">&#9670;&#160;</a></span>symbolic_factorization()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -684,83 +317,7 @@ Protected Attributes</h2></td></tr>
 </table>
 </div><div class="memdoc">
 
-<p>Implemented in <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a3600a8e3b26e2cb77c28bbb38f4e39b3">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6d6c05aebcd6029024746b23de381670">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="aa8c9adf9ad592b8fd06139fd121b38a6" name="aa8c9adf9ad592b8fd06139fd121b38a6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8c9adf9ad592b8fd06139fd121b38a6">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[2/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::symbolic_factorization </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int &amp;&#160;</td>
-          <td class="paramname"><em>init</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a3600a8e3b26e2cb77c28bbb38f4e39b3">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6d6c05aebcd6029024746b23de381670">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>.</p>
-
-</div>
-</div>
-<a id="aa8c9adf9ad592b8fd06139fd121b38a6" name="aa8c9adf9ad592b8fd06139fd121b38a6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa8c9adf9ad592b8fd06139fd121b38a6">&#9670;&#160;</a></span>symbolic_factorization() <span class="overload">[3/3]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">virtual void Solver::symbolic_factorization </td>
-          <td>(</td>
-          <td class="paramtype">SpMat &amp;&#160;</td>
-          <td class="paramname"><em>Q</em>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">int &amp;&#160;</td>
-          <td class="paramname"><em>init</em>&#160;</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>)</td>
-          <td></td><td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-<p>Implemented in <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classEigenCholSolver.html#a3600a8e3b26e2cb77c28bbb38f4e39b3">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6d6c05aebcd6029024746b23de381670">EigenSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>, <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>, and <a class="el" href="classRGFSolver.html#a7f36b8dea388db752b462220251650b2">RGFSolver</a>.</p>
+<p>Implemented in <a class="el" href="classBTASolver.html#afb0700ff21350cf4c647c48f56b4ee50">BTASolver</a>, <a class="el" href="classEigenCholSolver.html#a3600a8e3b26e2cb77c28bbb38f4e39b3">EigenCholSolver</a>, <a class="el" href="classEigenSolver.html#a6d6c05aebcd6029024746b23de381670">EigenSolver</a>, and <a class="el" href="classPardisoSolver.html#afba99923045305210246792d7cbdeea3">PardisoSolver</a>.</p>
 
 </div>
 </div>
@@ -884,10 +441,8 @@ Protected Attributes</h2></td></tr>
 
 </div>
 </div>
-<hr/>The documentation for this class was generated from the following files:<ul>
-<li>INLA_CPUonly/<a class="el" href="INLA__CPUonly_2Solver_8h_source.html">Solver.h</a></li>
-<li>INLA_main/<a class="el" href="INLA__main_2Solver_8h_source.html">Solver.h</a></li>
-<li>INLA_predict/<a class="el" href="INLA__predict_2Solver_8h_source.html">Solver.h</a></li>
+<hr/>The documentation for this class was generated from the following file:<ul>
+<li>INLA_main/<a class="el" href="Solver_8h_source.html">Solver.h</a></li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

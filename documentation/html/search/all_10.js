@@ -1,17 +1,7 @@
 var searchData=
 [
-  ['m0_0',['M0',['../classPostTheta.html#a06391c3ed3d8368da520d465cc909bc0',1,'PostTheta']]],
-  ['m1_1',['M1',['../classPostTheta.html#af97e49a98f2a9f390abb52cdaf998577',1,'PostTheta']]],
-  ['m2_2',['M2',['../classPostTheta.html#a93e3e540d2f3d3cd343f9a66867ec03a',1,'PostTheta']]],
-  ['main_20_24_3',['4.) $\text{INLA}_{\text{MAIN}}$',['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/README.md#autotoc_md10',1,'']]],
-  ['maineigen_20c_4',['Running mainEigen.C',['../index.html#autotoc_md2',1,'']]],
-  ['manifold_5',['manifold',['../classPostTheta.html#a48f86e8f68bce72ec4f0aed80ebebce7',1,'PostTheta']]],
-  ['min_5ff_5ftheta_6',['min_f_theta',['../classPostTheta.html#a3c397bdfb45cb31699067c615b541f23',1,'PostTheta']]],
-  ['mpi_5fall_5fbfgs_7',['3.) MPI_all_BFGS',['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/README.md#autotoc_md11',1,'']]],
-  ['mpi_5frank_8',['mpi_rank',['../classEigenSolver.html#af1ad54fe101f81520d0e5ad92b972a13',1,'EigenSolver::MPI_rank'],['../classEigenCholSolver.html#a742bca5062c0d2ba74d9028abc21befa',1,'EigenCholSolver::MPI_rank'],['../classPostTheta.html#ab87a9d6318c690344f749edb51638119',1,'PostTheta::MPI_rank'],['../classPardisoSolver.html#a954b3aea843bb36012788ca946694d6f',1,'PardisoSolver::MPI_rank']]],
-  ['mpi_5fsize_9',['MPI_size',['../classPostTheta.html#a8050ac12b4eb6d0fe9b69a10f91d4aa2',1,'PostTheta']]],
-  ['mtype_10',['mtype',['../classPardisoSolver.html#abe72c585da2b3023cbb783cda70b80f0',1,'PardisoSolver']]],
-  ['mu_11',['mu',['../classPostTheta.html#aa6d3402de41235b5226e1e93be4a9dbe',1,'PostTheta']]],
-  ['mu_5fmatrix_12',['mu_matrix',['../classPostTheta.html#aca3178a77f1e6e41a315faeed05674d5',1,'PostTheta']]],
-  ['mu_5fmidpoint_13',['mu_midpoint',['../classPostTheta.html#abf7a2113f8f3a83332876a0869a9a1c9',1,'PostTheta']]]
+  ['pardisosolver_0',['pardisosolver',['../classPardisoSolver.html',1,'PardisoSolver'],['../classPardisoSolver.html#a80ba40bbc188f29b571fad9ac92b6a1d',1,'PardisoSolver::PardisoSolver()']]],
+  ['posttheta_1',['posttheta',['../classPostTheta.html',1,'PostTheta'],['../classPostTheta.html#ad45441d61f13cadb72c8fd19ba7047c9',1,'PostTheta::PostTheta(int ns, int nt, int nb, int no, MatrixXd B, Vect y, Vect theta_prior, Vect mu_initial, string likelihood, Vect extraCoeffVecLik, string solver_type, const bool constr, const MatrixXd Dxy, const bool validate, const Vect w)'],['../classPostTheta.html#a152ca7756a325c1a1b7d334332578a25',1,'PostTheta::PostTheta(int ns, int nt, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, Vect theta_prior, Vect mu_initial, string likelihood, Vect extraCoeffVecLik, string solver_type, int dim_spatial_domain, string manifold, const bool constr, const MatrixXd Dx, const MatrixXd Dxy, const bool validate, const Vect w)'],['../classPostTheta.html#ac476b37613676dee3959a63978501bc7',1,'PostTheta::PostTheta(int ns, int nt, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vect theta_prior, Vect mu_initial, string likelihood, Vect extraCoeffVecLik, string solver_type, int dim_spatial_domain, string manifold, const bool constr, const MatrixXd Dx, const MatrixXd Dxy, const bool validate, const Vect w)'],['../classPostTheta.html#aa09b11852e0230bb4c9b174cc03f5c44',1,'PostTheta::PostTheta(int ns, int nt, int nss, int nb, int no, SpMat Ax, Vect y, SpMat c0, SpMat g1, SpMat g2, SpMat g3, SpMat M0, SpMat M1, SpMat M2, Vect theta_prior_param, Vect mu_initial, string likelihood, Vect extraCoeffVecLik, string solver_type, int dim_spatial_domain, string manifold, const bool constr, const MatrixXd Dx, const MatrixXd Dxy, const bool validate, const Vect w)']]],
+  ['prior_2',['prior',['../classPostTheta.html#ae2ddd0a6d8bcecd2e3d2eb94ac7cb765',1,'PostTheta']]],
+  ['pt_3',['pt',['../classPardisoSolver.html#a42422b08f516acc17789e2301ea9df1d',1,'PardisoSolver']]]
 ];

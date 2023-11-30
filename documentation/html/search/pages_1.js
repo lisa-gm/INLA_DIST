@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['block_20tridiagonal_20arrowhead_20solver_0',['Block Tridiagonal Arrowhead Solver',['../index.html',1,'']]]
+  ['_5f_20text_20dist_20_24_0',['$\text{INLA}_{\text{DIST}}$',['../index.html',1,'']]]
 ];

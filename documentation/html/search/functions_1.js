@@ -1,4 +1,22 @@
 var searchData=
 [
-  ['diaghess_5fcond_5fneglogpoislik_0',['diagHess_cond_negLogPoisLik',['../classPostTheta.html#ada8322161a4b456296baa49a3b02c159',1,'PostTheta']]]
+  ['check_5fpos_5fdef_0',['check_pos_def',['../classPostTheta.html#a240a43fde6a2e26c30275b24f99f5d4e',1,'PostTheta']]],
+  ['compute_5ffull_5finverse_1',['compute_full_inverse',['../classEigenCholSolver.html#a6cd7fb9657442e2d22df1607b4409e46',1,'EigenCholSolver::compute_full_inverse()'],['../classEigenSolver.html#ad12c1343fa52088c9e2cd5a972b2942a',1,'EigenSolver::compute_full_inverse()']]],
+  ['compute_5finverse_5fpardiso_2',['compute_inverse_pardiso',['../classPardisoSolver.html#a0619e73e3ace9662c82854c0a15305a4',1,'PardisoSolver']]],
+  ['computeg_3',['computeG',['../classPostTheta.html#a33a7918139c515f19f4663057ca3e5cc',1,'PostTheta']]],
+  ['cond_5flogpoislik_4',['cond_LogPoisLik',['../classPostTheta.html#af4ccd433b0980957378ce768d1edd1fa',1,'PostTheta']]],
+  ['cond_5flogpriorlat_5',['cond_LogPriorLat',['../classPostTheta.html#acab609440015d89151088d88d22743a9',1,'PostTheta']]],
+  ['cond_5fneglogbinom_6',['cond_negLogBinom',['../classPostTheta.html#aae16e0d7a8f7be90183994aa20bead02',1,'PostTheta']]],
+  ['cond_5fneglogbinomlik_7',['cond_negLogBinomLik',['../classPostTheta.html#ae8164624f557686c53b8710370f8e284',1,'PostTheta']]],
+  ['cond_5fneglogdist_8',['cond_negLogDist',['../classPostTheta.html#ad7e1701ddb453651f4cfb4cb55090212',1,'PostTheta']]],
+  ['cond_5fneglogpois_9',['cond_negLogPois',['../classPostTheta.html#a4f55646f57619e97c20489ec846c984f',1,'PostTheta']]],
+  ['cond_5fneglogpoislik_10',['cond_negLogPoisLik',['../classPostTheta.html#aebfe9fe1b43f43755e663c10b539b4df',1,'PostTheta']]],
+  ['construct_5fb_11',['construct_b',['../classPostTheta.html#af69559f2f98cbdd4b844a9e0c571d64d',1,'PostTheta']]],
+  ['construct_5fq_12',['construct_Q',['../classPostTheta.html#a75d95efb35ba09080558cb9817deed67',1,'PostTheta']]],
+  ['construct_5fq_5fspat_5ftemp_13',['construct_Q_spat_temp',['../classPostTheta.html#ac41faf4a6b8b2a30168f35805c2c7b3f',1,'PostTheta']]],
+  ['construct_5fq_5fspatial_14',['construct_Q_spatial',['../classPostTheta.html#a2ceec7e512bf71ca7267f01733ec8719',1,'PostTheta']]],
+  ['convert_5finterpret2theta_5fspat_15',['convert_interpret2theta_spat',['../classPostTheta.html#a1106be4ac083bf08aa93fd38e7a24764',1,'PostTheta']]],
+  ['convert_5finterpret2theta_5fspattemp_16',['convert_interpret2theta_spatTemp',['../classPostTheta.html#a9fecf779db9e24870fa0c21ac556399e',1,'PostTheta']]],
+  ['convert_5ftheta2interpret_5fspat_17',['convert_theta2interpret_spat',['../classPostTheta.html#ae9138a56d91cdca73cc350d3d5011734',1,'PostTheta']]],
+  ['convert_5ftheta2interpret_5fspattemp_18',['convert_theta2interpret_spatTemp',['../classPostTheta.html#aed82a7d83d895a856f6841b9ef701783',1,'PostTheta']]]
 ];

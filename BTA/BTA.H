@@ -21,44 +21,175 @@
 
 #include "nvToolsExt.h"
 
-
 //#define PRINT_MSG
 
+ /**
+ * @class BTA
+ * @brief Template class for Block Triangular Arrowhead Solver.
+ * @tparam T Data type of the matrix elements. Choices are double, single (and some remainders of complex)
+ */
 template <class T>
 class BTA{
-	
+
 public:
-
-    BTA(size_t,size_t,size_t, int);
-
+   /**
+    * @brief Constructor for BTA Solver.
+    * @param ns number of spatial nodes.
+    * @param nt number of timesteps.
+    * @param nd number of fixed effects.
+    * @param GPU_rank_ GPU rank.
+    */
+    BTA(size_t ns, size_t nt, size_t nd, int GPU_rank_);
+    /**
+     * @brief Destructor for BTA class.
+     */
     ~BTA();
+
+   /**
+    * @brief Perform factorization of sparse matrix in CSC format.
+    * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+    * @param[in] ja Array of type size_t storing the column indices of the matrix.
+    * @param[in] a Array of type T storing the values of the matrix.
+    * @param[inout] t_firstStageFactor time first state Factor.
+    * @return number of GFLOP/S.
+    */
     double factorize(size_t* ia, size_t* ja, T* a, double& t_firstStageFactor);
+    
+   /**
+    * @brief Perform factorization on the given matrix without copying factor back to host.
+    * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+    * @param[in] ja Array of type size_t storing the column indices of the matrix.
+    * @param[in] a Array of type T storing the values of the matrix.
+    * @param[inout] logDet Log determinant of the matrix.
+    * @return number of GFLOP/S.
+    */
     double factorize_noCopyHost(size_t* ia, size_t* ja, T* a, T &logDet);
+   
+   /**
+    * @brief Perform factorization and solve the linear system for multiple right-hand sides. 
+    * forward substitution of solve already happens on GPU, while the factorization is being computed.
+    * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+    * @param[in] ja Array of type size_t storing the column indices of the matrix.
+    * @param[in] a Array of type T storing the values of the matrix.
+    * @param[inout] x Array of type T storing the solutions.
+    * @param[in] rhs Array of type T storing the right-hand sides.
+    * @param[in] nrhs Number of right-hand sides.
+    * @param[inout] t_firstSecondStage Time taken for factorization & forward solve
+    * @param[inout] t_SecondStageBackPass Time taken for the backward pass.
+    * @return number of GFLOP/S.
+    */
     double factorizeSolve(size_t* ia, size_t* ja, T* a, T* x, T* rhs,size_t nrhs, double& t_firstSecondStage, double& t_SecondStageBackPass);
-    double solve(size_t*, size_t*, T*, T*,size_t, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass);
+    
+   /**
+     * @brief Solve the linear system when cholesky factor is already computed.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix.
+     * @param[in] rhs rhs, gets overwritten by solution.
+     * @param[in] nrhs number of of right-hand sides.
+     * @param[inout] t_secondStageForwardPass Time taken for the forward pass.
+     * @param[inout] t_secondStageBackwardPass Time taken for the backward pass.
+     * @return number of GFLOP/S.
+     */
+    double solve(size_t* ia, size_t* ja, T* a, T* rhs, size_t nrhs, double& t_secondStageForwardPass,  double& t_secondStageBackwardPass);
+    
+   /**
+     * @brief Solve the linear system for a single right-hand side.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix.
+     * @param[inout] x Array of type T storing the solution.
+     * @param[in] rhs Array of type T storing the right-hand side.
+     * @param[inout] t_secondStageForwardPass Time taken for the forward pass.
+     * @param[inout] t_secondStageBackwardPass Time taken for the backward pass.
+     * @return number of GFLOP/S.
+     */    
     double solve(size_t*, size_t*, T*, T*,T*,size_t, double& t_secondStageForwardPass, double& t_secondStageBackwardPass);
-    // single precision solve but assuming double precision input
-    double solve_s(size_t*, size_t*, double*, double*,double*,size_t);
-    // double precision solve but assuming single precision input
+   
+   /**
+     * @brief single precision solve but assuming double precision input.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix (double precision).
+     * @param[inout] x Array of type T storing the solution.
+     * @param[in] rhs Array of type T storing the right-hand side (single precision).
+     * @param[in] nrhs Number of right-hand sides.
+     * @return number of GFLOP/S.
+     */
+    double solve_s(size_t* ia, size_t* ja, double* a, double* x, double* rhs, size_t nrhs);
+
+   /**
+     * @brief double precision solve but assuming single precision input.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix (single precision).
+     * @param[inout] x Array of type T storing the solution.
+     * @param[in] rhs Array of type T storing the right-hand side (double precision).
+     * @param[in] nrhs Number of right-hand sides.
+     * @return number of GFLOP/S.
+     */
     double solve_d(size_t*, size_t*, float*, float*,float*,size_t); 
-    double BTAdiag(size_t*, size_t*, T*, T*);
+
+   /**
+     * @brief compute selected inverse. return only the diagonal of the inverse.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix.
+     * @param[inout] diag Array of type T diagonal of the inverse.
+     * @return number of GFLOP/S.
+     */
+    double BTAdiag(size_t* ia, size_t* ja, T* a, T* diag);
+
+
     double BTAinvBlks(size_t*, size_t*, T*, T*);
+
+   /**
+     * @brief compute selected inverse. return all elements of the inverse that were 
+     * nonzero in Q and are within the diagonal block.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix.
+     * @param[inout] invQ Array of type T diagonal of the inverse.
+     * @return number of GFLOP/S.
+     */ 
     double BTAselInv(size_t *ia, size_t *ja, T *a, T *invQ);
-    T logDet(size_t*, size_t*, T*);
-    double residualNorm(T*,T*);
-    double residualNormNormalized(T*,T*);
+
+   /**
+     * @brief compute log determinant.
+     * @param[in] ia Array of type size_t storing the row pointers of the matrix.
+     * @param[in] ja Array of type size_t storing the column indices of the matrix.
+     * @param[in] a Array of type T storing the values of the matrix.
+     * @return log determinant.
+     */
+    T logDet(size_t* ia, size_t* ja, T* a);
+
+   /**
+     * @brief compute residual norm as || r || =  || b - A*x ||.
+     * @param[in] x Array of type T storing the row pointers of the matrix.
+     * @param[in] b Array of type T storing the column indices of the matrix.
+     * @return || r || =  || b - A*x ||.
+     */
+    double residualNorm(T* x,T* b);
+
+   /**
+     * @brief compute residual norm as || rel r || =  || b - A*x || / || b ||.
+     * @param[in] x Array of type T storing the row pointers of the matrix.
+     * @param[in] b Array of type T storing the column indices of the matrix.
+     * @return || rel r|| =  || b - A*x || / || b || .
+     */
+    double residualNormNormalized(T* x,T* b);
     double flop_count_factorise();
 				
 private:
 
-    size_t *matrix_ia;
-    size_t *matrix_ja;
-    T      *matrix_a;
-    size_t matrix_size;
-    size_t matrix_n_nonzeros;
-    size_t matrix_ns;
-    size_t matrix_nt;
-    size_t matrix_nd;
+    size_t *matrix_ia;            /**<  array of type size_t storing the row pointers of the sparse input matrix. */
+    size_t *matrix_ja;            /**<  array of type size_t storing the column indices of the sparse input matrix. */
+    T      *matrix_a;             /**<  array of type T storing the values of the sparse input matrix.*/         
+    size_t matrix_size;           /**<  dimension of the matrix.*/ 
+    size_t matrix_n_nonzeros;     /**<  number of nonzeros in the block formatted matrix. NOT sparse input.*/ 
+    size_t matrix_ns;             /**<  size of diagonal blocks, i.e. number of spatial nodes. */ 
+    size_t matrix_nt;             /**<  number of large diagonal blocks, i.e. number of time steps. */ 
+    size_t matrix_nd;             /**<  number of dense rows in the arrowhead. */ 
     size_t *Bmin;
     size_t *Bmax;
     size_t NBlock;
@@ -69,7 +200,7 @@ private:
     size_t ind_invBlks_fi;
     size_t mem_alloc_dev = 0;   // keep track of allocated memory on GPU
 
-    int GPU_rank;
+    int GPU_rank;                /**<  GPU rank of the current MPI process. */ 
 
     //size_t b_size;
     bool MF_allocated = false;

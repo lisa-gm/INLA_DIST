@@ -1,4 +1,5 @@
 var searchData=
 [
-  ['rgfsolver_0',['RGFSolver',['../classRGFSolver.html',1,'']]]
+  ['pardisosolver_0',['PardisoSolver',['../classPardisoSolver.html',1,'']]],
+  ['posttheta_1',['PostTheta',['../classPostTheta.html',1,'']]]
 ];

@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['3_20mpi_5fall_5fbfgs_0',['3.) MPI_all_BFGS',['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/README.md#autotoc_md11',1,'']]]
+  ['_5f_20text_20dist_20_24_0',['$\text{INLA}_{\text{DIST}}$',['../index.html',1,'']]]
 ];
