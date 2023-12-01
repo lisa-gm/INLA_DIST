@@ -1,4 +1,4 @@
-## $\text{INLA}_{\text{MAIN}}$ 
+## INLA<sub>main</sub>
 
 ### Compiling 
 
@@ -22,11 +22,11 @@ in this folder.
 
 There are different run scripts for different machines available which you can adapt. Different input matrices are expected in the ```../data``` folder. A small test example can be found there already. It was generated using ```generate_synth_dataset.R``` from the Rscripts folder.
 
-The code itself is documented using $\mathtt{doxygen}$. 
-- $\mathtt{PostTheta}$       : contains the main parts of the INLA methodology.
-- $\mathtt{BTASolver}$       : contains the interface to the BTA solver.
-- $\mathtt{PardisoSolver}$   : contains the interface to PARDISO.
-- $\mathtt{EigenSolver}$     : contains the interface to Eigen's internal solver (only suitable for very small test cases).
+The code itself is documented using doxygen. 
+- PostTheta       : contains the main parts of the INLA methodology.
+- BTASolver       : contains the interface to the BTA solver.
+- PardisoSolver   : contains the interface to PARDISO.
+- EigenSolver     : contains the interface to Eigen's internal solver (only suitable for very small test cases).
 
 During runtime you can choose between BTA solver (check for installation details), PARDISO & Eigen's internal solver. For examples see one of the different runscripts. 
 
