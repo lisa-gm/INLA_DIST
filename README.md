@@ -1,17 +1,17 @@
-#  $\text{INLA}_{\text{DIST}}$
+#  INLA<sub>DIST</sub>
 
-Repository to host $\text{INLA}_{\text{DIST}}$. This code base provides a highly scalable approach to Bayesian spatial-temporal modeling. It relies on the methodology of integrated nested Laplace approximations, in combination with the stochastic partial differential equations approach to provide an efficient framework for performing inference, leveraging sparse representations of the underlying processes. Building upon the INLA-SPDE approach, the main focus of the current implementation is on non-separable spatial-temporal model, derived from a partial differential equation equation. This family of physically inspired models captures the spatial-temporal behavior of the underlying physical process. We tackle the challenge of higher model complexity by developing a solution method which exploits the underlying model sparsity, utilizes parallelism and leverages the strengths of modern compute architectures. Details can be found in [Integrated Nested Laplace Approximations for Large-Scale Spatial-Temporal Bayesian Modeling](https://arxiv.org/abs/2303.15254).
+Repository to host INLA<sub>DIST</sub>. This code base provides a highly scalable approach to Bayesian spatial-temporal modeling. It relies on the methodology of integrated nested Laplace approximations, in combination with the stochastic partial differential equations approach to provide an efficient framework for performing inference, leveraging sparse representations of the underlying processes. Building upon the INLA-SPDE approach, the main focus of the current implementation is on non-separable spatial-temporal model, derived from a partial differential equation equation. This family of physically inspired models captures the spatial-temporal behavior of the underlying physical process. We tackle the challenge of higher model complexity by developing a solution method which exploits the underlying model sparsity, utilizes parallelism and leverages the strengths of modern compute architectures. Details can be found in [Integrated Nested Laplace Approximations for Large-Scale Spatial-Temporal Bayesian Modeling](https://arxiv.org/abs/2303.15254).
 
 ## Overview of the different directories
 
 main directories which contains the majority of the source code of our method and in particular everything related to the INLA methodology:
-  - $\text{INLA}_{\text{MAIN}}$    : most general version, linear solver can be chosen at runtime.
-  - $\text{INLA}_{\text{CPUonly}}$ : CPU only version using PARDISO solver.
-  - $\text{INLA}_{\text{predict}}$ : new version under development with additional prediction features and accuracy measures.
+  - [INLA<sub>main</sub>](INLA_main)    : most general version, linear solver can be chosen at runtime.
+  - [INLA<sub>CPUonly</sub>](INLA_CPUonly)  : CPU only version using PARDISO solver.
+  - [INLA<sub>predict</sub>](INLA_predict) : new version under development with additional prediction features and accuracy measures.
 
 other directories:
-  - $\text{BTA}$ : contains all code related to the block tridiagonal arrowhead solver.
-  - Rscripts     : scripts for data preprocessing & generation of synthetic datasets. contains code to export to c-readable files.
+  - [BTA](BTA)   : contains all code related to the block tridiagonal arrowhead solver.
+  - [Rscripts](Rscripts)     : scripts for data preprocessing & generation of synthetic datasets. contains code to export to c-readable files.
   - Test Scripts : small test scripts to develop and test features in the code. for development purposes.
 
 Detailed documentation of the code can be found [here](https://lisa-gm.github.io/INLA_DIST/documentation/html/index.html).
