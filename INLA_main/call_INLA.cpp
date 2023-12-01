@@ -1112,24 +1112,24 @@ int main(int argc, char* argv[])
 
     if(MPI_rank == 0){
         // TO BE deleted later
-        std::cout << "theta prior param  : " << theta_prior_param.transpose() << std::endl;
+        std::cout << "theta prior param       : " << theta_prior_param.transpose() << std::endl;
         //std::cout << "theta orig. param  : " << theta_original_param.transpose() << std::endl;
-        std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
+        //std::cout << "theta original     : " << std::right << std::fixed << theta_original.transpose() << std::endl;
         //std::cout << "theta prior param  : " << theta_prior_test.flatten_modelS().transpose() << std::endl;
     }
 
     // convert from interpretable parametrisation to internal one
     fun->convert_interpret2theta(theta_param, theta);
     if(MPI_rank == 0){
-        std::cout << "theta interpret. param.         : "  << std::right << std::fixed << theta_param.transpose() << std::endl;
+        std::cout << "theta interpret. param. : "  << std::right << std::fixed << theta_param.transpose() << std::endl;
 	    std::cout << "initial theta                   : "  << std::right << std::fixed << theta.transpose() << std::endl;       
     }
 
     fun->convert_interpret2theta(theta_original_param, theta_original);
-    if(MPI_rank == 0){
+    /*if(MPI_rank == 0){
         std::cout << "theta original param.         : "  << std::right << std::fixed << theta_original_param.transpose() << std::endl;
 	    std::cout << "original theta                   : "  << std::right << std::fixed << theta_original.transpose() << std::endl;       
-    }
+    }*/
 
 #ifdef WRITE_RESULTS
     string results_folder = base_path + "/results_param_fixed_inverse";

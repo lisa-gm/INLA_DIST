@@ -5,13 +5,13 @@ Repository to host INLA<sub>DIST</sub>. This code base provides a highly scalabl
 ## Overview of the different directories
 
 main directories which contains the majority of the source code of our method and in particular everything related to the INLA methodology:
-  - [INLA<sub>main</sub>](INLA_main)    : most general version, linear solver can be chosen at runtime.
-  - [INLA<sub>CPUonly</sub>](INLA_CPUonly)  : CPU only version using PARDISO solver.
-  - [INLA<sub>predict</sub>](INLA_predict) : new version under development with additional prediction features and accuracy measures.
+  - INLA<sub>main</sub>    : most general version, linear solver can be chosen at runtime.
+  - INLA<sub>CPUonly</sub>  : CPU only version using PARDISO solver.
+  - INLA<sub>predict</sub> : new version under development with additional prediction features and accuracy measures.
 
 other directories:
-  - [BTA](BTA)   : contains all code related to the block tridiagonal arrowhead solver.
-  - [Rscripts](Rscripts)     : scripts for data preprocessing & generation of synthetic datasets. contains code to export to c-readable files.
+  - BTA   : contains all code related to the block tridiagonal arrowhead solver.
+  - Rscripts     : scripts for data preprocessing & generation of synthetic datasets. contains code to export to c-readable files.
   - Test Scripts : small test scripts to develop and test features in the code. for development purposes.
 
 Detailed documentation of the code can be found [here](https://lisa-gm.github.io/INLA_DIST/documentation/html/index.html).

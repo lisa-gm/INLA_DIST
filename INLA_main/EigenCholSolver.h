@@ -52,7 +52,8 @@ private:
 #ifdef CHOLMOD
     CholmodSupernodalLLT<SpMat> solverEigenQ;
 #else
-    SimplicialLLT<SpMat> solverEigenQ;
+    //SimplicialLLT<SpMat> solverEigenQ;
+    SimplicialLDLT<SpMat> solverEigenQ;
 #endif
 
 

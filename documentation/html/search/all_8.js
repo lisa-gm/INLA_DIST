@@ -1,14 +1,10 @@
 var searchData=
 [
-  ['g_0',['G',['../classPostTheta.html#af9fbf9c2513c00af4252fd56ac955d58',1,'PostTheta']]],
-  ['g1_1',['g1',['../classPostTheta.html#ade2defef59b9295d794620fefb7c8b05',1,'PostTheta']]],
-  ['g2_2',['g2',['../classPostTheta.html#ae1be0d6e322a26924b67b6258cf55b08',1,'PostTheta']]],
-  ['g3_3',['g3',['../classPostTheta.html#ac59ad0f384dc3d3f73c6f340aaac2996',1,'PostTheta']]],
-  ['get_5fcovariance_4',['get_Covariance',['../classPostTheta.html#ab8824cb165bee60e50b66f0b753428ed',1,'PostTheta']]],
-  ['get_5ffullfact_5fmarginals_5ff_5',['get_fullFact_marginals_f',['../classPostTheta.html#afe3237450eed420a2a2bb8217afaa428',1,'PostTheta']]],
-  ['get_5fgrad_6',['get_grad',['../classPostTheta.html#a6b59d9c23fb21cf517f281ae48ac970d',1,'PostTheta']]],
-  ['get_5fmarginals_5ff_7',['get_marginals_f',['../classPostTheta.html#a59a304945cc0ac88a80717dfd2f6975a',1,'PostTheta']]],
-  ['get_5fmu_8',['get_mu',['../classPostTheta.html#a67817f8f6c3b54ccdeee1dafd20d124b',1,'PostTheta']]],
-  ['gpu_5frank_9',['GPU_rank',['../classBTA.html#abbad33336554dad7e177a4efce3d9d05',1,'BTA']]],
-  ['grad_5fcond_5fneglogpoislik_10',['grad_cond_negLogPoisLik',['../classPostTheta.html#a9869ed1f62b2833100e38412658fdd64',1,'PostTheta']]]
+  ['ia_0',['ia',['../classBTASolver.html#a12ad91cb469cc1599a5b93b4e8013867',1,'BTASolver::ia'],['../classEigenSolver.html#acfb59f30a46acc3eaa1ea9772d804f95',1,'EigenSolver::ia'],['../classPardisoSolver.html#a472aae27d4fded5deef53bbabab84922',1,'PardisoSolver::ia']]],
+  ['idum_1',['idum',['../classPardisoSolver.html#a6eae8a42e4b7201f5d9f6a1f8d71fb54',1,'PardisoSolver']]],
+  ['init_2',['init',['../classPardisoSolver.html#a20a8e89d94d661aaa894f3d699313a4a',1,'PardisoSolver::init'],['../classSolver.html#a803d2e274657300ed7df217a729003cb',1,'Solver::init']]],
+  ['inla_20spde_20optimization_20routine_3',['INLA-SPDE optimization routine',['../index.html#autotoc_md3',1,'']]],
+  ['inla_20sub_20dist_20sub_4',['INLA&lt;sub&gt;DIST&lt;/sub&gt;',['../index.html',1,'']]],
+  ['installation_5',['installation',['../index.html#autotoc_md2',1,'Installation'],['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/BTA/README.md#autotoc_md7',1,'Installation']]],
+  ['iter_5fcount_6',['iter_count',['../classPostTheta.html#a6f35b1d4e2eb881fd0b8513571874bc0',1,'PostTheta']]]
 ];

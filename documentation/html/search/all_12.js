@@ -1,9 +1,8 @@
 var searchData=
 [
-  ['residualnorm_0',['residualNorm',['../classBTA.html#a7ee6c6fba8e294aeff422d0cc8ff6f09',1,'BTA']]],
-  ['residualnormnormalized_1',['residualNormNormalized',['../classBTA.html#a8132d195b76d14cd434d3075faafe000',1,'BTA']]],
-  ['rhs_2',['rhs',['../classSolver.html#ad2e11288194f48c67229ec05182c3cc8',1,'Solver']]],
-  ['routine_3',['INLA-SPDE optimization routine',['../index.html#autotoc_md3',1,'']]],
-  ['running_4',['running',['../index.html#autotoc_md5',1,'Running'],['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/INLA_main/README.md#autotoc_md12',1,'Running']]],
-  ['running_20maineigen_20c_5',['Running mainEigen.C',['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/BTA/README.md#autotoc_md8',1,'']]]
+  ['t_5fgrad_0',['t_grad',['../classPostTheta.html#aa24f5936cd2425d668e97832018ab172',1,'PostTheta']]],
+  ['the_20different_20directories_1',['Overview of the different directories',['../index.html#autotoc_md1',1,'']]],
+  ['theta_5fprior_5fparam_2',['theta_prior_param',['../classPostTheta.html#a4c8a5c414b883fbc1b9566d38fa27f2d',1,'PostTheta']]],
+  ['threads_5flevel1_3',['threads_level1',['../classPostTheta.html#a4ef6bc3ffd3a8170f5540673a842e772',1,'PostTheta']]],
+  ['todo_20list_4',['Todo List',['../todo.html',1,'']]]
 ];

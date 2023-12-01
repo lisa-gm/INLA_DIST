@@ -1,12 +1,14 @@
 var searchData=
 [
-  ['eigencholsolver_0',['eigencholsolver',['../classEigenCholSolver.html',1,'EigenCholSolver'],['../classEigenCholSolver.html#ab900608acc8567fc1c8e5b5bef924596',1,'EigenCholSolver::EigenCholSolver()']]],
-  ['eigensolver_1',['eigensolver',['../classEigenSolver.html',1,'EigenSolver'],['../classEigenSolver.html#a16dcb31c308a115afcce6e9f99a0d5ea',1,'EigenSolver::EigenSolver()']]],
-  ['eval_5fdenominator_2',['eval_denominator',['../classPostTheta.html#a5af7519622a314b59a75f5b84f15ad9a',1,'PostTheta']]],
-  ['eval_5flikelihood_3',['eval_likelihood',['../classPostTheta.html#ae938a9d6de15e0512300f8ce00d8ffea',1,'PostTheta']]],
-  ['eval_5flog_5fgaussian_5fprior_5fhp_4',['eval_log_gaussian_prior_hp',['../classPostTheta.html#a97c18f0138b2cce7d71181bf57261bf5',1,'PostTheta']]],
-  ['eval_5flog_5fpc_5fprior_5fhp_5',['eval_log_pc_prior_hp',['../classPostTheta.html#a66f7a4987eeb15a84b1af7c784c3b6ff',1,'PostTheta']]],
-  ['eval_5flog_5fprior_5flat_6',['eval_log_prior_lat',['../classPostTheta.html#a39be6fb891850dcb5d3042fc20cf9e51',1,'PostTheta']]],
-  ['eval_5fpost_5ftheta_7',['eval_post_theta',['../classPostTheta.html#a437a6716c8fe32396f0643f3dba43e5b',1,'PostTheta']]],
-  ['example_8',['Simple Example',['..//home/hpc/ihpc/ihpc060h/test_b_INLA/INLA_DIST/INLA_main/README.md#autotoc_md13',1,'']]]
+  ['g_0',['G',['../classPostTheta.html#af9fbf9c2513c00af4252fd56ac955d58',1,'PostTheta']]],
+  ['g1_1',['g1',['../classPostTheta.html#ade2defef59b9295d794620fefb7c8b05',1,'PostTheta']]],
+  ['g2_2',['g2',['../classPostTheta.html#ae1be0d6e322a26924b67b6258cf55b08',1,'PostTheta']]],
+  ['g3_3',['g3',['../classPostTheta.html#ac59ad0f384dc3d3f73c6f340aaac2996',1,'PostTheta']]],
+  ['get_5fcovariance_4',['get_Covariance',['../classPostTheta.html#ab8824cb165bee60e50b66f0b753428ed',1,'PostTheta']]],
+  ['get_5ffullfact_5fmarginals_5ff_5',['get_fullFact_marginals_f',['../classPostTheta.html#afe3237450eed420a2a2bb8217afaa428',1,'PostTheta']]],
+  ['get_5fgrad_6',['get_grad',['../classPostTheta.html#a6b59d9c23fb21cf517f281ae48ac970d',1,'PostTheta']]],
+  ['get_5fmarginals_5ff_7',['get_marginals_f',['../classPostTheta.html#a59a304945cc0ac88a80717dfd2f6975a',1,'PostTheta']]],
+  ['get_5fmu_8',['get_mu',['../classPostTheta.html#a67817f8f6c3b54ccdeee1dafd20d124b',1,'PostTheta']]],
+  ['gpu_5frank_9',['GPU_rank',['../classBTA.html#abbad33336554dad7e177a4efce3d9d05',1,'BTA']]],
+  ['grad_5fcond_5fneglogpoislik_10',['grad_cond_negLogPoisLik',['../classPostTheta.html#a9869ed1f62b2833100e38412658fdd64',1,'PostTheta']]]
 ];

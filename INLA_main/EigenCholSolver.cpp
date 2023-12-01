@@ -14,7 +14,8 @@ EigenCholSolver::EigenCholSolver(int& MPI_rank_) : MPI_rank(MPI_rank_){
     if(MPI_rank == 0){
         printf("Eigen Solver. NO CHOLMOD.\n");
     }
-    SimplicialLLT<SpMat> solverEigenQ;
+    //SimplicialLLT<SpMat> solverEigenQ;
+    SimplicialLDLT<SpMat> solverEigenQ;
 #endif
 
 }
@@ -34,7 +35,11 @@ void EigenCholSolver::symbolic_factorization(SpMat& Q, int& init){
 
 
 void EigenCholSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol){
-    printf("in factorize Eigen solver.\n");
+#ifdef PRINT_MSG
+    if(MPI_rank == 0){
+        printf("in factorize Eigen solver.\n");
+    }
+#endif
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -47,11 +52,14 @@ void EigenCholSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatCho
 #ifdef CHOLMOD
     log_det = solverEigenQ.logDeterminant();
 #else
-    log_det = log(solverEigenQ.determinant());
+    // fails quickly as entries are too large
+    //log_det = log(solverEigenQ.determinant());
+    Vect diagD = solverEigenQ.vectorD();
+    log_det = diagD.array().log().sum();
 #endif
 
     t_priorLatChol += omp_get_wtime();
-    std::cout << "log det = " << log(solverEigenQ.determinant()) << ", comp = " << log_det << std::endl;
+    //std::cout << "log det = " << log(solverEigenQ.determinant()) << ", comp = " << log_det << std::endl;
 }
 
 
@@ -61,7 +69,7 @@ void EigenCholSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& lo
 }
 
 void EigenCholSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve){
-    printf("in factorize solve Eigen solver.\n");
+    //printf("in factorize solve Eigen solver.\n");
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -73,7 +81,9 @@ void EigenCholSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &lo
 #ifdef CHOLMOD
     log_det = solverEigenQ.logDeterminant();
 #else
-    log_det = log(solverEigenQ.determinant());
+    //log_det = log(solverEigenQ.determinant());
+    Vect diagD = solverEigenQ.vectorD();
+    log_det = diagD.array().log().sum();
 #endif
     t_condLatChol += omp_get_wtime();
 
