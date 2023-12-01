@@ -7,7 +7,7 @@ Main operations that can be performed:
 - Forward-backward solve using Cholesky factor (CPU)
 - selected matrix inversion (GPU)
   
-Assumes matrix to be in right format, $n_t$ defines number of large diagonal blocks of size $n_s \times n_s$, $n_b$ number of rows/columns in arrowhead structure. Overall matrix size is thus $n = n_s \cdot n_t + n_b$. 
+Assumes matrix to be in right format, n<sub>t</sub> defines number of large diagonal blocks of size n<sub>s</sub> x n<sub>s</sub>, n<sub>b</sub> number of rows/columns in arrowhead structure. Overall matrix size is thus n = n<sub>s</sub> x n<sub>t</sub> + n<sub>b</sub>.
 
 ## Installation
 
