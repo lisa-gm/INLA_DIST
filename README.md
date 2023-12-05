@@ -23,7 +23,6 @@ Detailed documentation of the code can be found [here](https://lisa-gm.github.io
 The implementation targets linux-based systems. Compile from the respective subfolder you are interested in using the provided ``makefile``, potentially adapting some of the provided paths. The following additional software libraries or packages are needed:
 
 - [Eigen](https://eigen.tuxfamily.org)
-- [Armadillo](https://arma.sourceforge.net/) (only for reading in matrices in CSR format)
 
 #### INLA-SPDE optimization routine
 - [adapted LBFGSpp](https://github.com/lisa-gm/adapted_LBFGSpp)
