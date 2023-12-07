@@ -103,8 +103,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQst = new PardisoSolver(MPI_rank);
 		}
 	} else if(solver_type == "BTA"){
-		//solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);
-		//solverQst = new RGFSolver(ns, nt, 0,  no, threadID_solverQst);
+		//solverQ   = new BTASolver(ns, nt, nb, no, threadID_solverQ);
+		//solverQst = new BTASolver(ns, nt, 0,  no, threadID_solverQst);
 		printf("CALLING EIGEN CHOLMOD SOLVER INSTEAD OF BTA!\n");
 		solverQ   = new EigenCholSolver(MPI_rank);
 		solverQst = new EigenCholSolver(MPI_rank);
@@ -263,11 +263,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		//{
 		//#pragma omp task
 		//{
-		solverQst = new RGFSolver(ns, nt, 0, no, threadID_solverQst);
+		solverQst = new BTASolver(ns, nt, 0, no, threadID_solverQst);
 		//}
 		//#pragma omp task
 		//{
-		solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);
+		solverQ   = new BTASolver(ns, nt, nb, no, threadID_solverQ);
 		//}
 		//}
 	} else if(solver_type == "Eigen"){
@@ -460,14 +460,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		/*#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
-			solverQst = new RGFSolver(ns, nt, 0, no);
+			solverQst = new BTASolver(ns, nt, 0, no);
 		} 
 		if(omp_get_thread_num() == 1 || threads_level1 == 1){
-			solverQ = new RGFSolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
+			solverQ = new BTASolver(ns, nt, nb, no);  // solver for prior random effects. best way to handle this? 
 		}
 		}*/
-		solverQst = new RGFSolver(ns, nt, 0,  no, threadID_solverQst);
-		solverQ   = new RGFSolver(ns, nt, nb, no, threadID_solverQ);  
+		solverQst = new BTASolver(ns, nt, 0,  no, threadID_solverQst);
+		solverQ   = new BTASolver(ns, nt, nb, no, threadID_solverQ);  
 	} else if(solver_type == "Eigen"){
 		solverQ     = new EigenCholSolver(MPI_rank);
 		solverQst   = new EigenCholSolver(MPI_rank);
@@ -697,14 +697,14 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 		/*#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
-			solverQst = new RGFSolver(ns, nt, nss, no);
+			solverQst = new BTASolver(ns, nt, nss, no);
 		} 
 		if(omp_get_thread_num() == 1 || threads_level1 == 1){
-			solverQ = new RGFSolver(ns, nt, nb+nss, no);  // solver for prior random effects. best way to handle this? 
+			solverQ = new BTASolver(ns, nt, nb+nss, no);  // solver for prior random effects. best way to handle this? 
 		}
 		}*/
-		solverQst = new RGFSolver(ns, nt, nss, no, threadID_solverQst);
-		solverQ   = new RGFSolver(ns, nt, nb+nss, no, threadID_solverQ); 
+		solverQst = new BTASolver(ns, nt, nss, no, threadID_solverQst);
+		solverQ   = new BTASolver(ns, nt, nb+nss, no, threadID_solverQ); 
 	} else if(solver_type == "Eigen"){
 		solverQ   = new EigenCholSolver(MPI_rank);
 		solverQst = new EigenCholSolver(MPI_rank);
@@ -1049,6 +1049,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		if(MPI_rank == 0){
 			Vect theta_interpret(dim_th);
 			convert_theta2interpret(theta, theta_interpret);
+			std::cout << "theta          : " << std::right << std::fixed << std::setprecision(4) << theta.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 		}
 

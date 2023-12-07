@@ -507,9 +507,11 @@ int main(int argc, char* argv[])
     // data y
     std::string y_file        =  base_path + "/y_" + no_s + "_1" + ".dat";
     file_exists(y_file);
-    // at this point no is set ... 
-    // not a pretty solution. 
-    y = read_matrix(y_file, no, 1);  
+
+    //y = read_matrix(y_file, no, 1);  
+    // faster but requires armadillo
+    y = read_matrix_arma(y_file, no, 1); 
+
     if(MPI_rank == 0){ 
         std::cout << "sum(y) = " << y.sum() << std::endl;
     }

@@ -26,8 +26,8 @@
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
 #include "PardisoSolver.h"
-#include "RGFSolver.h"
-//#include "RGFSolver_dummy.h"
+#include "BTASolver.h"
+//#include "BTASolver_dummy.h"
 #include "EigenCholSolver.h"
 
 //#include "Hyperparameters.h"
