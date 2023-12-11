@@ -15,6 +15,8 @@ SCAHOME       = $(MKLHOME)
 
 BTA_PATH      = ../BTA
 include $(BTA_PATH)/make.inc
+
+SOLVER_IF_PATH = ../linSolverInterfaces
 #############################################################################################################
 
 #CXX=CC    # cscs
@@ -56,6 +58,7 @@ $(info MAGMA    : $(MAGMA))
 $(info BFGS     : $(INCBFGS))
 $(info EIGEN    : $(INCEIGEN))
 $(info BTA      : $(BTA_PATH))
+$(info SOLVERS  : $(SOLVER_IF_PATH))
 
 
 $(info )
@@ -76,7 +79,7 @@ $(BTA_PATH)/Utilities.o: $(BTA_PATH)/Utilities.C
 $(BTA_PATH)/CWC_utility.o: $(BTA_PATH)/CWC_utility.cu
 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver.o BTASolver.o EigenCholSolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
+call_INLA: call_INLA.o PostTheta.o $(SOLVER_IF_PATH)/PardisoSolver.o $(SOLVER_IF_PATH)/BTASolver.o $(SOLVER_IF_PATH)/EigenCholSolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
 	$(CXX) $^ $(LIBS) $(BTA_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp
@@ -88,7 +91,8 @@ call_INLA.o: call_INLA.cpp
 
 clean:	
 	rm -f *.o call_INLA
-	rm -f BTA/*.o
+	rm -f $(BTA)/*.o
+	rm -f $(linSolverInterfaces)/*.o
 	rm -f BTA/main
 
 

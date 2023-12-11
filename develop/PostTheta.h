@@ -25,10 +25,10 @@
 //#include "../read_write_functions.h"
 
 //#include "solver_cholmod.h" -> pardiso can do inversion now
-#include "PardisoSolver.h"
-#include "BTASolver.h"
-//#include "BTASolver_dummy.h"
-#include "EigenCholSolver.h"
+#include "../linSolverInterfaces/PardisoSolver.h"
+#include "../linSolverInterfaces/BTASolver.h"
+//#include "../linSolverInterfaces/BTASolver_dummy.h"
+#include "../linSolverInterfaces/EigenCholSolver.h"
 
 //#include "Hyperparameters.h"
 

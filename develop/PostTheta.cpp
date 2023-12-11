@@ -1610,7 +1610,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& mu_, Vect& vars){
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
 			MatrixXd V(n, Dxy.rows());
-			solverQ->selected_inversion_w_constr(Q, Dxy, vars, V);
+			solverQ->selected_inversion_diag_w_constr(Q, Dxy, vars, V);
 			MatrixXd W = Dxy*V;
 			MatrixXd S = W.inverse()*V.transpose();
 
@@ -1632,11 +1632,11 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& mu_, Vect& vars){
 		{
 		if(omp_get_thread_num() == 1 || threads_level1 == 1)
 		{
-			solverQ->selected_inversion(Q, vars);
+			solverQ->selected_inversion_diag(Q, vars);
 		}
 		}*/
 		//printf("before selected inversion.\n");
-		solverQ->selected_inversion(Q, vars);
+		solverQ->selected_inversion_diag(Q, vars);
 		//printf("after selected inversion.\n");
 	}
 	
