@@ -25,8 +25,6 @@ BTA_NVCCFLAGS     = -arch=compute_80 -code=sm_80
 BTA_CUDA_SDK      = 3
 BTA_COMMONFLAGS   = -DCUDA_SDK=$(CUDA_SDK)
 
-#INCMAG            = -I/home/x_gaedkelb/applications/magma-2.5.4/include
-#MAGMA             = -L/home/x_gaedkelb/applications/magma-2.5.4/lib -lmagma
 INCMAG            = -I$(BASE_PATH)/applications/magma-2.7.2/include
 MAGMA             = -L$(BASE_PATH)/applications/magma-2.7.2/magma/lib -lmagma
 

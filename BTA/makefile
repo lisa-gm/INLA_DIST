@@ -1,4 +1,4 @@
-# compile into shared library and then include this in main makefile
+## compile into shared library and then include this in main makefile
 #
 #####################
 ## PATHS TO BE ADAPTED
@@ -26,7 +26,7 @@ DEBUG       =  -lnvToolsExt #-O1 -g #-fsanitize=address,signed-integer-overflow 
 INCEIGEN=-I$(BASE_PATH)/applications/eigen
 #INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
 
-ARMADILLO=-larmadillo
+#ARMADILLO=-larmadillo
 
 $(info ============== Library paths ==============)
 
@@ -36,17 +36,23 @@ $(info CUDA   : $(CUDA))
 $(info MAGMA  : $(MAGMA))
 
 INCLUDEDIR  = $(INCCUD) $(INCMAG) $(INCEIGEN)
-LIBS	    = $(ARMADILLO) $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)  
+LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)  #$(ARMADILLO) 
 
 
 $(info ============== Compiling ==============)
 
-all: mainEigen #mainEigen
+#all: mainEigen
+all: main_fullCSC 
 
-CC_FILES   = Utilities.o mainEigen.o #main.o
+#CC_FILES   = Utilities.o mainEigen.o #main.o
+CC_FILES   = Utilities.o main_fullCSC.o #main.o
+
 CU_FILES   = CWC_utility.o
 
 mainEigen: $(CC_FILES) $(CU_FILES)
+	$(BTA_MPICXX) $(BTA_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(LIBS) $(DEBUG) -lm -o $@ # $(BTA_LOADFLAGS)
+
+main_fullCSC: $(CC_FILES) $(CU_FILES)
 	$(BTA_MPICXX) $(BTA_CXXFLAGS) $(CC_FILES) $(CU_FILES) $(LIBS) $(DEBUG) -lm -o $@ # $(BTA_LOADFLAGS)
 
 main: $(CC_FILES) $(CU_FILES)
@@ -61,6 +67,8 @@ CWC_utility.o: CWC_utility.cu
 
 clean:	
 	rm -f *.o BTASolver
-	rm -f mainEigen
-	rm -f main
+	#rm -f mainEigen 
+	rm -f main_fullCSC   
+		
+
 

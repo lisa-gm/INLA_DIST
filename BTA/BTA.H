@@ -3122,7 +3122,7 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
    t_inv = get_time(t_inv);
    double gflops = flop_count / (1e9*t_inv);
-   printf("GFLOPS sel. inversion : %f, time selInv : %f\n", gflops, t_inv);
+   //printf("GFLOPS sel. inversion : %f, time selInv : %f\n", gflops, t_inv);
 
    nvtxRangeEnd(id_inv);
 
