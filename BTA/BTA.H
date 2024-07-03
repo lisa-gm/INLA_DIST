@@ -22,6 +22,7 @@
 #include "nvToolsExt.h"
 
 //#define PRINT_MSG
+#define SEPARATE_DEV_BUFFER_ALLOC
 
  /**
  * @class BTA
@@ -2025,6 +2026,8 @@ double BTA<T>::ForwardPassSolve(size_t nrhs){
       flop_count += 2.0*NR * NR * nrhs;
    }
 
+   nvtxRangeEnd(id_solve);
+
    return flop_count;
 
 }
@@ -2582,6 +2585,8 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       NR = Bmax[IB]-Bmin[IB];
 
       // *************** Gn+1n+1 ************ //
+      // copy blockDense from host to blockDense_dev
+
       // copies lower triangular part of blockDense_dev to G_LastDense_dev
       tlacpy_dev('L', NR, NR, blockDense_dev, mf_block_lda(IB, IB), G_LastDense_dev, NR, magma_queue_1);
 
@@ -3261,11 +3266,20 @@ double BTA<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFacto
    t_allocate_MF_host = get_time(t_allocate_MF_host);
    //std::cout << "time to allocate memory on CPU: " << t_allocate_MF_host << std::endl;
 
+#ifdef SEPARATE_DEV_BUFFER_ALLOC
+   // allocate and deacllocate memory on GPU every time 
    double t_allocate_MF_dev = get_time(0.0);
 
-    //Data allocation on GPU -> negligible time
-    if (!MF_dev_allocated)
-    {
+   size_t max_supernode_nnz_dense = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
+   size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
+   allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz_dense*sizeof(T));
+   allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
+   allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+
+   t_allocate_MF_dev = get_time(t_allocate_MF_dev);
+   std::cout << "Allocated device memory in factorize. time: " << t_allocate_MF_dev << std::endl;
+#else
+   if (!MF_dev_allocated){
        //printf("In MF_dev_allocated not allocated.\n");
        //MF = new T[matrix_n_nonzeros];
        size_t max_supernode_nnz_dense = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
@@ -3274,10 +3288,9 @@ double BTA<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFacto
        allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
        allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
        MF_dev_allocated = true;
-    }
+   }
+#endif
 
-   t_allocate_MF_dev = get_time(t_allocate_MF_dev);
-   //std::cout << "time to allocate memory on GPU: " << t_allocate_MF_dev << std::endl;
 
     
     size_t nnz = matrix_ia[matrix_size];
@@ -3317,11 +3330,20 @@ double BTA<T>::factorize(size_t *ia, size_t *ja, T *a, double& t_firstStageFacto
      }
 
      file.close();*/
-     
-    //Temp data deallocation
-    deallocate_data_on_dev(ia_dev,(max_cols+1)*sizeof(size_t));
-    deallocate_data_on_dev(ja_dev,max_rows*max_cols*sizeof(size_t));
-    mem_alloc_dev = deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));
+
+
+   //Temp data deallocation
+   deallocate_data_on_dev(ia_dev,(max_cols+1)*sizeof(size_t));
+   deallocate_data_on_dev(ja_dev,max_rows*max_cols*sizeof(size_t));
+   mem_alloc_dev = deallocate_data_on_dev(a_dev,max_rows*max_cols*sizeof(T));      
+   
+ #ifdef SEPARATE_DEV_BUFFER_ALLOC  
+   // deallocate device buffer
+   deallocate_data_on_dev(blockR_dev,max_supernode_nnz_dense*sizeof(T));
+   deallocate_data_on_dev(blockM_dev,max_supernode_nnz_dense*sizeof(T));
+   deallocate_data_on_dev(blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+   //printf("deallocated device memory in factorize!\n");
+#endif
 
 #ifdef PRINT_MGS
     printf("Allocated GPU memory after Factorize: %ld\n", mem_alloc_dev);
@@ -3739,13 +3761,32 @@ double BTA<T>::BTAdiag(size_t *ia, size_t *ja, T *a, T *diag)
       //printf("in BTAdiag. current GPU rank: %d. set GPU rank to: %d\n", GPU_currRank, GPU_rank);
       cudaSetDevice(GPU_rank);
       cudaGetDevice(&GPU_currRank);
-      //printf("updated GPU rank is: %d.\n", GPU_currRank);   
+      printf("updated GPU rank is: %d.\n", GPU_currRank);   
    }
 
    double t_FSF;
 
    if (!factorization_completed)
        factorize(ia, ja, a, t_FSF);
+
+#ifdef SEPARATE_DEV_BUFFER_ALLOC
+   // allocate and deacllocate memory on GPU every time 
+   double t_allocate_MF_dev = get_time(0.0);
+
+   size_t max_supernode_nnz_dense = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
+   size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
+   allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz_dense*sizeof(T));
+   allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
+   allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+
+   // initialize deleted buffers from Cholesky factorization
+   copy_supernode_to_device(blockDense_dev, matrix_nt, copyStream);
+   copy_supernode_to_device(blockR_dev, matrix_nt-1, copyStream);
+   cudaDeviceSynchronize();
+
+   t_allocate_MF_dev = get_time(t_allocate_MF_dev);
+   std::cout << "Allocated device memory in BTAdiag. time: " << t_allocate_MF_dev << std::endl;
+#endif
 
    // check if number of nnz are the same to check if matrix is the same
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
@@ -3787,6 +3828,14 @@ double BTA<T>::BTAdiag(size_t *ia, size_t *ja, T *a, T *diag)
     deallocate_data_on_dev(diag_pos_dev,matrix_size*sizeof(size_t));
     deallocate_data_on_dev(tmp1_dev,matrix_ns*matrix_ns*sizeof(T));
     deallocate_data_on_dev(tmp2_dev,matrix_ns*matrix_ns*sizeof(T));
+
+#ifdef SEPARATE_DEV_BUFFER_ALLOC
+   // deallocate device buffer
+   deallocate_data_on_dev(blockR_dev,max_supernode_nnz_dense*sizeof(T));
+   deallocate_data_on_dev(blockM_dev,max_supernode_nnz_dense*sizeof(T));
+   deallocate_data_on_dev(blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+   //printf("deallocated device memory in BTAdiag!\n");
+#endif
 
 #ifdef PRINT_MSG
     printf("Allocated GPU memory after sel Inv: %ld, cpy ind %d\n", mem_alloc_dev, cpy_indicator);
@@ -3838,6 +3887,24 @@ double BTA<T>::BTAselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     printf("\nBTASelInv: allocating data on device now. CPY indicator %d\n", cpy_indicator);
 #endif
 
+#ifdef SEPARATE_DEV_BUFFER_ALLOC
+   // allocate and deacllocate memory on GPU every time 
+   double t_allocate_MF_dev = get_time(0.0);
+
+   size_t max_supernode_nnz_dense = matrix_nt > 1 ? matrix_ns*(2*matrix_ns+matrix_nd) : matrix_ns*(matrix_ns+matrix_nd);
+   size_t final_supernode_nnz_dense = matrix_nd > 0 ? matrix_nd*matrix_nd : 0;
+   allocate_data_on_device((void**)&blockR_dev,max_supernode_nnz_dense*sizeof(T));
+   allocate_data_on_device((void**)&blockM_dev,max_supernode_nnz_dense*sizeof(T));
+   allocate_data_on_device((void**)&blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+
+   // initialize deleted buffers from Cholesky factorization
+   copy_supernode_to_device(blockDense_dev, matrix_nt, copyStream);
+   copy_supernode_to_device(blockR_dev, matrix_nt-1, copyStream);
+   
+   t_allocate_MF_dev = get_time(t_allocate_MF_dev);
+   std::cout << "Allocated device memory in BTAselInv. time: " << t_allocate_MF_dev << std::endl;
+#endif
+
     //allocate_data_on_device((void**)&diag_dev,matrix_size*sizeof(T));
     //allocate_data_on_device((void**)&diag_pos_dev,matrix_size*sizeof(size_t));
     allocate_data_on_device((void**)&tmp1_dev,matrix_ns*matrix_ns*sizeof(T));
@@ -3886,6 +3953,14 @@ double BTA<T>::BTAselInv(size_t *ia, size_t *ja, T *a, T *invQ)
     deallocate_data_on_dev(inv_ia_dev,(max_cols+1)*sizeof(size_t));
     deallocate_data_on_dev(inv_ja_dev,max_rows*max_cols*sizeof(size_t));
     deallocate_data_on_dev(inv_a_dev,max_rows*max_cols*sizeof(T));
+
+#ifdef SEPARATE_DEV_BUFFER_ALLOC
+   // deallocate device buffer
+   deallocate_data_on_dev(blockR_dev,max_supernode_nnz_dense*sizeof(T));
+   deallocate_data_on_dev(blockM_dev,max_supernode_nnz_dense*sizeof(T));
+   deallocate_data_on_dev(blockDense_dev,final_supernode_nnz_dense*sizeof(T));
+   //printf("deallocated device memory in BTAselInv!\n");
+#endif
 
     cudaFreeHost(inv_a);
 
