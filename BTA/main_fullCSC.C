@@ -51,7 +51,7 @@ std::string valueType;
 #endif
 
 
-#if 1 // dummy example
+#if 0 // dummy example
 
     int ns=3;
     int nss=0;
@@ -92,7 +92,7 @@ std::string valueType;
 
 
     // =========================================================================== //
-#if 1 // call eigen solver for comparison
+#if 0 // call eigen solver for comparison
     std::cout << "Call Eigen solver. " << std::endl;
 
     //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
@@ -193,7 +193,7 @@ std::string valueType;
     BTA<T> *solver;
     solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
 
-    int m = 2;
+    int m = 3;
     Vect t_factorize_vec(m-1);
     T log_det;
 
@@ -206,7 +206,7 @@ std::string valueType;
 
     double flops_factorize;
 
-    for(int iter=0; iter<m; iter++){
+    for(int iter=1; iter<=m; iter++){
         printf("\niter = %d\n", iter);
 
         /*t_factorise = get_time(0.0);
@@ -227,8 +227,10 @@ std::string valueType;
         t_solve = get_time(t_solve);
         //printf("flops solve:     %f\n", flops_solve);
 
-        printf("time factorize:            %f\n",t_factorise);
-        printf("time solve:                %f\n",t_solve);
+        if(iter > 0){
+            printf("time factorize:            %f\n",t_factorise);
+            printf("time solve:                %f\n",t_solve);
+        }
 
         printf("Residual norm. :           %e\n", solver->residualNorm(x, b));
         printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
@@ -278,7 +280,10 @@ std::string valueType;
     t_invDiag = get_time(0.0);
     double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
     t_invDiag = get_time(t_invDiag);
-    printf("time BTAselInv: %f\n", t_invDiag);
+
+    if(iter > 0){  
+        printf("time BTAselInv: %f\n", t_invDiag);
+    }
 
     if(n < 10){
         printf("invQa : ");
@@ -292,23 +297,21 @@ std::string valueType;
     SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
                                 Q_lower.innerIndexPtr(),invQa);
 
+
     if(n < 10){
         std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
     }
 
     // TODO: more efficient way to do this?
-    SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
+    //SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
 
     Vect invDiag_vec(n);
     for(int i=0; i<n; i++){
         invDiag_vec[i] = invDiag[i];
     }
 
-    std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
-    std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - inv_Q_Eigen.diagonal()).norm() << std::endl;
-
-  delete[] invDiag;
-  delete[] invQa;
+    //std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new_lower.diagonal() - invDiag_vec).norm() << std::endl;
+    //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new_lower.diagonal() - inv_Q_Eigen.diagonal()).norm() << std::endl;
 
     }
   
@@ -321,6 +324,9 @@ std::string valueType;
 
   delete[] x;
   delete[] b;
+
+  delete[] invDiag;
+  delete[] invQa;
 
   return 0;
   }
