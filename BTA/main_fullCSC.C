@@ -80,9 +80,46 @@ void assemblyBTAMatFromArray(const double* data, int ns, int nt, int nb, SpMat& 
 
     printf("idx = %d\n", idx);
 
+    // can I generate the outer & inner pointer arrays manually
+    // nnz per column: 2*ns + nb for for first ns*(nt-1) columns
+    // ns + nb for next ns columns
+    // nb for last nb columns
+
     // Finalize the construction of the sparse matrix
     A.makeCompressed();
     
+}
+
+// extract diagonal elements from blocked array
+void extractDiagFromBlks(const double* data, int ns, int nt, int nb, Vect& diag) {
+    int n = ns*nt + nb;  // Total size of the matrix
+
+    // iterate through data array by column
+    int idx;
+
+    for(int j = 0; j < ns*(nt-1); j++){
+        idx = (2*ns+nb)*j + (j % ns);
+        //printf("idx = %d\n", idx);
+        diag[j] = data[idx];
+    }
+
+    // offset
+    int offset = idx + ns + nb + 1;
+    for(int j = 0; j < ns; j++){
+        idx = offset + (ns+nb)*j + (j % ns);
+        //printf("idx = %d\n", idx);
+        diag[ns*(nt-1) + j] = data[idx];
+    }
+
+    offset = idx + nb + 1;
+    for(int j = 0; j < nb; j++){
+        idx = offset + nb*j + (j % nb);
+        //printf("idx = %d\n", idx);
+        diag[ns*nt + j] = data[idx];
+    }
+
+    //std::cout << "diag: " << diag.transpose() << std::endl;
+ 
 }
 
 /* ===================================================================== */
@@ -104,10 +141,10 @@ std::string valueType;
 
 #if 0 // dummy example
 
-    int ns=3;
+    int ns=2;
     int nss=0;
-    int nt=4;
-    int nb=2;
+    int nt=5;
+    int nb=0;
     int n = ns*nt + nb;
 
     SpMat Q       = gen_test_mat_base3(ns, nt, nb);
@@ -216,6 +253,9 @@ std::string valueType;
 
     // extract only diagonal entries
     T *invDiag;
+
+    // extract all inverse elements corresponding to nonzero entries in Cholesky factor L
+    T* invQ_blks;
 
     b  = new T[n];
     x  = new T[n];
@@ -348,19 +388,8 @@ std::string valueType;
         t_invDiag = get_time(0.0);
         double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
         t_invDiag = get_time(t_invDiag);
-
-        if(iter > 0){  
-            printf("time BTAselInv: %f\n", t_invDiag);
-        }
-
-        // if(n < 10){
-        //     printf("invQa : ");
-        //     for(int i=0; i<nnz; i++){
-        //         printf(" %f", invQa[i]);
-        //     }
-        //     printf("\n");
-        // }
-
+        printf("time BTAselInv: %f\n", t_invDiag);
+    
         // store in matrix
         SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
                                     Q_lower.innerIndexPtr(),invQa);
@@ -378,10 +407,12 @@ std::string valueType;
 
         // call copy indicator 2
 
-        // size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
-        // printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
-        // T* invQ_blks = new T[matrix_nonzeros_blocked];
-        // solver->BTAinvBlks(ia, ja, a, invQ_blks);
+        size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
+        printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
+        t_invDiag = get_time(0.0);
+        solver->BTAinvBlks(ia, ja, a, invQ_blks);
+        t_invDiag = get_time(t_invDiag);
+        printf("time BTAinvBlks: %f\n", t_invDiag);
 
         // printf("invQ_blks: ");
         // for(int i=0; i<matrix_nonzeros_blocked; i++){
@@ -395,6 +426,12 @@ std::string valueType;
         // SpMat S_blks_lower = S_blks.triangularView<Lower>();
         // std::cout << "S_blks-invQ_new_lower: \n" << MatrixXd(S_blks_lower.block(0,0,10,10) - invQ_new_lower.block(0,0,10,10)) << std::endl;
 
+        // Vect diagFromBlks(n);
+        // extractDiagFromBlks(invQ_blks, ns, nt, nb, diagFromBlks);
+        //std::cout << "diag(S_ref) - diagFromBlks = " << (S_ref.diagonal() - diagFromBlks).transpose() << std::endl;
+        // std::cout << "invDiag - diagFromBlks = " << (invDiag_vec - diagFromBlks).transpose() << std::endl;
+
+
         //std::cout << "norm(S_blks_lower - invQ_new_lower) = " << (S_blks_lower - invQ_new_lower).norm() << std::endl;
 
         // TODO: more efficient way to do this?
@@ -405,8 +442,9 @@ std::string valueType;
             invDiag_vec[i] = invDiag[i];
         }*/
 
-        //std::cout << "norm(diag(S_ref) - diag(S_blks_lower)) = " << (S_ref.diagonal() - S_blks_lower.diagonal()).norm() << std::endl;
+        // std::cout << "norm(diag(S_ref) - diag(S_blks_lower)) = " << (S_ref.diagonal() - diagFromBlks).norm() << std::endl;
         std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new_lower.diagonal() - invDiag_vec).norm() << std::endl;
+        //std::cout << "norm(diag(S_blk)    - diag(invDiag)) = " << (S_blks.diagonal() - invDiag_vec).norm() << std::endl;
         //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new_lower.diagonal() - inv_Q_Eigen.diagonal()).norm() << std::endl;
 
         //std::cout << "invQ_new_lower.diagonal().head(10) = " << invQ_new_lower.diagonal().head(10).transpose() << std::endl;
