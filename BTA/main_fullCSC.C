@@ -13,7 +13,7 @@
 #include <unsupported/Eigen/KroneckerProduct>
 #include <unsupported/Eigen/SparseExtra>   // includes saveMarket
 
-#include <armadillo>
+// #include <armadillo>
 #include "generate_testMat_selInv.cpp"
 #include "../read_write_functions.cpp"
 #include "helper_functions.h"
@@ -33,6 +33,57 @@ typedef Eigen::VectorXd Vect;
 typedef double T;
 #define assign_T(val) val
 // ******************* 
+
+void assemblyBTAMatFromArray(const double* data, int ns, int nt, int nb, SpMat& A) {
+    int n = ns*nt + nb;  // Total size of the matrix
+
+    // Containers for dense blocks
+    Eigen::MatrixXd diagBlock = Eigen::MatrixXd::Zero(ns, ns);  // Diagonal block
+    Eigen::MatrixXd offDiagBlock = Eigen::MatrixXd::Zero(ns, ns);  // Lower off-diagonal block
+    Eigen::MatrixXd lastRowBlock = Eigen::MatrixXd::Zero(nb, ns);  // Block in last nb rows and first ns columns
+    
+    A.reserve(ns*ns*(2*nt-1) + ns*nt*nb + nb*nb);
+
+    // iterate through data array
+    int idx = 0;
+
+    // iterate over columns
+    for(int j = 0; j < ns*nt; j++){
+
+        int row_offset = j / ns;
+        //printf("row_offset = %d\n", row_offset);
+
+        // diagonal and off-diagonal block
+        if(row_offset < nt - 1){
+            for(int i = 0; i < 2*ns; i++){
+                A.insert(i+ns*row_offset, j) = data[idx++];
+            }
+        } else {
+            for(int i = 0; i < ns; i++){
+                A.insert(i+ns*row_offset, j) = data[idx++];
+            }
+        }
+
+        // arrowhead rows
+        for(int i = 0; i < nb; i++){
+            A.insert(i+ns*nt, j) = data[idx++];
+        }
+
+     }
+
+    // Insert last block
+    for (int j = 0; j < nb; ++j) {
+        for (int i = 0; i < nb; ++i) {
+            A.insert(i + ns*nt, j + ns*nt) = data[idx++];;  // Arrowhead tip
+        }
+    }
+
+    printf("idx = %d\n", idx);
+
+    // Finalize the construction of the sparse matrix
+    A.makeCompressed();
+    
+}
 
 /* ===================================================================== */
 
@@ -61,6 +112,11 @@ std::string valueType;
 
     SpMat Q       = gen_test_mat_base3(ns, nt, nb);
 
+    // compute reference inverse
+    Eigen::MatrixXd Q_dense = Q;
+    Eigen::MatrixXd S_ref = Q_dense.inverse();
+    std::cout << "S_ref: \n" << S_ref << std::endl;
+
     Vect rhs = Vect::Random(n);
     //rhs.setOnes(n);
 
@@ -83,7 +139,21 @@ std::string valueType;
     std::string Q_file = argv[5];    
     file_exists(Q_file);
     SpMat Q      = read_sym_CSC(Q_file);
-    //std::cout << "Q(1:15, 1:15) : \n" << Q.block(0,0,15,15) << std::endl;
+    // std::cout << "Q(1:15, 1:15) : \n" << Q.block(0,0,15,15) << std::endl;
+
+    // std::string A_file = "/home/vault/j101df/j101df10/inla_matrices/Ax_11508109_9286186.dat";
+    // file_exists(A_file);
+    // SpMat A      = readCSC(A_file);
+
+    // std::cout << "A(1:15, 1:15) : \n" << A.block(0,0,15,15) << std::endl;
+
+    // double exp_theta_0 = 0.1289926;
+    // SpMat Qxy = Q + exp_theta_0*A.transpose() * A;
+
+    // std::cout << Qxy.block(0,0,15,15) << std::endl;
+
+    // write_sym_CSC_matrix("Qxy_ns5088_nt1825_nss582_nb4_n9286186.dat", Qxy);
+    // exit(1);
 
     // initialize dummy rhs for testing
     Vect rhs = Vect::Random(n);
@@ -123,7 +193,7 @@ std::string valueType;
     SpMat SpId(n,n);
     SpId.setIdentity();
 
-    SpMat inv_Q_Eigen = solverQ.solve(SpId);
+    SpMat S_ref = solverQ.solve(SpId);
 
 #endif
 
@@ -193,7 +263,7 @@ std::string valueType;
     BTA<T> *solver;
     solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
 
-    int m = 3;
+    int m = 2;
     Vect t_factorize_vec(m-1);
     T log_det;
 
@@ -259,61 +329,91 @@ std::string valueType;
         printf("time factorizeSolve      : %f\n", t_factorise);
 #endif
 
-    // Selected Inversion
+        // Selected Inversion
 
-    // extract only the diagonal entries
-    double t_invDiag;
-    t_invDiag = get_time(0.0);
-    double flops_invDiag = solver->BTAdiag(ia, ja, a, invDiag);
-    t_invDiag = get_time(t_invDiag);
-    printf("time BTAdiag: %f\n", t_invDiag);
-    double log_detBTAdiag = solver->logDet(ia, ja, a);
+        // extract only the diagonal entries
+        double t_invDiag;
+        t_invDiag = get_time(0.0);
+        double flops_invDiag = solver->BTAdiag(ia, ja, a, invDiag);
+        t_invDiag = get_time(t_invDiag);
+        printf("time BTAdiag: %f\n", t_invDiag);
+        double log_detBTAdiag = solver->logDet(ia, ja, a);
 
-    if(n < 10){
-        printf("\nBTAinvDiag: ");
-        for(i=0; i<n; i++){
-            printf(" %f", invDiag[i]);
+        Vect invDiag_vec(n);
+        for(int i=0; i<n; i++){
+            invDiag_vec[i] = invDiag[i];
         }
-        printf("\n");
-    }
+        //std::cout << "norm(diag(S_ref) - invDiag) = " << (invDiag_vec - S_ref.diagonal()).norm() << std::endl;
 
-    t_invDiag = get_time(0.0);
-    double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
-    t_invDiag = get_time(t_invDiag);
+        t_invDiag = get_time(0.0);
+        double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
+        t_invDiag = get_time(t_invDiag);
 
-    if(iter > 0){  
-        printf("time BTAselInv: %f\n", t_invDiag);
-    }
-
-    if(n < 10){
-        printf("invQa : ");
-        for(int i=0; i<nnz; i++){
-            printf(" %f", invQa[i]);
+        if(iter > 0){  
+            printf("time BTAselInv: %f\n", t_invDiag);
         }
-        printf("\n");
-    }
 
-    // store in matrix
-    SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
-                                Q_lower.innerIndexPtr(),invQa);
+        // if(n < 10){
+        //     printf("invQa : ");
+        //     for(int i=0; i<nnz; i++){
+        //         printf(" %f", invQa[i]);
+        //     }
+        //     printf("\n");
+        // }
+
+        // store in matrix
+        SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
+                                    Q_lower.innerIndexPtr(),invQa);
+
+        if(n < 10){
+            std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
+        }
+
+        // Eigen::MatrixXd S_ref_lower = S_ref.triangularView<Lower>();
+        // std::cout << "S_ref: \n" << S_ref_lower << std::endl;
+
+        // std::cout << "invQ_new_lower: \n" << invQ_new_lower << std::endl;
+
+        // std::cout << "S_ref_lower - invQ_new_lower = \n" << S_ref_lower - invQ_new_lower << std::endl;
+
+        // call copy indicator 2
+
+        // size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
+        // printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
+        // T* invQ_blks = new T[matrix_nonzeros_blocked];
+        // solver->BTAinvBlks(ia, ja, a, invQ_blks);
+
+        // printf("invQ_blks: ");
+        // for(int i=0; i<matrix_nonzeros_blocked; i++){
+        //     printf(" %f", invQ_blks[i]);
+        // }
+        // printf("\n");
+
+        // SpMat S_blks(n,n);
+        // assemblyBTAMatFromArray(invQ_blks, ns, nt, nb, S_blks);
+        
+        // SpMat S_blks_lower = S_blks.triangularView<Lower>();
+        // std::cout << "S_blks-invQ_new_lower: \n" << MatrixXd(S_blks_lower.block(0,0,10,10) - invQ_new_lower.block(0,0,10,10)) << std::endl;
+
+        //std::cout << "norm(S_blks_lower - invQ_new_lower) = " << (S_blks_lower - invQ_new_lower).norm() << std::endl;
+
+        // TODO: more efficient way to do this?
+        //SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
+
+        /*Vect invDiag_vec(n);
+        for(int i=0; i<n; i++){
+            invDiag_vec[i] = invDiag[i];
+        }*/
+
+        //std::cout << "norm(diag(S_ref) - diag(S_blks_lower)) = " << (S_ref.diagonal() - S_blks_lower.diagonal()).norm() << std::endl;
+        std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new_lower.diagonal() - invDiag_vec).norm() << std::endl;
+        //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new_lower.diagonal() - inv_Q_Eigen.diagonal()).norm() << std::endl;
+
+        //std::cout << "invQ_new_lower.diagonal().head(10) = " << invQ_new_lower.diagonal().head(10).transpose() << std::endl;
+        //std::cout << "invDiag_vec.head(10) = " << invDiag_vec.head(10).transpose() << std::endl;
 
 
-    if(n < 10){
-        std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
-    }
-
-    // TODO: more efficient way to do this?
-    //SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
-
-    Vect invDiag_vec(n);
-    for(int i=0; i<n; i++){
-        invDiag_vec[i] = invDiag[i];
-    }
-
-    //std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new_lower.diagonal() - invDiag_vec).norm() << std::endl;
-    //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new_lower.diagonal() - inv_Q_Eigen.diagonal()).norm() << std::endl;
-
-    }
+    } // iter < m
   
   // free memory
   delete solver;

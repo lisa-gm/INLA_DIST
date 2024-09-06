@@ -61,9 +61,9 @@ extern "C" {
 				 int,int,int,cudaStream_t); 
   void z_symmetrize_matrix(CPX*,int,cudaStream_t);
   void z_symmetrize_matrix_2(CPX*,int,cudaStream_t);
-  void d_tril_on_dev(double *A, int lda, int N);
-  void s_tril_on_dev(float  *A, int lda, int N);
-  void z_tril_on_dev(CPX *A, int lda, int N);
+  void d_tril_on_dev(double *A, int lda, int N, cudaStream_t stream);
+  void s_tril_on_dev(float  *A, int lda, int N, cudaStream_t stream);
+  void z_tril_on_dev(CPX *A, int lda, int N, cudaStream_t stream);
   void d_indexed_copy_on_dev(double *src, double *dst, size_t *index, size_t N);
   void z_indexed_copy_on_dev(CPX *src, CPX *dst, size_t *index, size_t N);
   void d_indexed_copy_offset_on_dev(double *src, double *dst, size_t *index, size_t N, size_t offset);
@@ -83,6 +83,6 @@ extern "C" {
   //void z_init_supernode_on_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
 
   // new
-  void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
-  void s_extract_nnzA_on_dev(float *a,  size_t *ia, size_t *ja, float *M,  size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
+  void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream);
+  void s_extract_nnzA_on_dev(float *a,  size_t *ia, size_t *ja, float *M,  size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream);
 }

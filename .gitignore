@@ -39,3 +39,4 @@
 
 # ignoring nvidia profiler files
 *.nsys-rep
+*.qdstrm
