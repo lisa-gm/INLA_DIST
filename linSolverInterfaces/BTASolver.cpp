@@ -145,16 +145,11 @@ void BTASolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
     printf("Calling BTA solver in BTA factorize now.\n");
 #endif
 
-       // std::cout << "BTA factorzie, nb = " << nb_t << " , MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
-
     t_priorLatChol = get_time(0.0);
     double gflops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
+    t_priorLatChol = get_time(t_priorLatChol);
     //std::cout << "log_det new      = " << log_det << std::endl;
 
-    //double gflops_factorize = solver->factorize();
-    //log_det = solver->logDet();
-    //std::cout << "log_det original = " << log_det << std::endl;
-    t_priorLatChol = get_time(t_priorLatChol);
 
 #ifdef GFLOPS
     if(MPI_rank == 0){
@@ -325,16 +320,11 @@ void BTASolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	std::cout << "calling solver = new BTA now. ns = " << ns_t << ", nt = " << nt_t << ", nb = " << nb_t << std::endl;
 #endif
 
-    // std::cout << "BTA factorize solve, nb = " << nb_t << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
     t_condLatChol = get_time(0.0);
-
 	double gflops_factorize = solver->factorize(ia, ja, a);
-    //double gflops_factorize = solver->factorize();
-
     t_condLatChol = get_time(t_condLatChol);
     
 	log_det = solver->logDet(ia, ja, a);
-    //log_det = solver->logDet();
 
 #ifdef GFLOPS
     if(MPI_rank == 0){

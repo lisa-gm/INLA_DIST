@@ -1050,7 +1050,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 			Vect theta_interpret(dim_th);
 			convert_theta2interpret(theta, theta_interpret);
 			std::cout << "theta          : " << std::right << std::fixed << std::setprecision(4) << theta.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
-			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
+			// std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 		}
 
 		// alternatively ...
@@ -1071,9 +1071,9 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	t_f_grad_f += omp_get_wtime();
 
-	if(MPI_rank == 0){
-		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
-	}
+	// if(MPI_rank == 0){
+	// 	std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
+	// }
 
 	return f_theta;
 
@@ -1492,7 +1492,7 @@ void PostTheta::get_Qprior(Vect theta, SpMat& Qprior){
 }
 
 
-MatrixXd PostTheta::get_Covariance(Vect theta, double eps){
+MatrixXd PostTheta::get_Covariance(Vect& theta, double eps){
 
 	int dim_th = theta.size();
 	MatrixXd hess(dim_th,dim_th);
@@ -1527,7 +1527,7 @@ MatrixXd PostTheta::get_Covariance(Vect theta, double eps){
 }
 
 
-MatrixXd PostTheta::get_Cov_interpret_param(Vect interpret_theta, double eps){
+MatrixXd PostTheta::get_Cov_interpret_param(Vect& interpret_theta, double eps){
 
 	int dim_th = interpret_theta.size();
 
@@ -1567,36 +1567,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& mu_, Vect& vars){
 	mu = mu_;
 	SpMat Q(n, n);
 	construct_Q(theta, mu, Q);
-	//std::cout << "in get marginals f. Q(1:10,1:10) = \n" << Q.block(0,0,10,10) << std::endl;
-
-	/*
-	MatrixXd Q_d = MatrixXd(Q);
-	//std::cout << "Q.bottomRightCorner(10,10) : \n" << Q_d.bottomRightCorner(10,10) << std::endl;
-	MatrixXd Q_fe = Q_d.bottomRightCorner(nb,nb);
-	std::cout << "dim(Q(FE, FE))    : " << Q_fe.rows() << " " << Q_fe.cols() << std::endl;
-	std::cout << "Q_fe : \n" << Q_fe << std::endl;
-	Vect eig =  Q_fe.eigenvalues().real();
-	std::cout << "\neigenvalues Q(FE, FE) : \n" << eig.transpose() << std::endl;
-	Vect norm_eig = eig / eig.minCoeff();
-	std::cout << "\nnormalized eigenvalues Q(FE, FE) : \n" << norm_eig.transpose() << std::endl;
-
-	MatrixXd Cov_fe = Q_fe.inverse();
-	std::cout << "\nCovariance mat FE = \n" << Cov_fe << std::endl;
-
-	// compute correlation matrix : cor(x_i, x_j) = cov(x_i, x_j) / sqrt(cov(x_i, x_i)*cov(x_j, x_j))
-	MatrixXd Cor_fe(Cov_fe.rows(), Cov_fe.cols());
-	for(int i = 0; i<Cov_fe.rows(); i++){
-		for(int j=0; j<Cov_fe.cols(); j++){
-			Cor_fe(i,j) = Cov_fe(i,j) / sqrt(Cov_fe(i,i)*Cov_fe(j,j));
-		}
-	}
-
-	std::cout << "Correlation mat FE = \n" << Cor_fe << "\n" << std::endl;
-	*/
-
-	//std::cout << "exp(theta[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
 	
-
 #ifdef PRINT_MSG
 		std::cout << "after construct Q in get get_marginals_f" << std::endl;
 #endif
@@ -1635,9 +1606,7 @@ void PostTheta::get_marginals_f(Vect& theta, Vect& mu_, Vect& vars){
 			solverQ->selected_inversion_diag(Q, vars);
 		}
 		}*/
-		//printf("before selected inversion.\n");
 		solverQ->selected_inversion_diag(Q, vars);
-		//printf("after selected inversion.\n");
 	}
 	
 #ifdef PRINT_TIMES
@@ -1658,7 +1627,7 @@ the parallel structure of MPI process + nested parallelism with the number of fu
 evaluations required here. For none Gaussian data this probably needs to be completely 
 rewritten.
 */
-MatrixXd PostTheta::hess_eval(Vect theta, double eps){
+MatrixXd PostTheta::hess_eval(Vect& theta, double eps){
 
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
@@ -1896,7 +1865,7 @@ MatrixXd PostTheta::hess_eval(Vect theta, double eps){
 	return hess;
 }
 
-MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
+MatrixXd PostTheta::hess_eval_interpret_theta(Vect& interpret_theta, double eps){
 
 	//double eps = 0.005;
 
@@ -3080,7 +3049,6 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 		//std::cout << "Qx(1:10, 1:10) = \n" <<  Qx.block(0,0,10,10) << std::endl;
 		//std::cout << "Qu(1:10, 1:10) = \n" <<  Qu.block(0,0,10,10) << std::endl;
 		//std::cout << "Qx.outerSize() = " << Qx.outerSize() << ", Qx.nonZeros() = " << Qx.nonZeros() << ", Qu.outerSize() = " << Qu.outerSize() << ", Qu.nonZeros() = " << Qu.nonZeros() << std::endl;
-
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger

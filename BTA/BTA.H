@@ -133,7 +133,6 @@ private:
     T *blockDense_dev;
     T *rhs;
     T *rhs_dev; 
-    T* sol_dev;
 
     size_t *ia_dev;
     size_t *ja_dev;
@@ -545,6 +544,8 @@ double BTA<T>::FirstStageFactor()
        	std::cout << "IB = " << IB << std::endl;
 #endif
 
+   nvtxRangeId_t id_factorize = nvtxRangeStartA("Factorization");
+
    /*
    int GPU_CurrRank;
    cudaGetDevice(&GPU_CurrRank);
@@ -910,11 +911,13 @@ double BTA<T>::FirstStageFactor()
 
    cudaDeviceSynchronize(); // TO BE REPLACED
 
-   printf("flop count firstStageFactor = %f\n", flop_count);
+   nvtxRangeEnd(id_factorize);  
+
+   //printf("flop count firstStageFactor = %f\n", flop_count);
    t_fact = get_time(t_fact);
    //std::cout << "time factorize : " << t_fact << ", sum time copy DtH : " << t_copy_DtH << ", sum t potrf : " << t_potrf << ", sum t dgemm : " << t_dgemm << std::endl;
    double gflops = flop_count / (1e9*t_fact);
-   printf("GFLOPS factorize firstStageFactor : %f\n", gflops);
+   // printf("GFLOPS factorize firstStageFactor : %f\n", gflops);
 
    return gflops;
 }
@@ -945,6 +948,8 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
 
     // count floating point operations
     double flop_count = 0;
+
+    nvtxRangeId_t id_factFP = nvtxRangeStartA("FactorizeForwardPass");
 
     IB = 0;
     NR = Bmax[0]-Bmin[0];
@@ -1394,8 +1399,9 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
     }
 
    cudaDeviceSynchronize(); // TO BE REPLACED
+   //printf("flop count firstSecondStageFactor = %f\n", flop_count);
 
-   printf("flop count firstSecondStageFactor = %f\n", flop_count);
+   nvtxRangeEnd(id_factFP);
 
    t_fact = get_time(t_fact);
    //nt    : " << flop_count / 1e9 << std::endl;
@@ -1920,10 +1926,11 @@ double BTA<T>::ForwardPassSolve(size_t nrhs){
       flop_count += NR * NR * nrhs;
    }
 
-   printf("flop count ForwardPass = %f\n", flop_count);
+    nvtxRangeEnd(id_solve);
 
    double gflops = flop_count / (1e9*t_solve);
    //printf("GFLOPS solve : %f\n", gflops);
+   //printf("flop count ForwardPass = %f\n", flop_count);
 
    return gflops;
 
@@ -1942,6 +1949,8 @@ double BTA<T>::BackwardPassSolve(size_t nrhs){
    double flop_count = 0;
 
    double t_solve = get_time(0.0);
+
+   nvtxRangeId_t id_solve = nvtxRangeStartA("BackwardPassSolve");
    
    if (matrix_nd > 0)
    {
@@ -1985,12 +1994,14 @@ double BTA<T>::BackwardPassSolve(size_t nrhs){
    //rj dtrsm LLTN MF[NBlock-1,NBlock-1] rhs[NBlock-1]
    c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE, &MF[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs[Bmin[IB]], matrix_size);
    flop_count += NR * NR * nrhs;
-   t_solve = get_time(t_solve);
 
-   printf("flop count BackwardPass = %f\n", flop_count);
+   nvtxRangeEnd(id_solve);
+
+   t_solve = get_time(t_solve);
 
    double gflops = flop_count / (1e9*t_solve);
    //printf("GFLOPS solve : %f\n", gflops);
+   //printf("flop count BackwardPass = %f\n", flop_count);
 
 #ifdef PRINT_MSG
    std::cout << "after forward-backword solve in 2nd stage factor" << std::endl;
@@ -2471,8 +2482,6 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
    cudaMallocHost(&tmp4,matrix_ns*matrix_ns*sizeof(T));
 #endif
 
-   //printf("\n*** new version selected inverse... ***\n\n");
-
    double flop_count = 0;
    nvtxRangeId_t id_inv = nvtxRangeStartA("Inversion");
    double t_inv = get_time(0.0);
@@ -2717,29 +2726,12 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       }
 
    }
-      /*
-      T* tmp_host;
-      cudaMallocHost(&tmp_host, (NR*NR) * sizeof(T));
-      tlacpy_dev('F', NR, NR, blockR_dev, mf_block_lda(IB,IB), tmp4_dev, NR, magma_queue_1);
-      cudaDeviceSynchronize();
-      gpuErrchk(cudaMemcpy(&tmp_host[0], &tmp4_dev[0], NR*NR*sizeof(double), cudaMemcpyDeviceToHost));
-      cudaDeviceSynchronize();
-
-      std::string fileName = "invBlock_cpyInd" + to_string(cpy_indicator) + "_IB" + to_string(IB) + ".txt";
-      ofstream file(fileName,    ios::out | ::ios::trunc);
-
-      for(int i=0; i<NR*NR; i++){
-         file << std::setprecision(15) << tmp_host[i] << endl;
-      }
-
-      file.close();
-      cudaFreeHost(tmp_host);
-      */
 
       // -> already copy next block to device
       cudaDeviceSynchronize();
-      copy_supernode_to_device(blockM_dev, matrix_nt-2, copyStream);
-
+      if(matrix_nt > 1){
+         copy_supernode_to_device(blockM_dev, matrix_nt-2, copyStream);
+      }
 
    //second-last non-dense block .. 0-block
    for (int IBi = matrix_nt-2; IBi > -1; IBi--)
@@ -2770,16 +2762,11 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          //exit(1);
       }
 
-      /*
-      cudaDeviceSynchronize();
-      copy_supernode_to_device(blockR_dev, IB);
-      cudaDeviceSynchronize();
-      */
-
       // tril(blockR_dev)
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR);
       // if L = blockR_dev, then compute L^-1
-      nvtxRangeId_t id_trtri = nvtxRangeStartA("TriangularSolve_inLoop");
+      std::string nvtx_label = "TriangularSolve_inLoop_" + std::to_string(IB);
+      nvtxRangeId_t id_trtri = nvtxRangeStartA(nvtx_label.c_str());
 #ifdef CUDA_POTRF
      // factorization first block -> set buffer flag to zero!
      if(NR != NP){
@@ -2797,6 +2784,8 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       init_eye_on_dev(tmp1_dev,NR,magma_cudaStream_1);
       //cudaDeviceSynchronize();
 
+      std::string nvtx_label2 = "diffGEMM_inLoop_" + std::to_string(IB);
+      nvtxRangeId_t id_dgemm = nvtxRangeStartA(nvtx_label2.c_str());
       // tmp2_dev = blockR_dev^T*blockM_dev => L_Ei^T*Gi+1
       tgemm_dev('T', 'N', NR, NP, NP, ONE, &blockR_dev[NR], mf_block_lda(IB+1, IB), blockM_dev, mf_block_lda(IB+1, IB+1), ZERO, tmp2_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NP * NP;
@@ -2976,6 +2965,9 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       // tmp1_dev = tmp2_dev*L^-1
       tgemm_dev('N', 'N', NR, NR, NR, ONE, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), ZERO, tmp1_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NR * NR; 
+
+      //cudaDeviceSynchronize();
+      nvtxRangeEnd(id_dgemm); // goes through entire loop
 
 #ifdef PRINT_MSG
       if(NR*NR < 200){
@@ -3405,11 +3397,8 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
    memcpy(rhs,b,matrix_size*nrhs*sizeof(T));
 
    allocate_data_on_device((void**)&rhs_dev,matrix_size*sizeof(T));
-   allocate_data_on_device((void**)&sol_dev,matrix_size*sizeof(T));
-
    // TODO: stream later
    memcpy_to_device(b, rhs_dev,matrix_size*sizeof(T), NULL);
-   memcpy_to_device(b, sol_dev,matrix_size*sizeof(T), NULL);
 
 #ifdef PRINT_MSG
     printf("Allocated GPU memory FactorizeSolve(): %ld\n", mem_alloc_dev);
@@ -3475,7 +3464,6 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
 
    // deallocate rhs device buffer
    deallocate_data_on_dev(rhs_dev, matrix_size*sizeof(T));
-   deallocate_data_on_dev(sol_dev, matrix_size*sizeof(T));
 
 
 #ifdef PRINT_MGS

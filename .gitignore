@@ -29,7 +29,10 @@
 *.mtc
 *.mtc1
 *.out
+*.err
 *.synctex.gz
+
+*.tar.gz
 
 # ignoring object files
 *.o

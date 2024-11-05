@@ -12,7 +12,7 @@
 #SBATCH --output=%x.out         #The .output file name
 
 base_path=/home/hpc/ihpc/ihpc060h/b_INLA/develop
-results_folder=${base_path}/standard_tests_Dec6
+results_folder=${base_path}/standard_tests_Nov4_2024
 
 if [ ! -d ${results_folder} ]; then
   mkdir -p ${results_folder};
@@ -37,11 +37,11 @@ RESULT_FILE=${results_folder}/results_tests_${solver_type}_${num_ranks}_${l1t}_$
 
 source ~/env/cholmod.sh
 
-##################################
-###### GAUSSIAN LIKELIHOOD #######
-##################################
+#################################
+##### GAUSSIAN LIKELIHOOD #######
+#################################
 
-################################## TEST I ##########################################
+################################# TEST I ##########################################
 echo " "
 
 ns=0
@@ -54,13 +54,14 @@ no=200
 
 data_type=regression
 likelihood=gaussian
+prior_hyperparameters=gaussian
 folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/GaussianData/nb${nb}_no${no}
 test1_output=${results_folder}/INLA_testCase_I_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE I. regression model. Gaussian Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test1_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test1_output}
 
 ## theta INLA : 1.33111849377324
 ## fixed effects INLA : -1.21, 1.23, -0.36, -1.07, -0.156, 1.91
@@ -79,7 +80,7 @@ cat ${test1_output} | grep "est.  mean parameters" | cut -d':' -f 2 >> ${RESULT_
 echo -e "mean parameters INLA         : 1.33111849377324 " >> ${RESULT_FILE}
 echo -n "estimated mean fixed effects : "  >> ${RESULT_FILE}
 cat ${test1_output} | grep "estimated mean fixed effects" | cut -d':' -f 2 >> ${RESULT_FILE}
-echo -e "mean fixed effects INLA     : -1.21, 1.23, -0.36, -1.07, -0.156, 1.91" >> ${RESULT_FILE}
+echo -e "mean fixed effects INLA      : -1.21, 1.23, -0.36, -1.07, -0.156, 1.91" >> ${RESULT_FILE}
 
 ################################## TEST II ##########################################
 echo " "
@@ -94,13 +95,14 @@ no=595
 
 data_type=synthetic
 likelihood=gaussian
+prior_hyperparameters=pc
 folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 test2_output=${results_folder}/INLA_testCase_II_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE II. spatial model. Gaussian Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${nb}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test2_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test2_output}
 
 ################################ WRITE OUT RESULTS #####################################
 
@@ -116,7 +118,7 @@ cat ${test2_output} | grep "est.  mean parameters" | cut -d':' -f 2 >> ${RESULT_
 echo -e "mean parameters original         : 1.386294 -5.013283  2.649159 " >> ${RESULT_FILE}
 echo -n "estimated mean fixed effects : "  >> ${RESULT_FILE}
 cat ${test2_output} | grep "estimated mean fixed effects" | cut -d':' -f 2 >> ${RESULT_FILE}
-echo -e "mean fixed effects original     : -0.294, -0.72 , -0.061" >> ${RESULT_FILE}
+echo -e "mean fixed effects original   : -0.294, -0.72 , -0.061" >> ${RESULT_FILE}
 
 ################################## TEST III ##########################################
 echo " "
@@ -132,13 +134,14 @@ no=$((2*${ns}*${nt}))
 
 data_type=synthetic
 likelihood=gaussian
+prior_hyperparameters=pc
 folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 test3_output=${results_folder}/INLA_testCase_III_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE III. Spatial-Temporal model. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test3_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test3_output}
 
 ## orig. mean parameters        :  1.38629400 -5.88254100  1.03972100  3.68887900
 ## orig. mean interpret. param. : 1.38629400 -0.00000023 2.30258418 1.40625832
@@ -176,13 +179,15 @@ noPerTs=$((2*${ns}))
 no=$((2*${ns}*${nt}))
 
 data_type=synthetic
+likelihood=gaussian
+prior_hyperparameters=pc
 folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_ntFit${ntFit}_ntPred0_noPerTs${noPerTs}_nss${nss}_nb${nb}
 test4_output=${results_folder}/INLA_testCase_IV_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE IV. Spatial-Temporal model with add. spatial field. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${noPerTs} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test4_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${noPerTs} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test4_output}
 
 ## interpret.param 1.386 0.405 1.099 1.386 -1.204 1.099
 ## theta.original  1.386 -4.42 0.634 1.674 -4.608 2.244
@@ -228,13 +233,14 @@ no=100
 
 data_type=regression
 likelihood=Poisson
+prior_hyperparameters=pc
 folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/${likelihood}Data/nb${nb}_no${no}
 test5_output=${results_folder}/INLA_testCase_V_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE V. regression model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test5_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test5_output}
 
 ## fixed effects INLA : 0.166, -1.7075385, -2.0048265692293, 2.09097384070468, 1.79709866484101, -1.03048874777528
 
@@ -244,9 +250,10 @@ echo -e " " >> ${RESULT_FILE}
 echo -e "TEST CASE V. regression model. Poisson Data. ns = ${ns}, nt = ${nt}, nb = ${nb}, no = ${nb}. " >> ${RESULT_FILE}
 echo -e "numRanks numThreadsL1 numThreadsL2 SolverType "  >> ${RESULT_FILE}
 echo -e "${num_ranks} ${l1t} ${l2t} ${solver_type} " >> ${RESULT_FILE}
-echo -n "No hyperparameters!"  >> ${RESULT_FILE}
+echo -e "No hyperparameters! "  >> ${RESULT_FILE}
+echo -n "estimated mean fixed effects : "  >> ${RESULT_FILE}
 cat ${test5_output} | grep "estimated mean fixed effects" | cut -d':' -f 2 >> ${RESULT_FILE}
-echo -e "mean fixed effects INLA     : 0.166, -1.71, -2.00, 2.09, 1.797, -1.03" >> ${RESULT_FILE}
+echo -e "mean fixed effects INLA      : 0.166, -1.71, -2.00, 2.09, 1.797, -1.03" >> ${RESULT_FILE}
 
 
 
@@ -263,13 +270,14 @@ no=966
 
 data_type=synthetic
 likelihood=Poisson
+prior_hyperparameters=pc
 folder_path=${base_path}/../data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
 test6_output=${results_folder}/INLA_testCase_VI_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VI. spatial model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}"
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test6_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}"
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test6_output}
 
 ## fixed effects original: 10
 
@@ -287,7 +295,7 @@ cat ${test6_output} | grep "est.  mean parameters" | cut -d':' -f 2 >> ${RESULT_
 echo -e "orig. mean parameters        : -4.9125  2.5536 " >> ${RESULT_FILE}
 echo -n "estimated mean fixed effects : "  >> ${RESULT_FILE}
 cat ${test6_output} | grep "estimated mean fixed effects" | cut -d':' -f 2 >> ${RESULT_FILE}
-echo -e "mean fixed effects INLA     : 9.834" >> ${RESULT_FILE}
+echo -e "mean fixed effects INLA      : 9.834" >> ${RESULT_FILE}
 
 
 ################################## TEST VII ##########################################
@@ -302,13 +310,14 @@ no=16320
 
 data_type=synthetic
 likelihood=Poisson
+prior_hyperparameters=pc
 folder_path=${base_path}/../data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
 test7_output=${results_folder}/INLA_testCase_VII_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VII. spatial-temporal model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}"
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test7_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}"
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test7_output}
 
 ## fixed effects original: 10
 
@@ -342,13 +351,14 @@ no=16320
 
 data_type=synthetic
 likelihood=Poisson
+prior_hyperparameters=pc
 folder_path=${base_path}/../data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nss${nss}_nb${nb}_no${no}
 test8_output=${results_folder}/INLA_testCase_VIII_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VIII. spatial-temporal model with add. spatial field. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}"
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >${test8_output}
+echo "srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type}"
+srun -n ${num_ranks} ./main ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${prior_hyperparameters} ${folder_path} ${solver_type} >${test8_output}
 
 ## fixed effects original: 10
 
