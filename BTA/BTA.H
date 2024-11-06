@@ -2675,9 +2675,11 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
    } // end if matrix_nd > 0
 
-      // -> already copy next block to device -> TODO: put this somewhere earlier ... not in parallel ... ?
       cudaDeviceSynchronize();
-      copy_supernode_to_device(blockM_dev, matrix_nt-2, cuda_copystream);
+      // TODO: can already start this before ...
+      if(matrix_nt > 1){
+         copy_supernode_to_device(blockM_dev, NBlock-2, cuda_copystream);
+      }
 
    //second-last non-dense block .. 0-block
    for (int IBi = matrix_nt-2; IBi > -1; IBi--)
