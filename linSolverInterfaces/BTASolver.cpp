@@ -218,8 +218,10 @@ void BTASolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
     printf("Calling BTA solver in BTA factorize w constraints now.\n");
 #endif
 
+    double extra_timer_1;
+
     double t_factorise = get_time(0.0);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     t_factorise = get_time(t_factorise);
 
     log_det = solver->logDet(ia, ja, a);
@@ -243,8 +245,10 @@ void BTASolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det,
     MatrixXd Dt = D.transpose();
     memcpy(b, Dt.data(), n*nrhs*sizeof(double));
 
+    double extra_timer_2;
+
     double t_solve = get_time(0.0); 
-    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, extra_timer_1, extra_timer_2);
     t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
@@ -320,8 +324,10 @@ void BTASolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	std::cout << "calling solver = new BTA now. ns = " << ns_t << ", nt = " << nt_t << ", nb = " << nb_t << std::endl;
 #endif
 
+    double extra_timer_1;
+    
     t_condLatChol = get_time(0.0);
-	double gflops_factorize = solver->factorize(ia, ja, a);
+	double gflops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     t_condLatChol = get_time(t_condLatChol);
     
 	log_det = solver->logDet(ia, ja, a);
@@ -346,8 +352,10 @@ void BTASolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 	    //printf("%f\n", b[i]);
   	}
 
+    double extra_timer_2;
+
     t_condLatSolve = get_time(0.0);
-  	double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+  	double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, extra_timer_1, extra_timer_2);
     //double gflops_solve = solver->solve(x, b, nrhs);
     t_condLatSolve = get_time(t_condLatSolve);
 
@@ -428,9 +436,11 @@ void BTASolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
     printf("Calling BTA solver in BTA factorize_solver now.\n");
 #endif
 
+    double extra_timer_1;
+
     double t_factorise = get_time(0.0);
     //solver->solve_equation(GR);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     t_factorise = get_time(t_factorise);
 
     log_det = solver->logDet(ia, ja, a);
@@ -449,8 +459,10 @@ void BTASolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dx
     // Dxy.transpose().data() is not sufficient ... 
     memcpy(b + n, Dt.data(), n*Dxy.rows()*sizeof(double));
 
+    double extra_timer_2;
+
     double t_solve = get_time(0.0); 
-    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, extra_timer_1, extra_timer_2);
     t_solve = get_time(t_solve);
 
 #ifdef PRINT_MSG
@@ -520,10 +532,11 @@ void BTASolver::selected_inversion_diag(SpMat& Q, Vect& inv_diag) {
         a[i] = Q_lower.valuePtr()[i];
     }
 
+    double extra_timer_1;
     double t_factorise, t_inv;
 
     t_factorise = get_time(0.0);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
@@ -606,18 +619,21 @@ void BTASolver::selected_inversion_diag_w_constr(SpMat& Q, const MatrixXd& D, Ve
     // Dxy.transpose().data() is not sufficient ... 
     memcpy(b, Dt.data(), n*nrhs*sizeof(double));
 
+    double extra_timer_1;
     double t_factorise, t_solve, t_inv;
 
     t_factorise = get_time(0.0);
-    double flops_factorize = solver->factorize(ia, ja, a);
+    double flops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
     printf("BTA factorise time: %lg\n",t_factorise);
 #endif
 
+    double extra_timer_2;
+
     t_solve = get_time(0.0); 
-    double flops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double flops_solve = solver->solve(ia, ja, a, x, b, nrhs, extra_timer_1, extra_timer_2);
     t_solve = get_time(t_solve);
 
 //#ifdef PRINT_MSG
@@ -703,10 +719,11 @@ void BTASolver::selected_inversion_full(SpMat& Q, SpMat& Qinv) {
         a[i] = Q_lower.valuePtr()[i];
     }
 
-    double t_factorise, t_inv;
+    double extra_timer_1;
 
+    double t_factorise, t_inv;
     t_factorise = get_time(0.0);
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double gflops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     t_factorise = get_time(t_factorise);
 
 #ifdef PRINT_TIMES
@@ -804,9 +821,10 @@ void BTASolver::compute_full_inverse(SpMat& Q, MatrixXd& Qinv) {
 
        // std::cout << "BTA factorize solve, nb = " << nb_t << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
 
-    double t_condLatChol = get_time(0.0);
+    double extra_timer_1;
 
-    double gflops_factorize = solver->factorize(ia, ja, a);
+    double t_condLatChol = get_time(0.0);
+    double gflops_factorize = solver->factorize(ia, ja, a, extra_timer_1);
     //double gflops_factorize = solver->factorize();
 
     t_condLatChol = get_time(t_condLatChol);
@@ -842,9 +860,11 @@ void BTASolver::compute_full_inverse(SpMat& Q, MatrixXd& Qinv) {
         //printf("%f\n", b[i]);
     }
 
+    double extra_timer_2;
+
     double t_condLatSolve = get_time(0.0);
 
-    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs);
+    double gflops_solve = solver->solve(ia, ja, a, x, b, nrhs, extra_timer_1, extra_timer_2);
     //double gflops_solve = solver->solve(x, b, nrhs);
 
     t_condLatSolve = get_time(t_condLatSolve);
