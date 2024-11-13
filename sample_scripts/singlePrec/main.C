@@ -39,6 +39,8 @@ using namespace std;
 
 inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
+    fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+
     if (code != cudaSuccess)
     {
         fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
@@ -442,8 +444,8 @@ int main(int argc, char* argv[])
 
     int init_flag = 0;
 
-    int* info;
-    magma_mode_t mode = MagmaNative;
+    int info[1];
+    magma_mode_t mode = MagmaHybrid;
     int subN = 256;
     int subSubN = 32;
     void* host_work;
@@ -471,8 +473,9 @@ int main(int argc, char* argv[])
         exit(1);
     }
 
-    checkCudaErrors(cudaMalloc((void**)&device_work,lwork_device*sizeof(double)));
-    checkCudaErrors(cudaMallocHost((void**)&host_work, lwork_host*sizeof(double)));    
+#if 1
+    checkCudaErrors(cudaMalloc((void**)&device_work,lwork_device));
+    checkCudaErrors(cudaMallocHost((void**)&host_work, lwork_host));    
     cudaDeviceSynchronize();
 
     printf("Properly calling dpotrf expert now.\n");
@@ -482,14 +485,15 @@ int main(int argc, char* argv[])
         std::cout << "magma potrf error = " << potrfErr << std::endl;
         exit(1);
     }  
-   
     cudaDeviceSynchronize();
     printf("after dpotrf expert now.\n");
 
     cudaFree(device_work);
     cudaFreeHost(host_work);
+#endif   
 
 	checkCudaErrors(cudaMemcpy(L_host, Q_dev1, n*n*sizeof(T), cudaMemcpyDeviceToHost));
+    printf("after copy back.\n");
 
 	printf("\nL_host: ");
 	for(int i=0; i<n*n; i++){

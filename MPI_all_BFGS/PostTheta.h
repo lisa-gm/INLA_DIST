@@ -25,6 +25,8 @@
 //#include "RGFSolver.h"
 #include "RGFSolver_dummy.h"
 
+#include "../read_write_functions.cpp"
+
 //#define SMART_GRAD
 //#define EST_LOGDET_QST
 

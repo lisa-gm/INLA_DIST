@@ -7,22 +7,21 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 // choose one of the two
 #define DATA_SYNTHETIC
 //#define DATA_TEMPERATURE
 
-// enable RGF solver or not
-#define RGF_SOLVER
+// enable BTA solver or not
+#define BTA_SOLVER
 
-#ifdef RGF_SOLVER
+#ifdef BTA_SOLVER
 #include "cuda_runtime_api.h" // to use cudaGetDeviceCount()
 #endif
 
 //#define WRITE_RESULTS
 
 // if predict defined -> account for missing data
-#define PREDICT    
+//#define PREDICT    
 
 //#define PRINT_MSG
 //#define WRITE_LOG
@@ -187,7 +186,7 @@ int main(int argc, char* argv[])
     	threads_level2 = 1;
     }
 
-    // overwrite in case RGF is used
+    // overwrite in case BTA is used
     int noGPUs;
    
     if(MPI_rank == 0){
@@ -196,11 +195,11 @@ int main(int argc, char* argv[])
         printf("OMP threads level 1 : %d\n", threads_level1);
         //printf("OMP threads level 2 : %d\n", threads_level2);
 	printf("OMP threads level 2 FIXED TO 1!!\n");
-#ifdef RGF_SOLVER
+#ifdef BTA_SOLVER
 	cudaGetDeviceCount(&noGPUs);
 	printf("available GPUs      : %d\n", noGPUs);
 #else
-	printf("RGF dummy version\n");
+	printf("BTA dummy version\n");
     noGPUs = 0;
 #endif
     }  
@@ -272,7 +271,7 @@ int main(int argc, char* argv[])
     std::string base_path   = argv[8];    
     std::string solver_type = argv[9];
 
-    // check if solver type is neither PARDISO nor RGF :
+    // check if solver type is neither PARDISO nor BTA :
     if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
         std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
         exit(1);
@@ -509,7 +508,7 @@ int main(int argc, char* argv[])
 #ifdef PREDICT
         // check projection matrix for A.st
         // size Ax : no_per_ts*(nt_fit+nt_predict) x (ns*(nt_fit+nt_predict) + nb)
-        std::string Ax_file     =  base_path + "/Ax_all_" + to_string(no) + "_" + to_string(n) + ".dat";
+        std::string Ax_file     =  base_path + "/Ax_" + to_string(no) + "_" + to_string(n) + ".dat";
         file_exists(Ax_file); 
 
         // keep complete matrix as Ax_all in column major
@@ -525,31 +524,22 @@ int main(int argc, char* argv[])
             std::cout << "time assign matrix                      : " << t_am << std::endl;
         }
 
-        // get rows from the matrix directly
-        // doesnt work for B
-
         // data y
         //size_t no_all = nt_total*no_per_ts;
         size_t no_all = no;
-        std::string y_file        =  base_path + "/y_all_" + to_string(no_all) + "_1" + ".dat";
+        std::string y_file        =  base_path + "/y_" + to_string(no_all) + "_1" + ".dat";
         file_exists(y_file);
         // at this point no is set ... 
         // not a pretty solution. 
         y_all = read_matrix(y_file, no_all, 1);  
 
-        std::string y_ind_file        =  base_path + "/y_indicator_" + to_string(no_all) + "_1" + ".dat";
+        /*std::string y_ind_file        =  base_path + "/y_indicator_" + to_string(no_all) + "_1" + ".dat";
         file_exists(y_ind_file);
-        // at this point no is set ... 
-        // not a pretty solution. 
-        y_ind = read_matrix(y_ind_file, no_all, 1); 
-
-        /*
-        std::string y_times_file        =  base_path + "/y_times_" + to_string(no_all) + "_1" + ".dat";
-        file_exists(y_times_file);
-        // at this point no is set ... 
-        // not a pretty solution. 
-        y_times = read_matrix(y_times_file, no_all, 1); 
-        */
+        y_ind = read_matrix(y_ind_file, no_all, 1);*/
+        y_ind = Vect::Ones(no_all);
+        if(MPI_rank == 0){
+            printf("CAREFUL!! Using dummy y indicator vector. Manually set to all ones.\n");
+        }
 
         no = y_ind.sum(); 
 

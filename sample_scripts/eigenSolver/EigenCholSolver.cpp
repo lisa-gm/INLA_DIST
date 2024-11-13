@@ -2,16 +2,16 @@
 
 
 EigenCholSolver::EigenCholSolver(int& MPI_rank_) : MPI_rank(MPI_rank_){
-    printf("in constructor Eigen solver.\n");
+    //printf("in constructor Eigen solver.\n");
 
     init = 0;
-    //SimplicialLLT<SpMat> solverEigenQ;
-    CholmodSupernodalLLT<SpMat> solverEigenQ;
+    SimplicialLLT<SpMat> solverEigenQ;
+    //CholmodSupernodalLLT<SpMat> solverEigenQ;
 }
 
 
 void EigenCholSolver::symbolic_factorization(SpMat& Q, int& init){
-    printf("in symbolic factorization Eigen solver.\n");
+    //printf("in symbolic factorization Eigen solver.\n");
 
     if(init == 1){
         printf("symbolic factorization flag already set. init = %d\n", init);
@@ -24,7 +24,7 @@ void EigenCholSolver::symbolic_factorization(SpMat& Q, int& init){
 
 
 void EigenCholSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol){
-    printf("in factorize Eigen solver.\n");
+    //printf("in factorize Eigen solver.\n");
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -34,8 +34,9 @@ void EigenCholSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatCho
 
     solverEigenQ.factorize(Q);
 
-    log_det = solverEigenQ.logDeterminant();
-    //log_det = log(solverEigenQ.determinant());
+    //log_det = solverEigenQ.logDeterminant();
+    log_det = log(solverEigenQ.determinant());
+    
 
     t_priorLatChol += omp_get_wtime();
     //std::cout << "log det = " << log(solverEigenQ.determinant()) << ", comp = " << log_det << std::endl;
@@ -48,7 +49,7 @@ void EigenCholSolver::factorize_w_constr(SpMat& Q, const MatrixXd& D, double& lo
 }
 
 void EigenCholSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve){
-    printf("in factorize solve Eigen solver.\n");
+    //printf("in factorize solve Eigen solver.\n");
 
     if(init == 0){
         symbolic_factorization(Q, init);
@@ -57,9 +58,15 @@ void EigenCholSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &lo
     t_condLatChol = - omp_get_wtime();
     solverEigenQ.factorize(Q);
 
-    log_det = solverEigenQ.logDeterminant();
-    //log_det = log(solverEigenQ.determinant());
+    //log_det = solverEigenQ.logDeterminant();
+    log_det = log(solverEigenQ.determinant());    
     t_condLatChol += omp_get_wtime();
+    printf("log det: %f\n", log_det);
+
+    Vect diagD = solverEigenQ.vectorD();
+    log_det = diagD.array().log().sum();
+    printf("log det: %f\n", log_det);
+   
 
     t_condLatSolve = - omp_get_wtime();
     sol = solverEigenQ.solve(rhs);
@@ -73,14 +80,14 @@ void EigenCholSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const Matrix
 }
 
 void EigenCholSolver::selected_inversion(SpMat& Q, Vect& inv_diag){
-    printf("in selected inversion Eigen solver.\n");
+    //printf("in selected inversion Eigen solver.\n");
 
     SpMat spId(Q.rows(), Q.cols());
     spId.setIdentity();
 
     SpMat Qinv = solverEigenQ.solve(spId);
 
-    std::cout << "norm(Q*Qinv - I) = " << (Q*Qinv - spId).norm() << std::endl;
+    //std::cout << "norm(Q*Qinv - I) = " << (Q*Qinv - spId).norm() << std::endl;
     inv_diag = Qinv.diagonal();
 }
 
@@ -90,13 +97,13 @@ void EigenCholSolver::selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, V
 }
 
 void EigenCholSolver::compute_full_inverse(MatrixXd& H, MatrixXd& C){
-    printf("in compute full inverse Eigen solver.\n");
+    //printf("in compute full inverse Eigen solver.\n");
 
     C = H.inverse();
     //std::cout << "inv(H) = \n" << C << std::endl;
 }
 
 EigenCholSolver::~EigenCholSolver(){
-    printf("in EigenCholSolver destructor.\n");
+    //printf("in EigenCholSolver destructor.\n");
 }
 

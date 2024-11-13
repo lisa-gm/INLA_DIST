@@ -36,7 +36,7 @@
 #include <LBFGS.h>
 
 #include "PostTheta.h"
-#include "../read_write_functions.cpp"
+//#include "../read_write_functions.cpp"
 
 // comment out when not needed
 #include "generate_regression_data.cpp"
@@ -819,7 +819,7 @@ int main(int argc, char* argv[])
     // stop if norm of gradient smaller than :
     // computed as ||𝑔|| < 𝜖 ⋅ max(1,||𝑥||)
     param.epsilon = 1e-1;
-    // or if objective function has not decreased by more than  
+    // or if objective function has not decreasd by more than  
     // cant find epsilon_rel in documentation ...
     // stops if grad.norm() < eps_rel*x.norm() 
     param.epsilon_rel=1e-3;
@@ -830,9 +830,9 @@ int main(int argc, char* argv[])
     // changed BFGS convergence criterion, now stopping when abs(f(x_k) - f(x_k-1)) < delta
     // is this sufficiently bullet proof?!
     //param.delta = 1e-3;
-    param.delta = 1e-7;
+    param.delta = 1e-3;
     // maximum line search iterations
-    param.max_iterations = 5; //200;
+    param.max_iterations = 200; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -999,7 +999,7 @@ if(MPI_rank == 0){
 #endif // #if true/false
 
 
-#if 1
+#if 0
 
     double t_f_eval = -omp_get_wtime();
 
@@ -1037,7 +1037,7 @@ if(MPI_rank == 0){
 
 double time_bfgs = 0.0;
 
-#if 0
+#if 1
     if(MPI_rank == 0)
         printf("\n====================== CALL BFGS SOLVER =====================\n");
 

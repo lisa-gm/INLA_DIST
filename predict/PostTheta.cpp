@@ -40,6 +40,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 #ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 #endif
@@ -51,8 +57,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 		solverQst = new PardisoSolver(MPI_rank);
 		}
 	} else if(solver_type == "BTA"){
-		solverQ   = new RGFSolver(ns, nt, nb);
-		solverQst = new RGFSolver(ns, nt, 0);
+		solverQ   = new BTASolver(ns, nt, nb, no, threadID_solverQ);
+		solverQst = new BTASolver(ns, nt, 0, no, threadID_solverQst);
 	} else {
 		printf("wrong solver type! \n");
 		exit(1);
@@ -138,6 +144,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 	#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
@@ -154,11 +166,11 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 		//{
 		//#pragma omp task
 		//{
-		solverQ   = new RGFSolver(ns, nt, nb);
+		solverQ   = new BTASolver(ns, nt, nb, no, threadID_solverQ);
 		//}
 		//#pragma omp task
 		//{
-		solverQst = new RGFSolver(ns, nt, 0);
+		solverQst = new BTASolver(ns, nt, 0, no, threadID_solverQst);
 		//}
 		//}
 	} else {
@@ -289,6 +301,12 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
 	#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
 	#endif
@@ -303,10 +321,10 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpRmMat Ax_, Vect y_, S
 		#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
-			solverQst = new RGFSolver(ns, nt, 0);
+			solverQst = new BTASolver(ns, nt, 0, no, threadID_solverQst);
 		} 
 		if(omp_get_thread_num() == 1 || threads_level1 == 1){
-			solverQ = new RGFSolver(ns, nt, nb);  // solver for prior random effects. best way to handle this? 
+			solverQ = new BTASolver(ns, nt, nb, no, threadID_solverQst);  // solver for prior random effects. best way to handle this? 
 		}
 		}
 	} else {
@@ -448,9 +466,15 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 	// if num_solver < threads_level1 hess_eval will fail!
 	num_solvers        = threads_level1;
 
-	#ifdef PRINT_MSG
+	threadID_solverQst = 0; 
+	threadID_solverQ   = 0;
+	if(threads_level1 > 1){
+		threadID_solverQ = 1;
+	}
+
+#ifdef PRINT_MSG
 		printf("num solvers     : %d\n", num_solvers);
-	#endif
+#endif
 
 	if(solver_type == "PARDISO"){
 		#pragma omp parallel
@@ -462,10 +486,15 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpRmMat Ax_, 
 		#pragma omp parallel
 		{	
 		if(omp_get_thread_num() == 0){	
-			solverQst = new RGFSolver(ns, nt, nss);
+			//solverQst = new BTASolver(ns, nt, nss);
+			solverQst = new BTASolver(ns, nt, nss, no, threadID_solverQst);
+
+
 		} 
 		if(omp_get_thread_num() == 1 || threads_level1 == 1){
-			solverQ = new RGFSolver(ns, nt, nb+nss);  // solver for prior random effects. best way to handle this? 
+			//solverQ = new BTASolver(ns, nt, nb+nss);  // solver for prior random effects. best way to handle this? 
+			solverQ = new BTASolver(ns, nt, nb+nss, no, threadID_solverQst);
+
 		}
 		}
 	} else {

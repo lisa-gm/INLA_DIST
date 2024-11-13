@@ -3,7 +3,6 @@ MKLROOT?=$(shell echo $$MKLROOT)
 
 DEBUG= -g
 
-#BASE_PATH=/home/x_gaedkelb
 BASE_PATH=/home/hpc/ihpc/ihpc060h
 
 MKLHOME       = $(MKLROOT)/lib/intel64
@@ -18,9 +17,6 @@ INCEIGEN=-I${BASE_PATH}/applications/eigen
 INCMAG            = -I$(BASE_PATH)/applications/magma-2.7.2/include
 MAGMA             = -L$(BASE_PATH)/applications/magma-2.7.2/lib -lmagma
 
-#CUDAHOME          = /usr/local/cuda
-#CUDAHOME	 	  = /usr/lib/cuda
-#CUDAHOME          = $(CUDA_HOME)
 INCCUD	          = -I$(CUDAHOME)/include
 CUDA              = -L/usr/lib64/ -L$(CUDAHOME)/lib64 -lcudart -lcublas -lcufft -lcusparse -lcusolver -Wl,-rpath,$(CUDAHOME)/lib64
 
@@ -30,7 +26,7 @@ LIBS	    = $(LIBMKL) $(ARMADILLO) $(CUDA) $(MAGMA)
 
 
 
-main: main.C
+main: main_MPOTRF.C   # main_MPOTRF.C 
 	g++ $< -o $@ $(LIBS) $(INCLUDEDIR) $(DEBUG) -fopenmp
 
 

@@ -13,7 +13,7 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 #include <Eigen/SparseCholesky>
-#include <Eigen/CholmodSupport>
+//#include <Eigen/CholmodSupport>
 
 #include "Solver.h"
 
@@ -47,7 +47,8 @@ private:
 
     SpMat Q;                /**< sparse precision matrix Q. Eigen format. */
 
-    CholmodSupernodalLLT<SpMat> solverEigenQ;
+    //CholmodSupernodalLLT<SpMat> solverEigenQ;
+    SimplicialLDLT<SpMat> solverEigenQ;
 
 
 public:

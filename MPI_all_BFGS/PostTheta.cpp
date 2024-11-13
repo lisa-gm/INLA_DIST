@@ -1920,7 +1920,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	} else{
 
 		solverQst->factorize(Qu, log_det, t_priorLatChol);
-		printf("time chol(Qst) = %f\n", t_priorLatChol);
+		//printf("time chol(Qst) = %f\n", t_priorLatChol);
 		//std::cout << "Log det : " << log_det << std::endl;
 		val = 0.5 * (log_det);
 
@@ -2362,8 +2362,18 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 		// solve linear system
 		// returns vector mu, which is of the same size as rhs
 		//solve_cholmod(Q, rhs, mu, log_det);
+
+		// WRITE OUT MATRICES
+		if(MPI_rank == 0){
+			string filename = "Q_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + "_theta" + to_string(theta[0]) + "_" +  to_string(theta[1]) + "_" +  to_string(theta[2]) + "_" +  to_string(theta[3]) + "_iter" + to_string(iter_count) + ".dat";
+			write_sym_PARDISO_readable_CSR(filename, Q);
+
+			string filename_rhs = "rhs_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + "_theta" + to_string(theta[0]) + "_" +  to_string(theta[1]) + "_" +  to_string(theta[2]) + "_" +  to_string(theta[3]) + "_iter" + to_string(iter_count) + ".dat";
+			write_vector(filename_rhs, rhs, n);
+		}
+		//
 		solverQ->factorize_solve(Q, rhs, mu, log_det, t_condLatChol, t_condLatSolve);
-		printf("time chol(Q) = %f, solve = %f\n", t_condLatChol, t_condLatSolve);
+		//printf("time chol(Q) = %f, solve = %f\n", t_condLatChol, t_condLatSolve);
 	
 		// compute value
 		val = 0.5*log_det - 0.5 * mu.transpose()*(Q)*(mu);

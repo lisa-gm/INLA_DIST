@@ -21,7 +21,7 @@ LIBCHOLMOD=-L$(BASE_PATH)/applications/SuiteSparse/CHOLMOD/build
 LIBCHOLMOD=-lcholmod
 #ARMADILLO=-larmadillo
 # $(ARMADILLO)
-LIBS=$(LIBMKL) $(LIBCHOLMOD)
+LIBS=$(LIBMKL) #$(LIBCHOLMOD)
 
 # INCLUDES
 #INCEIGEN=-I/usr/include/eigen3
@@ -29,7 +29,7 @@ INCEIGEN=-I$(BASE_PATH)/applications/eigen
 INCCHOLMOD= -I$(BASE_PATH)/applications/SuiteSparse/CHOLMOD/Include
 INCSUITESPARSE= -I$(BASE_PATH)/applications/SuiteSparse/SuiteSparse_config
 
-INCLUDES=$(INCEIGEN) $(INCCHOLMOD) $(INCSUITESPARSE)
+INCLUDES=$(INCEIGEN) #$(INCCHOLMOD) $(INCSUITESPARSE)
 
 $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))

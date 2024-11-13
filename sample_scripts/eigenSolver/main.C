@@ -25,8 +25,8 @@ using namespace Eigen;
 
 int main(int argc, char *argv[]) {
 
-int nrows = 2000;
-int ncols = 2000;
+int nrows = 15;
+int ncols = 15;
 
 // generate sparse matrix A with random sparsity pattern
 MatrixXd A_dense = MatrixXd::Random(nrows,ncols);
@@ -58,13 +58,11 @@ Vect rhs = Vect::Ones(nrows);
 Vect sol(nrows);
 double t_condLatChol; double t_condLatSolve;
 solverQ->factorize_solve(A, rhs, sol, log_det, t_condLatChol, t_condLatSolve);
-//printf("log det factorize solve = %f\n", log_det);
+printf("log det factorize solve = %f\n", log_det);
 
 Vect invDiag(nrows);
 solverQ->selected_inversion(A, invDiag);
-//std::cout << "invDiag = " << invDiag.transpose() << std::endl;
-
-exit(1);
+std::cout << "invDiag = " << invDiag.transpose() << std::endl;
 
 MatrixXd Ainv(A_dense.rows(), A_dense.cols());
 solverQ->compute_full_inverse(A_dense, Ainv);
