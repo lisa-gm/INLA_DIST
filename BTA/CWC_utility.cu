@@ -87,10 +87,7 @@ extern "C"
 void memcpy_to_device(void *host_data, void *device_data, size_t size_element, cudaStream_t stream ) {
      cudaError_t cudaErr = cudaMemcpyAsync(device_data,host_data,size_element,cudaMemcpyHostToDevice, stream );
      //cudaError_t cudaErr = cudaMemcpy (device_data, host_data, size_element, cudaMemcpyHostToDevice);
-     if (cudaErr != cudaSuccess) { 
-        printf("Copy Supernode to device. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); 
-        exit(1);
-    }
+     if (cudaErr != cudaSuccess) { printf("Copy Supernode to device. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); }
 }
 
 extern "C"
@@ -101,10 +98,7 @@ void copy_data_to_host(void *host_data,void *device_data,int N,int M,size_t size
 extern "C"
 void memcpy_to_host(void *host_data, void *device_data, size_t size_element, cudaStream_t stream ){
     cudaError_t cudaErr = cudaMemcpyAsync(host_data,device_data,size_element,cudaMemcpyDeviceToHost, stream );
-     if (cudaErr != cudaSuccess) { 
-        printf("Copy Supernode to host. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); 
-        exit(1);
-    }
+     if (cudaErr != cudaSuccess) { printf("Copy Supernode to host. Cuda Error: %s\n", cudaGetErrorString(cudaErr)); }
 
 }
 
@@ -881,7 +875,7 @@ __global__ void z_symmetrize_2(cuDoubleComplex *matrix, int N)
 }
 
 extern "C"
-void z_symmetrize_matrix_2(CPX *matrix,int N,cudaStream_t stream){
+void z_symmetrize_matrix_2(CPX *matrix,int N, cudaStream_t stream){
 
     uint i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
 
@@ -906,14 +900,14 @@ __global__ void d_tril(double *A, int lda, int N)
 }
 
 extern "C"
-void d_tril_on_dev(double *A, int lda, int N)
+void d_tril_on_dev(double *A, int lda, int N, cudaStream_t stream)
 {
     uint i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
 
     dim3 grid(i_size / BLOCK_DIM, i_size / BLOCK_DIM, 1);
     dim3 threads(BLOCK_DIM, BLOCK_DIM, 1);
 
-    d_tril<<<grid, threads>>>(A, lda, N);
+    d_tril<<<grid, threads, 0, stream>>>(A, lda, N);
 }
 
 // *** new SINGLE PRECISION *** //
@@ -932,14 +926,14 @@ __global__ void s_tril(float *A, int lda, int N)
 }
 
 extern "C"
-void s_tril_on_dev(float *A, int lda, int N)
+void s_tril_on_dev(float *A, int lda, int N, cudaStream_t stream)
 {
     uint i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
 
     dim3 grid(i_size / BLOCK_DIM, i_size / BLOCK_DIM, 1);
     dim3 threads(BLOCK_DIM, BLOCK_DIM, 1);
 
-    s_tril<<<grid, threads>>>(A, lda, N);
+    s_tril<<<grid, threads, 0, stream>>>(A, lda, N);
 }
 // ****************************** //
 
@@ -959,14 +953,14 @@ __global__ void z_tril(cuDoubleComplex *A, int lda, int N)
 }
 
 extern "C"
-void z_tril_on_dev(CPX *A, int lda, int N)
+void z_tril_on_dev(CPX *A, int lda, int N, cudaStream_t stream)
 {
     uint i_size = N + (BLOCK_DIM-(N%BLOCK_DIM));
 
     dim3 grid(i_size / BLOCK_DIM, i_size / BLOCK_DIM, 1);
     dim3 threads(BLOCK_DIM, BLOCK_DIM, 1);
 
-    z_tril<<<grid, threads>>>((cuDoubleComplex*)A, lda, N);
+    z_tril<<<grid, threads, 0, stream>>>((cuDoubleComplex*)A, lda, N);
 }
 
 __global__ void d_indexed_copy(double *src, double *dst, size_t *index, size_t N)
@@ -1440,7 +1434,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line)
 }
 
 extern "C"
-void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
     //printf("in d_extract_nnzA_on_dev()\n");
     size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
@@ -1448,14 +1442,14 @@ void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t 
     size_t supernode_fc = supernode * ns;
     size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
 
-    d_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    d_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 
-    gpuErrchk(cudaDeviceSynchronize());
+    //gpuErrchk(cudaDeviceSynchronize());
 }
 
 
 extern "C"
-void s_extract_nnzA_on_dev(float *a, size_t *ia, size_t *ja, float *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+void s_extract_nnzA_on_dev(float *a, size_t *ia, size_t *ja, float *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream )
 {
     //printf("in d_extract_nnzA_on_dev()\n");
     size_t i_size = supernode_nnz + (BLOCK_DIM-(supernode_nnz%BLOCK_DIM));
@@ -1463,8 +1457,8 @@ void s_extract_nnzA_on_dev(float *a, size_t *ia, size_t *ja, float *M, size_t su
     size_t supernode_fc = supernode * ns;
     size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
 
-    s_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    s_extract_nnzA<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(a, ia, ja, M, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
 
-    gpuErrchk(cudaDeviceSynchronize());
+    //gpuErrchk(cudaDeviceSynchronize());
 }
 

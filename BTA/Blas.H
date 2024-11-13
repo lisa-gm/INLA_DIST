@@ -7,10 +7,17 @@
 #include "magma_v2.h"
 
 #define CUDA_POTRF
+//#define CUDA_TRSM
+
 //#define MAGMA_EXPERT
 
 #ifdef CUDA_POTRF
 #include "cusolverDn.h"
+#endif
+
+#ifdef CUDA_TRSM
+//#include "cublasXt.h"
+#include "cublas_v2.h"
 #endif
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -941,10 +948,6 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
     static double res;
 #endif
 
-    /*double a_host;
-    gpuErrchk(cudaMemcpy(&a_host, &a[0], sizeof(double), cudaMemcpyDeviceToHost)); 
-    printf("in potrf. n = %d, lda = %d, a[0] = %f\n", n, lda, a_host);*/
-
     cublasFillMode_t uplo_cuda;
 
     if(uplo == 'L'){
@@ -960,10 +963,15 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
 
         cusolverStatus_t cuSolverError = cusolverDnXpotrf_bufferSize(
                 *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, dev_size, host_size);
+
+        // cusolverStatus_t cuSolverError = cusolverDnDpotrf_bufferSize(*handle, uplo_cuda, n, a, lda, (int*) dev_size);
+
        if(cuSolverError != 0){
             printf("cuSolverError buffer size allocation!\n");
             exit(1);
         }
+
+
 
         cuda_buffer_flag[0] = 1;
 
@@ -1005,12 +1013,10 @@ inline void tpotrf_dev_cuda(char uplo,int n,double *a,int lda,int *info, int *cu
 
     cuSolverError = cusolverDnXpotrf(
             *handle, *params, uplo_cuda, n, CUDA_R_64F, a, lda, CUDA_R_64F, 
-            mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info);
+            mem_cuda_dev, *dev_size, mem_cuda_host, *host_size, info); 
 
-
-    /*double l_host;
-    gpuErrchk(cudaMemcpy(&l_host, &a[0], sizeof(double), cudaMemcpyDeviceToHost)); 
-    printf("in potrf after factorization. n = %d, lda = %d, l[0] = %f\n", n, lda, l_host);*/
+    /*int dev_size_int = static_cast<int>(*dev_size);
+    cuSolverError = cusolverDnDpotrf(*handle, uplo_cuda, n, a, lda, mem_cuda_dev, dev_size_int, info);*/
 
     if(cuSolverError != 0){
         printf("cuSolverError potrf! cuSolverError : %d, lda = %d\n", cuSolverError, lda);
@@ -1104,48 +1110,44 @@ inline void tpotrf_dev_cuda(char uplo,int n,CPX *a,int lda,int *info, int *cuda_
 
 template <typename T>
 inline void magma_tpotrf_expert_wrapper(char uplo, int n, T* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, 
-                                        void** host_work, int *lwork_host, void** device_work, int *lwork_device,
+                                        void* host_work, int *lwork_host, void* device_work, int *lwork_device,
                                         magma_event_t events[2], magma_queue_t queues[2], int& init_flag){
     
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
-    //printf("in magma expert wrapper. init flag: %d\n", init_flag);
 
     if(init_flag < 1){
         *lwork_host   = -1;
         *lwork_device = -1;
+        printf("in initializing potrf expert gpu.\n");
 
         magma_tpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
                                                           host_work, lwork_host, device_work, lwork_device, events, queues);
-        //printf("DPOTRF EXPERT WORK. Allocating %d of host memory. Allocating %d of device memory.\n", *lwork_host, *lwork_device);
+        printf("DPOTRF EXPERT WORK. Allocating %d of host memory. Allocating %d of device memory.\n", *lwork_host, *lwork_device);
         
-        if(*lwork_device > 0){
-            gpuErrchk(cudaMalloc((void**)device_work,*lwork_device));
+        if(lwork_device > 0){
+            gpuErrchk(cudaMalloc((void**)&device_work,*lwork_device));
         }
 
-        if(*lwork_host > 0){
-            gpuErrchk(cudaMallocHost((void**)host_work,*lwork_host));    
+        if(lwork_host > 0){
+            gpuErrchk(cudaMallocHost((void**)&host_work,*lwork_host));    
         }
 
         init_flag = 1;
     }
 
-    //std::cout << "In magma expert wrapper. uplo: " << uplo << ", n = " << to_string(n) << ", lda = " << to_string(lda) << ", subN = " << to_string(subN);
-    //std::cout << ", subSubN = " << subSubN << ", lwork_host : " << to_string(*lwork_host) << ", lwork_device : " << to_string(*lwork_device) << std::endl;
-
     magma_tpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
                                  host_work, lwork_host, device_work, lwork_device, events, queues);
-                                 
 }
 
 template <typename T>
-inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, T* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void** host_work, magma_int_t *lwork_host, void** device_work, magma_int_t *lwork_device, magma_event_t events[2], magma_queue_t queues[2]);
+inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, T* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void* host_work, magma_int_t *lwork_host, void* device_work, magma_int_t *lwork_device, magma_event_t events[2], magma_queue_t queues[2]);
 
 // new magma -- double precision
 template <>
-inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, double* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void** host_work, int *lwork_host, void** device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
+inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, double* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void* host_work, int *lwork_host, void* device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
 {
     magma_int_t potrfErr = magma_dpotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
-                                                        *host_work, lwork_host, *device_work, lwork_device, events, queues);    
+                                                        host_work, lwork_host, device_work, lwork_device, events, queues);    
     if(potrfErr != 0){
         std::cout << "in magma potrf expert work error = " << potrfErr << std::endl;
         exit(1);        
@@ -1154,10 +1156,10 @@ inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, double*
 
 // new magma -- single precision
 template <>
-inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, float* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void** host_work, int *lwork_host, void** device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
+inline void magma_tpotrf_expert_gpu_work(magma_uplo_t magma_uplo, int n, float* a, int lda, int info[1], magma_mode_t mode, int subN, int subSubN, void* host_work, int *lwork_host, void* device_work, int *lwork_device, magma_event_t events[2], magma_queue_t queues[2])
 {
     magma_int_t potrfErr = magma_spotrf_expert_gpu_work(magma_uplo, n, a, lda, info, mode, subN, subSubN, 
-                                                        *host_work, lwork_host, *device_work, lwork_device, events, queues);    
+                                                        host_work, lwork_host, device_work, lwork_device, events, queues);    
     if(potrfErr != 0){
         std::cout << "in magma potrf expert work error = " << potrfErr << std::endl;
         exit(1);        
@@ -1173,9 +1175,9 @@ inline void tpotrf_dev(char uplo,int n,T *a,int lda,int *info);
 template <>
 inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
 {
-    /*double a_host;
-    gpuErrchk(cudaMemcpy(&a_host, &a[0], sizeof(double), cudaMemcpyDeviceToHost)); 
-    printf("in potrf. n = %d, lda = %d, a[0] = %f\n", n, lda, a_host);*/
+    //double a_host;
+    //gpuErrchk(cudaMemcpy(&a_host, &a[0], sizeof(double), cudaMemcpyDeviceToHost)); 
+    //printf("in potrf. n = %d, lda = %d, a[0] = %f\n", n, lda, a_host);
 
     magma_uplo_t magma_uplo = magma_uplo_const(uplo);
     // using the magma_dpotrf_expert_gpu interface to
@@ -1238,7 +1240,96 @@ inline void tpotrf_dev(char uplo,int n,CPX *a,int lda,int *info)
 
 #endif // end #ifelse defined CUDA_POTRF
 
+// ******************** TRSM *************** //
+#ifdef CUDA_TRSM
 
+// cublasXtHandle_t handle
+template <typename T>
+inline void ttrsm_dev_cuda(cublasHandle_t handle, char side, char uplo, char trans, char diag, int m, int n, T alpha, T *a, int lda, T *b, int ldb, cudaStream_t stream);
+
+
+template <>
+inline void ttrsm_dev_cuda(cublasHandle_t handle, char side, char uplo, char trans, char diag, int m, int n, double alpha, double *a, int lda, double *b, int ldb, cudaStream_t stream)
+{
+    // magma_side_t magma_side = magma_side_const(side);
+    // magma_uplo_t magma_uplo = magma_uplo_const(uplo);
+    // magma_trans_t magma_trans = magma_trans_const(trans);
+    // magma_diag_t magma_diag = magma_diag_const(diag);
+
+    // magma_int_t trsmErr = magma_dtrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
+
+    // if(trsmErr != 0){
+    //     printf("magma trsm error = %d\n", trsmErr);
+    //     exit(1);
+    // }
+
+    cublasSideMode_t side_cuda;
+    if(side == 'L'){
+        side_cuda = CUBLAS_SIDE_LEFT;
+    } else if(side =='R') {
+        side_cuda = CUBLAS_SIDE_RIGHT;
+    } else {
+        printf("invalid trsm argument side: %c\n", side);
+        exit(1);
+    }
+
+    cublasFillMode_t uplo_cuda;
+    if(uplo == 'L'){
+        uplo_cuda = CUBLAS_FILL_MODE_LOWER;
+    } else if(uplo =='U') {
+        uplo_cuda = CUBLAS_FILL_MODE_UPPER;
+    } else {
+        printf("invalid trsm argmument uplo: %c\n", uplo);
+        exit(1);
+    }
+
+    cublasOperation_t trans_cuda;
+    if(trans == 'N'){
+        trans_cuda = CUBLAS_OP_N;
+    } else if(trans == 'T'){
+        trans_cuda = CUBLAS_OP_T;
+    } else {
+        printf("invalid trsm argmument trans %c\n", diag);
+        exit(1);
+    }
+
+
+    cublasDiagType_t diag_cuda;
+    if(diag == 'n' || diag == 'N'){
+        diag_cuda = CUBLAS_DIAG_NON_UNIT;
+    } else if(diag == 'u' || diag == 'U'){
+        diag_cuda = CUBLAS_DIAG_UNIT;
+    } else {
+        printf("invalid trsm argmument diag: %c\n", diag);
+        exit(1);
+    }
+
+    // add specific stream 
+    cublasStatus_t setStreamErr = cublasSetStream(handle, stream);
+    if(setStreamErr != 0){
+        printf("cuBlasError set Stream! cuBlasError = %d\n", setStreamErr);
+        exit(1);
+    }
+
+    cublasStatus_t cuBlasError = cublasDtrsm(handle, side_cuda, uplo_cuda, trans_cuda, diag_cuda, m, n, &alpha, a, lda, b, ldb);
+    //cublasStatus_t cuBlasError = cublasXtDtrsm(handle, side_cuda, uplo_cuda, trans_cuda, diag_cuda, m, n, &alpha, a, lda, b, ldb);
+
+    if(cuBlasError != 0){
+        printf("cuBlasError trsm! cuBlasError = %d\n", cuBlasError);
+        exit(1);
+    }
+
+}
+
+
+template <>
+inline void ttrsm_dev_cuda(cublasHandle_t handle, char side, char uplo, char trans, char diag, int m, int n, CPX alpha, CPX *a, int lda, CPX *b, int ldb, cudaStream_t stream)
+{
+    printf("In ttrsm_dev_cuda for T complex. Just a placeholder. Not working!\n");
+    exit(1);
+}
+
+#else
 /************************************************************************************************/
 
 template <typename T>
@@ -1280,6 +1371,8 @@ inline void ttrsm_dev(char side, char uplo, char trans, char diag, int m, int n,
 
     magma_ztrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, *reinterpret_cast<magmaDoubleComplex*>(&alpha), (magmaDoubleComplex_ptr)a, lda, (magmaDoubleComplex_ptr)b, ldb, queue);
 }
+
+#endif // end #ifdef CUDA_POTRF / MAGMA
 
 /************************************************************************************************/
 
@@ -1631,25 +1724,25 @@ inline void extract_not_diag_on_dev(CPX *D,int *edge_i,int *index_j,CPX *nnz,int
 /************************************************************************************************/
 
 template <typename T>
-inline void tril_dev(T *A, int lda, int N);
+inline void tril_dev(T *A, int lda, int N, cudaStream_t stream);
 
 template <>
-inline void tril_dev(double *A, int lda, int N)
+inline void tril_dev(double *A, int lda, int N, cudaStream_t stream)
 {
-    d_tril_on_dev(A, lda, N);
+    d_tril_on_dev(A, lda, N, stream);
 }
 
 // new SINGLE PRECISION
 template <>
-inline void tril_dev(float *A, int lda, int N)
+inline void tril_dev(float *A, int lda, int N, cudaStream_t stream)
 {
-    s_tril_on_dev(A, lda, N);
+    s_tril_on_dev(A, lda, N, stream);
 }
 
 template <>
-inline void tril_dev(CPX *A, int lda, int N)
+inline void tril_dev(CPX *A, int lda, int N, cudaStream_t stream)
 {
-    z_tril_on_dev(A, lda, N);
+    z_tril_on_dev(A, lda, N, stream);
 }
 
 /************************************************************************************************/
@@ -1825,23 +1918,23 @@ inline void init_supernode_dev(CPX *M, size_t *ia, size_t *ja, CPX *a, size_t su
 // NEW
 
 template <typename T>
-inline void extract_nnzA_dev(T *a, size_t *ia, size_t *ja, T *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd);
+inline void extract_nnzA_dev(T *a, size_t *ia, size_t *ja, T *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream);
 
 template <>
-inline void extract_nnzA_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+inline void extract_nnzA_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream)
 {
-    d_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+    d_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd, stream);
 }
 
 // new SINGLE PRECISION
 template <>
-inline void extract_nnzA_dev(float *a, size_t *ia, size_t *ja, float *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+inline void extract_nnzA_dev(float *a, size_t *ia, size_t *ja, float *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream)
 {
-    s_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd);
+    s_extract_nnzA_on_dev(a, ia, ja, M, supernode, supernode_nnz, supernode_offset, ns, nt, nd, stream);
 }
 
 template <>
-inline void extract_nnzA_dev(CPX *a, size_t *ia, size_t *ja, CPX *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)
+inline void extract_nnzA_dev(CPX *a, size_t *ia, size_t *ja, CPX *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd, cudaStream_t stream)
 {
     printf("just dummy version of COMPLEX extract_nnzA_dev. not implemented.\n");
     exit(1);   
