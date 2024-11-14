@@ -37,8 +37,8 @@ threads=1
 export OMP_NUM_THREADS=${threads}
 echo "OMP_NUM_THREADS=${threads}"
 
-#export CUDA_LAUNCH_BLOCKING=1
-#echo "CUDA_LAUNCH_BLOCKING=1"
+export CUDA_LAUNCH_BLOCKING=1
+echo "CUDA_LAUNCH_BLOCKING=1"
 
 echo "srun --gres=gpu:1 main ${ns} ${nt} ${nss} ${nb} ${Q_file} >BTA_output.txt"
 srun ./main_fullCSC ${ns} ${nt} ${nss} ${nb} ${Q_file} >BTA_output_fullCSC_ns${ns}_nt${nt}_nss${nss}_nb${nb}.txt

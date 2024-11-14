@@ -216,7 +216,7 @@ std::string valueType;
     BTA<T> *solver;
     solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
 
-    int m = 2;
+    int m = 1;
     Vect t_factorize_vec(m-1);
     T log_det;
 
@@ -311,6 +311,36 @@ std::string valueType;
             std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
         }
 
+        // Compute the inverse using SimplicialLDLT
+        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solverEigen;
+        solverEigen.compute(Q);
+        if (solverEigen.info() != Eigen::Success) {
+            std::cerr << "Decomposition failed" << std::endl;
+            return -1;
+        }
+
+        Eigen::MatrixXd Q_inv_ref = solverEigen.solve(Eigen::MatrixXd::Identity(Q.rows(), Q.cols()));
+        if (solverEigen.info() != Eigen::Success) {
+            std::cerr << "Solving failed" << std::endl;
+            return -1;
+        }
+
+
+
+        std::cout << "HEAD: diag(Q_inv_ref)" <<  Q_inv_ref.diagonal().transpose() << std::endl;
+        //std::cout << "TAIL: diag(Q_inv_ref)" <<  Q_inv_ref.diagonal().tail(50).transpose() << std::endl;
+
+        std::cout << "HEAD: diag(Q_inv_ref)" <<  invQ_new_lower.diagonal().transpose() << std::endl;
+        //std::cout << "TAIL: diag(Q_inv_ref)" <<  invQ_new_lower.diagonal().tail(50).transpose() << std::endl;
+
+        // Print the inverse matrix
+        std::cout << "Inverse matrix:\n" << Eigen::MatrixXd(Q_inv_ref.block(0,0,10,10)) << std::endl;
+        std::cout << "Q * Qinv :\n" << (Q*Q_inv_ref).block(0,0,10,10) << std::endl;
+
+        // 
+        std::cout << "norm(diag(invQ_new) - diag(Q_inv_ref)) = " << (invQ_new_lower.diagonal() - Q_inv_ref.diagonal()).norm() << std::endl;
+
+
         // Eigen::MatrixXd S_ref_lower = S_ref.triangularView<Lower>();
         // std::cout << "S_ref: \n" << S_ref_lower << std::endl;
 
@@ -320,12 +350,12 @@ std::string valueType;
 
         // call copy indicator 2
 
-        size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
-        printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
-        t_invDiag = get_time(0.0);
-        solver->BTAinvBlks(ia, ja, a, invQ_blks);
-        t_invDiag = get_time(t_invDiag);
-        printf("time BTAinvBlks: %f\n", t_invDiag);
+        // size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
+        // printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
+        // t_invDiag = get_time(0.0);
+        // solver->BTAinvBlks(ia, ja, a, invQ_blks);
+        // t_invDiag = get_time(t_invDiag);
+        // printf("time BTAinvBlks: %f\n", t_invDiag);
 
         // printf("invQ_blks: ");
         // for(int i=0; i<matrix_nonzeros_blocked; i++){
@@ -365,6 +395,7 @@ std::string valueType;
 
 
     } // iter < m
+
   
   // free memory
   delete solver;

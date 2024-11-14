@@ -41,11 +41,11 @@ LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)  #$(ARMADILLO)
 
 $(info ============== Compiling ==============)
 
-all: mainEigen
-#all: main_fullCSC 
+#all: mainEigen
+all: main_fullCSC 
 
-CC_FILES   = Utilities.o mainEigen.o #main.o
-#CC_FILES   = Utilities.o main_fullCSC.o #main.o
+#CC_FILES   = Utilities.o mainEigen.o #main.o
+CC_FILES   = Utilities.o main_fullCSC.o #main.o
 
 CU_FILES   = CWC_utility.o
 
