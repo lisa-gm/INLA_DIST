@@ -13,7 +13,7 @@
 #include <unsupported/Eigen/SparseExtra>   // includes saveMarket
 
 #include <armadillo>
-#include "generate_testMat_selInv.cpp"
+// #include "generate_testMat_selInv.cpp"
 #include "../read_write_functions.cpp"
 #include "helper_functions.h"
 
@@ -24,7 +24,7 @@ using Eigen::MatrixXd;
 
 typedef Eigen::VectorXd Vect;
 
-//#define PRINT_MSG
+#define PRINT_MSG
 //#define RECORD_TIMES
 
 #if 0
@@ -647,6 +647,8 @@ std::string valueType;
     if(solver_type.compare("PARDISO") != 0 && solver_type.compare("BTA") != 0){
         std::cout << "Unknown solver type. Available options are :\nPARDISO\nBTA" << std::endl;
         exit(1);
+    } else {
+        std::cout << "solver type : " << solver_type << std::endl;
     }
 
     /* ---------------- read in matrices ---------------- */
@@ -739,7 +741,6 @@ std::string valueType;
         }
         printf(".\n");
     
-
         // files to construct Q.u depending on HYPERPARAMETERS theta
         std::string c0_file      =  base_path + "/c0_" + ns_s + ".dat";
         file_exists(c0_file);
@@ -756,6 +757,7 @@ std::string valueType;
         file_exists(M1_file);
         std::string M2_file      =  base_path + "/M2_" + nt_s + ".dat";
         file_exists(M2_file);  
+
 
         // check projection matrix for A.st
         std::string Ax_file     =  base_path + "/Ax_" + no_s + "_" + n_s + ".dat";
