@@ -781,7 +781,7 @@ std::string valueType;
             //exit(1);
         }*/
 
-#if 0
+#if 1
     // true inv diag from Eigen
     //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
     SimplicialLLT<SpMat> solverQ;
@@ -1136,7 +1136,7 @@ std::string valueType;
 
     std::cout << "norm(diag(invQ_new)) = " << invQ_new.diagonal().norm() << std::endl;
     std::cout << "norm(invDiag))       = " << invDiag_vec.norm() << std::endl;    
-    //std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
+    std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
     //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
 
     //std::string invQ_fileName = "invQ_seq_" + to_string(n) + ".txt";

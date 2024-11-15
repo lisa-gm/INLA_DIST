@@ -52,12 +52,12 @@ std::string valueType;
 #endif
 
 
-#if 0 // dummy example
+#if 1 // dummy example
 
     int ns=2;
     int nss=0;
     int nt=5;
-    int nb=0;
+    int nb=1;
     int n = ns*nt + nb;
 
     SpMat Q       = gen_test_mat_base3(ns, nt, nb);
@@ -312,7 +312,7 @@ std::string valueType;
         }
 
         // Compute the inverse using SimplicialLDLT
-        Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solverEigen;
+        SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverEigen;
         solverEigen.compute(Q);
         if (solverEigen.info() != Eigen::Success) {
             std::cerr << "Decomposition failed" << std::endl;
@@ -325,20 +325,34 @@ std::string valueType;
             return -1;
         }
 
+        SpMat L = solverEigen.matrixL();
+        std::cout << "L: \n" << MatrixXd(L) << std::endl;
+
+        // compute inverse of L
+        MatrixXd inv_L = L.triangularView<Lower>().solve(Eigen::MatrixXd::Identity(L.rows(), L.cols()));
+        std::cout << "inv L: \n" << inv_L << std::endl;
+
+        // L L^T = Q, so Q^{-1} = L^{-T} L^{-1}
+        MatrixXd inv_Q_Eigen = inv_L.transpose() * inv_L;
+        std::cout << "diff(Q_inv_ref - inv_Q_Eigen): \n" << (inv_Q_Eigen - Q_inv_ref).norm()<< std::endl;
+
+
+
 
 
         std::cout << "HEAD: diag(Q_inv_ref)" <<  Q_inv_ref.diagonal().transpose() << std::endl;
         //std::cout << "TAIL: diag(Q_inv_ref)" <<  Q_inv_ref.diagonal().tail(50).transpose() << std::endl;
 
-        std::cout << "HEAD: diag(Q_inv_ref)" <<  invQ_new_lower.diagonal().transpose() << std::endl;
+        std::cout << "HEAD: diag(inQ_new_lower)" <<  invQ_new_lower.diagonal().transpose() << std::endl;
         //std::cout << "TAIL: diag(Q_inv_ref)" <<  invQ_new_lower.diagonal().tail(50).transpose() << std::endl;
 
         // Print the inverse matrix
-        std::cout << "Inverse matrix:\n" << Eigen::MatrixXd(Q_inv_ref.block(0,0,10,10)) << std::endl;
-        std::cout << "Q * Qinv :\n" << (Q*Q_inv_ref).block(0,0,10,10) << std::endl;
+        std::cout << "Inverse matrix:\n" << Eigen::MatrixXd(Q_inv_ref) << std::endl;
+        std::cout << "Q * Qinv :\n" << (Q*Q_inv_ref) << std::endl;
 
         // 
         std::cout << "norm(diag(invQ_new) - diag(Q_inv_ref)) = " << (invQ_new_lower.diagonal() - Q_inv_ref.diagonal()).norm() << std::endl;
+        std::cout << "norm(invDiag_vec    - diag(Q_inv_ref)) = " << (invDiag_vec - Q_inv_ref.diagonal()).norm() << std::endl;
 
 
         // Eigen::MatrixXd S_ref_lower = S_ref.triangularView<Lower>();
@@ -386,7 +400,7 @@ std::string valueType;
         }*/
 
         // std::cout << "norm(diag(S_ref) - diag(S_blks_lower)) = " << (S_ref.diagonal() - diagFromBlks).norm() << std::endl;
-        std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new_lower.diagonal() - invDiag_vec).norm() << std::endl;
+        //std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new_lower.diagonal() - invDiag_vec).norm() << std::endl;
         //std::cout << "norm(diag(S_blk)    - diag(invDiag)) = " << (S_blks.diagonal() - invDiag_vec).norm() << std::endl;
         //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new_lower.diagonal() - inv_Q_Eigen.diagonal()).norm() << std::endl;
 

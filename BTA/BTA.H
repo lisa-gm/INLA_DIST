@@ -162,7 +162,7 @@ public:
     * 
     * @return double 
     */
-    double BTAinvBlks(size_t* ia, size_t*ja, T *a, T *&invBlks);
+    double BTAinvBlks(size_t* ia, size_t*ja, T *a, T *invBlks);
 
    /**
      * @brief compute log determinant.
@@ -628,7 +628,7 @@ double BTA<T>::FirstStageFactor()
 #endif
 
    nvtxRangeId_t id_factorize = nvtxRangeStartA("FirstStageFactor");
-
+   
     double t_potrf    = 0;
     double t_dgemm    = 0;
     double t_copy_DtH = 0;
@@ -2441,7 +2441,6 @@ double BTA<T>::SecondStageSolve_s(size_t nrhs, float* rhs_s)
     c_ttrsm('L', 'L', 'T', 'N', NR, nrhs, ONE_s, &MF_s[mf_block_index(IB, IB)], mf_block_lda(IB, IB), &rhs_s[Bmin[IB]], matrix_size);
     flop_count += NR * NR * nrhs;
 
-    flop_count += NR * NR * nrhs;
     t_solve = get_time(t_solve);
 
     nvtxRangeEnd(id_solve);
@@ -2483,10 +2482,7 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
    T *eye_dev;
    mem_alloc_dev = allocate_data_on_device((void**)&eye_dev,matrix_ns*matrix_ns*sizeof(T));  
-
-   nvtxRangeId_t id_init_eye = nvtxRangeStartA("init_eye_on_dev");
    init_eye_on_dev(eye_dev,matrix_ns,0);
-   nvtxRangeEnd(id_init_eye);
 
    allocate_data_on_device((void**)&S_ii_dev,matrix_ns*matrix_ns*sizeof(T));
    allocate_data_on_device((void**)&S_i1i_dev  , matrix_ns*matrix_ns*sizeof(T));   
@@ -2522,26 +2518,19 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
       // make matrix lower triangular
       tril_dev(blockDense_dev, NR, NR, magma_cudaStream_1);
-      init_eye_on_dev(S_n1n1_dev, NR, 0);
+
+      // copy identity to tmp2_dev where L^-1 will be stored
+      init_eye_on_dev(S_n1n1_dev, NR, magma_cudaStream_1);
 
       // explicitly compute L_n+1n+1^-1
 #ifdef CUDA_TRSM
-   //   cuda_buffer_flag_trtri[0] = 0;
-   //   ttrtri_dev_cuda('L', 'N', NR, blockDense_dev, NR, info_cuda, cuda_buffer_flag_trtri, 
-   //             handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
-   ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, blockDense_dev, NR, S_n1n1_dev, NR, magma_cudaStream_1);
-
+      ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, blockDense_dev, NR, S_n1n1_dev, NR, magma_cudaStream_1);
 #else
-   // magma_queue currently not supported
-   //  ttrtri_dev('L', 'N', NR, blockDense_dev, NR, &info);
-   ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockDense_dev, NR, S_n1n1_dev, NR, magma_queue_1);
+      ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockDense_dev, NR, S_n1n1_dev, NR, magma_queue_1);
 #endif
-      //flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
       flop_count +=  NR * NR * NR;
 
       tlacpy_dev('F', NR, NR, S_n1n1_dev, NR, blockDense_dev, NR, magma_queue_1);
-
-      // if tmp1_dev contains L^-1, then
       // Sigma_n+1n+1 = C = L^-T*L^-1 -> beta = 0, write into S_n1n1
       tgemm_dev('T', 'N', NR, NR, NR, ONE, blockDense_dev, NR, blockDense_dev, NR, ZERO, S_n1n1_dev, mf_block_lda(IB, IB), magma_queue_1);
       flop_count += 2.0 * NR * NR * NR;
@@ -2572,28 +2561,22 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       // make lower triangular, blockR_dev still contains L_nn
       tril_dev(blockR_dev, mf_block_lda(IB, IB), NR, magma_cudaStream_1);
 
-      tlacpy_dev('F', NR, NR, eye_dev, NR, tmp2_dev, NR, magma_queue_1);
+      // copy identity to tmp1_dev where L^-1 will be stored   
+      tlacpy_dev('F', NR, NR, eye_dev, NR, tmp1_dev, NR, magma_queue_1);
 
       // explicitly compute L_nn^-1     
 #ifdef CUDA_TRSM
-   //   if(NR != NP){
-   //       cuda_buffer_flag_trtri[0] = 0;
-   //   }
-   //   ttrtri_dev_cuda('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), info_cuda, cuda_buffer_flag_trtri, 
-   //                     handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
-    ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_cudaStream_1);
+      // writes into second array i.e. tmp2_dev
+      ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, magma_cudaStream_1);
 #else
-     //ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-     ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev,  mf_block_lda(IB, IB), tmp2_dev, NR, magma_queue_1);
+      ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, magma_queue_1);
 #endif
 
-      //flop_count +=  1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
       flop_count +=  NR * NR * NR;
-      cudaDeviceSynchronize();
 
       // copy L_nn^-1 to simplify my life
       //tlacpy_dev('F', NR, NR, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, magma_queue_1);
-      tlacpy_dev('F', NR, NR, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
+      tlacpy_dev('F', NR, NR, tmp1_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
 
       // *************** Sn+1n ************ //
       // Sn+1n    = -Sn+1n+1*L_Fn*L_Dn+1^-1
@@ -2603,8 +2586,6 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 2.0 * NP * NR * NP;
 
       // step 2: tmp3_dev*L_Dn^-1 => -tmp3_dev*blockR_dev, dim(tmp3_dev) = (nb, ns), dim(blockR_dev) = (ns, ns)
-      // nb, ns, ns
-      //printf("mf_block_lda(IB, IB) = %d\n", mf_block_lda(IB, IB));
       tgemm_dev('N', 'N', NP, NR, NR, ONE, tmp3_dev, NP, blockR_dev, mf_block_lda(IB, IB), ZERO, S_n1i_dev, NP, magma_queue_1);
       flop_count += 2.0 * NP * NR * NR;
 
@@ -2621,11 +2602,11 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
       // *************** Snn ************ //
       // tmp1_dev = - L_n+1n^T * S_n1i_dev + L_nn^-1 (stored in blockR_dev)
-      tgemm_dev('T', 'N', NR, NR, NP, -ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), S_n1i_dev, NP, ONE, tmp2_dev, NR, magma_queue_1);
+      tgemm_dev('T', 'N', NR, NR, NP, -ONE, &blockR_dev[mf_dense_block_offset(IB)], mf_dense_block_lda(IB), S_n1i_dev, NP, ONE, tmp1_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NR * NP;
 
       // tmp4_dev = L_nn^-T * tmp1_dev
-      tgemm_dev('T', 'N', NR, NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, ZERO, S_ii_dev, NR, magma_queue_1);
+      tgemm_dev('T', 'N', NR, NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, ZERO, S_ii_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NR * NR;
 
       // *************** Snn ************ //
@@ -2633,7 +2614,7 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
 
 #ifdef PRINT_MSG
       if(matrix_ns*matrix_ns < 200){
-         cudaMemcpy(tmp4, tmp1_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+         cudaMemcpy(tmp4, S_ii_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
          printf("Sigma_nn : \n");
          for(int i=0; i<matrix_ns*matrix_ns; i++){
             printf("%f ", tmp4[i]);
@@ -2648,39 +2629,35 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       IB = NBlock-1;
       NR = Bmax[IB]-Bmin[IB];
 
-      // make make blockR_dev lower triangular
-      tril_dev(blockR_dev, mf_block_lda(IB, IB), NR, magma_cudaStream_1);
+      // copy lower triangular block of blockR_dev to tmp1_dev
+      tlacpy_dev('L', NR, NR, blockR_dev, mf_block_lda(IB, IB), tmp1_dev, NR, magma_queue_1);
+      cudaDeviceSynchronize();
 
-      // copy identity to tmp2_dev where L^-1 will be stored   
+      // make make tmp1_dev lower triangular
+      tril_dev(tmp1_dev, NR, NR, magma_cudaStream_1);
       tlacpy_dev('F', NR, NR, eye_dev, NR, tmp2_dev, NR, magma_queue_1);
-      // compute L^-1 = inv(tmp1_dev) which is lower triangular
-#ifdef CUDA_TRSM
-   // factorization first block -> set buffer flag to zero!
-   //   cuda_buffer_flag_trtri[0] = 0;
-   //   ttrtri_dev_cuda('L', 'N', NR, tmp1_dev, NR, info_cuda, cuda_buffer_flag_trtri, 
-   //                     handle, magma_cudaStream_1, dev_size, host_size, mem_cuda_dev, mem_cuda_host);
-      ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_cudaStream_1);
-#else
-      ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_queue_1);
-#endif
-      // TRTRI: 1/3 * NR^3 + 2/3 * NR^2, TRSM:
-      flop_count += NR * NR * NR;
 
-      // blockR_dev = L^-T*L^-1
-      tgemm_dev('T', 'N', NR, NR, NR, ONE, tmp2_dev, NR, tmp2_dev, NR, ZERO, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
+#ifdef CUDA_TRSM
+      ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, tmp1_dev, NR, tmp2_dev, NR, magma_cudaStream_1);
+#else
+      ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, tmp1_dev, NR, tmp2_dev, NR, magma_queue_1);
+#endif
+      flop_count += NR*NR*NR;
+      
+      // S_ii_dev = L^-T*L^-1
+      tgemm_dev('T', 'N', NR, NR, NR, ONE, tmp2_dev, NR, tmp2_dev, NR, ZERO, S_ii_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NR * NR;
 
       // *************** Snn ************ //
-      tlacpy_dev('F', NR, NR, blockR_dev, mf_block_lda(IB, IB), S_ii_dev, NR, magma_queue_1);
+      tlacpy_dev('F', NR, NR, S_ii_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
 
    } // end if matrix_nd > 0
 
-      cudaDeviceSynchronize();
-      // TODO: can already start this before ...
-      if(matrix_nt > 1){
-         copy_supernode_to_device(blockM_dev, NBlock-2, cuda_copystream);
-      }
-
+   // -> already copy next block to device -> TODO: put this somewhere earlier ... not in parallel ... ?
+   cudaDeviceSynchronize();
+   if(matrix_nt > 1){
+      copy_supernode_to_device(blockM_dev, matrix_nt-2, cuda_copystream);
+   }
    //second-last non-dense block .. 0-block
    for (int IBi = matrix_nt-2; IBi > -1; IBi--)
    {
@@ -2701,20 +2678,20 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       tlacpy_dev('F', NR, NR, eye_dev, NR, tmp2_dev, NR, magma_queue_1);
 
       // if L = blockR_dev, then compute L^-1
-      nvtxRangeId_t id_trsm = nvtxRangeStartA("TriangularSolve_inLoop");
+      nvtxRangeId_t id_trtri = nvtxRangeStartA("TriangularSolve_inLoop");
 #ifdef CUDA_TRSM
-      // writes into second array ...
+      // writes into second array i.e. tmp2_dev
       ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_cudaStream_1);
 #else 
-      ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_queue_1);
-      // takes about twice as long as trsm
-      //ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
-     
+    ttrsm_dev('L', 'L', 'N', 'N', NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_queue_1);
+    // takes about twice as long as trsm
+    //ttrtri_dev('L', 'N', NR, blockR_dev, mf_block_lda(IB, IB), &info);
 #endif
-      nvtxRangeEnd(id_trsm);
+      nvtxRangeEnd(id_trtri);
       flop_count += NR*NR*NR;
+      //flop_count += 1.0/3.0 * NR * NR * NR + 2.0/3.0 * NR;
 
-      // copy L_ii^-1 to tmp2_dev
+       // copy L_ii^-1 to tmp2_dev
       tlacpy_dev('F', NR, NR, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
       //tlacpy_dev('F', NR, NR, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_queue_1);
 
@@ -2775,6 +2752,15 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       flop_count += 2.0 * NR * NR * NR;
       nvtxRangeEnd(id_Si1i);
 
+#ifdef PRINT_MSG
+      printf("IB = %d, S_i+1i = \n", IB);
+      cudaMemcpy(tmp4, S_i1i_dev, NR*NR*sizeof(T), cudaMemcpyDeviceToHost);
+      for(int i=0; i<NR*NR; i++){
+         printf("%f ", tmp4[i]);
+      }
+      printf("\n");
+#endif
+
       // *************** Sn+1i ************ //
       if(matrix_nd > 0){
          nvtxRangeId_t id_Sn1i = nvtxRangeStartA("Sn1i_inLoop");
@@ -2790,6 +2776,17 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          tgemm_dev('N', 'N', ND, NR, NR, -ONE, tmp3_dev, ND, blockR_dev, mf_block_lda(IB, IB), ZERO, S_n1i_dev, ND, magma_queue_1);
          flop_count += 2.0 * ND * NR * NR;
          nvtxRangeEnd(id_Sn1i);
+
+#ifdef PRINT_MSG
+         if(matrix_ns*ND < 200){
+            cudaMemcpy(tmp3, S_n1i_dev, matrix_ns*ND*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("Sigma_n+1i : \n");
+            for(int i=0; i<matrix_ns*ND; i++){
+               printf("%f ", tmp3[i]);
+            }
+            printf("\n");
+         }
+#endif
       }
 
       // *************** Sii ************ //
@@ -2810,6 +2807,17 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       tgemm_dev('T', 'N', NR, NR, NR, ONE, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, ZERO, S_ii_dev, NR, magma_queue_1);
       flop_count += 2.0 * NR * NR * NR;
       nvtxRangeEnd(Sii);
+
+#ifdef PRINT_MSG
+         if(matrix_ns*matrix_ns < 200){
+            cudaMemcpy(tmp4, S_ii_dev, matrix_ns*matrix_ns*sizeof(T), cudaMemcpyDeviceToHost);
+            printf("Sigma_ii : \n");
+            for(int i=0; i<matrix_ns*matrix_ns; i++){
+               printf("%f ", tmp4[i]);
+            }
+            printf("\n");
+         }
+#endif
 
       // copy tmp1_dev to blockR_dev
       tlacpy_dev('F', NR, NR, S_ii_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
@@ -2877,10 +2885,7 @@ void BTA<T>::initialize_MF_host(){
    if(!MF_allocated)
    {
       // memory allocation on CPU 
-      // PREVIOUSLY unpinned memory:
       //MF = new T[matrix_n_nonzeros];
-      //unsigned int dummy_flag = 0;
-      //cudaHostRegister(MF, (matrix_n_nonzeros) * sizeof(T), dummy_flag);
       // pin memory:
       cudaMallocHost(&MF, (matrix_n_nonzeros) * sizeof(T));
       MF_allocated = true;
@@ -3469,7 +3474,6 @@ double BTA<T>::BTAdiag(size_t *ia, size_t *ja, T *a, T *diag)
       exit(1);
    }
 
-    // TODO: is this true??
     factorization_completed = false;
     cpy_indicator = 0; // => only copy back diagonal
 
@@ -3536,10 +3540,13 @@ double BTA<T>::BTAselInv(size_t *ia, size_t *ja, T *a, T *&invQ)
    double t_FSF;
 
    double t_factorize = get_time(0.0);
-   if (!factorization_completed)
+
+   if (!factorization_completed){
        factorize(ia, ja, a, t_FSF);
+   }
    t_factorize = get_time(t_factorize);
    printf("time factorize in BTAselInv: %f\n", t_factorize);
+
 
    // check if number of nnz are the same to check if matrix is the same
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
@@ -3608,9 +3615,10 @@ double BTA<T>::BTAselInv(size_t *ia, size_t *ja, T *a, T *&invQ)
     double t_selInv = get_time(0.0);
     double gflops = ThirdStageBTA(tmp1_dev,tmp2_dev, cpy_indicator);
     t_selInv = get_time(t_selInv);  
-    printf("time thirdStageBTA in BTAselInv: %f\n", t_selInv);  
+    //printf("time thirdStageBTA in BTAselInv: %f\n", t_selInv);  
 
-    factorization_completed = false; // we have overwritten the Cholesky factor
+
+   factorization_completed = false; // we have overwritten the Cholesky factor
 
     for(size_t i=0; i<nnz; i++){
       invQ[i] = inv_a[i];
@@ -3642,19 +3650,15 @@ double BTA<T>::BTAselInv(size_t *ia, size_t *ja, T *a, T *&invQ)
 
 // write inverted dense blocks into Cholesky factor
 template <class T>
-double BTA<T>::BTAinvBlks(size_t *ia, size_t *ja, T *a, T *&invBlks_ext)
+double BTA<T>::BTAinvBlks(size_t *ia, size_t *ja, T *a, T *invBlks_ext)
 {
 
    //printf("!!!CAREFUL: BTAinvBlks function abandoned. Not sure if it gives correct results!!!\n");
 
    double t_FSF;
 
-   double t_factorize = get_time(0.0);
    if (!factorization_completed)
        factorize(ia, ja, a, t_FSF);
-   t_factorize = get_time(t_factorize);
-   printf("time factorize in BTAinvBlks: %f\n", t_factorize);
-
 
    // check if number of nnz are the same to check if matrix is the same
    if(!(ia[matrix_size] == matrix_ia[matrix_size])){
@@ -3682,21 +3686,21 @@ double BTA<T>::BTAinvBlks(size_t *ia, size_t *ja, T *a, T *&invBlks_ext)
     //memcpy_to_device(diag_pos,diag_pos_dev,matrix_size*sizeof(size_t));
 
     //Computation
-    double t_thirdStageBTA = get_time(0.0);
     double gflops = ThirdStageBTA(tmp1_dev,tmp2_dev, cpy_indicator);
-    t_thirdStageBTA = get_time(t_thirdStageBTA);
-    printf("time thirdStageBTA in BTAinvBlks: %f\n", t_thirdStageBTA);
 
-    factorization_completed = false; // have overwritten the Cholesky factor
+   // print MF 
+   // printf("matrix_n_nonzeros: %ld\n", matrix_n_nonzeros);
+   // printf("MF = ");
+   // for(int i=0; i<matrix_n_nonzeros; i++){
+   //    printf(" %f ", MF[i]);
+   // }
+   // printf("\n");
 
-   //  double t_copy = get_time(0.0);
-   //  for(int i=0; i<matrix_n_nonzeros; i++){
-   //     invBlks_ext[i] = MF[i];
-   //  }
-   //  t_copy = get_time(t_copy);
-   //  printf("time to copy invBlks_ext: %f\n", t_copy);
-   invBlks_ext = MF;
-   
+   for(int i=0; i<matrix_n_nonzeros; i++){
+      invBlks_ext[i] = MF[i];
+   }
+
+
     //Data deallocation
     //deallocate_data_on_dev(diag_dev,matrix_size*sizeof(T));
     //deallocate_data_on_dev(diag_pos_dev,matrix_size*sizeof(size_t));
@@ -3759,24 +3763,6 @@ double BTA<T>::residualNormNormalized(T *x, T *b)
    return residualNorm(x, b) / c_dtnrm2(matrix_size, b, 1);
 }
 
-/************************************************************************************************/
-
-/*
-template <class T>
-void BTA<T>::create_blocks()
-{
-    size_t IB;
-
-    b_size = 0;
-
-    for(IB=0;IB<NBlock;IB++){
-
-        if(Bmax[IB]-Bmin[IB]>b_size){
-	    b_size = Bmax[IB]-Bmin[IB];
-	}
-    }
-}
-*/
 
 
 /************************************************************************************************/
@@ -3857,8 +3843,6 @@ inline void BTA<T>::extract_nnzA(T *M_dev, size_t supernode, cudaStream_t stream
       exit(1);
    }
 
-   //gpuErrchk(cudaMemcpy(inv_ia_dev, &matrix_ia[supernode_fc], (cols+1)*sizeof(size_t), cudaMemcpyHostToDevice ));
-   //gpuErrchk(cudaMemcpy(inv_ja_dev, &matrix_ja[supernode_offset], supernode_nnz*sizeof(size_t), cudaMemcpyHostToDevice ));
    memcpy_to_device(&matrix_ia[supernode_fc], inv_ia_dev, (cols+1)*sizeof(size_t), stream); 
    memcpy_to_device(&matrix_ja[supernode_offset], inv_ja_dev, supernode_nnz*sizeof(size_t), stream);
 
