@@ -112,7 +112,7 @@ std::string valueType;
 
 
     // =========================================================================== //
-#if 0 // call eigen solver for comparison
+#if 1 // call eigen solver for comparison
     std::cout << "Call Eigen solver. " << std::endl;
 
     //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
@@ -311,21 +311,21 @@ std::string valueType;
             std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
         }
 
-        // Eigen::MatrixXd S_ref_lower = S_ref.triangularView<Lower>();
+        Eigen::MatrixXd S_ref_lower = S_ref.triangularView<Lower>();
         // std::cout << "S_ref: \n" << S_ref_lower << std::endl;
 
         // std::cout << "invQ_new_lower: \n" << invQ_new_lower << std::endl;
 
-        // std::cout << "S_ref_lower - invQ_new_lower = \n" << S_ref_lower - invQ_new_lower << std::endl;
+        std::cout << "S_ref_lower - invQ_new_lower = \n" << (S_ref_lower.diagonal() - invQ_new_lower.diagonal()).norm() << std::endl;
 
         // call copy indicator 2
 
-        size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
-        printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
-        t_invDiag = get_time(0.0);
-        solver->BTAinvBlks(ia, ja, a, invQ_blks);
-        t_invDiag = get_time(t_invDiag);
-        printf("time BTAinvBlks: %f\n", t_invDiag);
+        // size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
+        // printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
+        // t_invDiag = get_time(0.0);
+        // solver->BTAinvBlks(ia, ja, a, invQ_blks);
+        // t_invDiag = get_time(t_invDiag);
+        // printf("time BTAinvBlks: %f\n", t_invDiag);
 
         // printf("invQ_blks: ");
         // for(int i=0; i<matrix_nonzeros_blocked; i++){
