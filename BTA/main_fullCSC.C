@@ -35,6 +35,88 @@ typedef double T;
 // ******************* 
 
 
+void assemblyBTAMatFromArray(const double* data, int ns, int nt, int nb, SpMat& A) {
+    int n = ns*nt + nb;  // Total size of the matrix
+
+    // Containers for dense blocks
+    Eigen::MatrixXd diagBlock = Eigen::MatrixXd::Zero(ns, ns);  // Diagonal block
+    Eigen::MatrixXd offDiagBlock = Eigen::MatrixXd::Zero(ns, ns);  // Lower off-diagonal block
+    Eigen::MatrixXd lastRowBlock = Eigen::MatrixXd::Zero(nb, ns);  // Block in last nb rows and first ns columns
+
+    A.reserve(ns*ns*(2*nt-1) + ns*nt*nb + nb*nb);
+
+    // iterate through data array
+    int idx = 0;
+
+    // iterate over columns
+    for(int j = 0; j < ns*nt; j++){
+
+        int row_offset = j / ns;
+        //printf("row_offset = %d\n", row_offset);
+
+        // diagonal and off-diagonal block
+        if(row_offset < nt - 1){
+            for(int i = 0; i < 2*ns; i++){
+                A.insert(i+ns*row_offset, j) = data[idx++];
+            }
+        } else {
+            for(int i = 0; i < ns; i++){
+                A.insert(i+ns*row_offset, j) = data[idx++];
+            }
+        }
+
+        // arrowhead rows
+        for(int i = 0; i < nb; i++){
+            A.insert(i+ns*nt, j) = data[idx++];
+        }
+
+     }
+
+    // Insert last block
+    for (int j = 0; j < nb; ++j) {
+        for (int i = 0; i < nb; ++i) {
+            A.insert(i + ns*nt, j + ns*nt) = data[idx++];;  // Arrowhead tip
+        }
+    }
+
+    printf("idx = %d\n", idx);
+
+    // can I generate the outer & inner pointer arrays manually
+    // nnz per column: 2*ns + nb for for first ns*(nt-1) columns
+    // ns + nb for next ns columns
+    // nb for last nb columns
+    // Finalize the construction of the sparse matrix
+    A.makeCompressed();
+
+}
+
+// extract diagonal elements from blocked array
+void extractDiagFromBlks(const double* data, int ns, int nt, int nb, Vect& diag) {
+    int n = ns*nt + nb;  // Total size of the matrix
+    // iterate through data array by column
+    int idx;
+    for(int j = 0; j < ns*(nt-1); j++){
+        idx = (2*ns+nb)*j + (j % ns);
+        //printf("idx = %d\n", idx);
+        diag[j] = data[idx];
+    }
+    // offset
+    int offset = idx + ns + nb + 1;
+    for(int j = 0; j < ns; j++){
+        idx = offset + (ns+nb)*j + (j % ns);
+        //printf("idx = %d\n", idx);
+        diag[ns*(nt-1) + j] = data[idx];
+    }
+    offset = idx + nb + 1;
+    for(int j = 0; j < nb; j++){
+        idx = offset + nb*j + (j % nb);
+        //printf("idx = %d\n", idx);
+        diag[ns*nt + j] = data[idx];
+    }
+    //std::cout << "diag: " << diag.transpose() << std::endl;
+ 
+}
+
 /* ===================================================================== */
 
 int main(int argc, char* argv[])
@@ -365,6 +447,7 @@ std::string valueType;
         // call copy indicator 2
 
         // size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
+        // invQ_blks = new T[matrix_nonzeros_blocked];
         // printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
         // t_invDiag = get_time(0.0);
         // solver->BTAinvBlks(ia, ja, a, invQ_blks);
@@ -381,6 +464,7 @@ std::string valueType;
         // assemblyBTAMatFromArray(invQ_blks, ns, nt, nb, S_blks);
         
         // SpMat S_blks_lower = S_blks.triangularView<Lower>();
+        // std::cout << "S_blks_lower: \n" << MatrixXd(S_blks_lower) << std::endl;
         // std::cout << "S_blks-invQ_new_lower: \n" << MatrixXd(S_blks_lower.block(0,0,10,10) - invQ_new_lower.block(0,0,10,10)) << std::endl;
 
         // Vect diagFromBlks(n);
