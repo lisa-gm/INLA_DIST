@@ -322,6 +322,7 @@ std::string valueType;
 
         // size_t matrix_nonzeros_blocked = ns*ns*(2*nt-1) + ns*nt*nb + nb*nb;
         // printf("matrix_nonzeros_blocked = %ld\n", matrix_nonzeros_blocked);
+        // invQ_blks = new T[matrix_nonzeros_blocked];
         // t_invDiag = get_time(0.0);
         // solver->BTAinvBlks(ia, ja, a, invQ_blks);
         // t_invDiag = get_time(t_invDiag);

@@ -7,7 +7,7 @@
 #include "magma_v2.h"
 
 #define CUDA_POTRF
-//#define CUDA_TRSM
+#define CUDA_TRSM
 
 //#define MAGMA_EXPERT
 
