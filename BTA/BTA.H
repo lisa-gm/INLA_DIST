@@ -2695,7 +2695,6 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
       tlacpy_dev('F', NR, NR, tmp2_dev, NR, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
       //tlacpy_dev('F', NR, NR, blockR_dev, mf_block_lda(IB, IB), tmp2_dev, NR, magma_queue_1);
 
-      // copy diagonal from previous iteration into buffer on device
       // redirect to copy stream, magma_copy_queue <=> cuda_copystream
       if(cpy_indicator == 0){
          copy_supernode_diag(blockM_dev, IB+1);
@@ -2708,7 +2707,6 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
          if(matrix_nd > 0){
             tlacpy_dev('F', ND, NR, S_n1i_dev, ND, &blockM_dev[mf_dense_block_offset(IB+1)], mf_dense_block_lda(IB+1), magma_copy_queue);
          }
-         //cudaDeviceSynchronize();
 
          if(cpy_indicator == 1){
             // this could be happening in parallel
@@ -2717,8 +2715,6 @@ double BTA<T>::ThirdStageBTA(T *tmp1_dev,T *tmp2_dev, int cpy_indicator)
             copy_supernode_to_host(blockM_dev, IB+1, cuda_copystream);
          }
       }
-      //cudaDeviceSynchronize();
-
       // blockM_dev not in use anymore until next iter where pointers are swapped 
       // -> already copy next block to device 
       // use cuda Events
