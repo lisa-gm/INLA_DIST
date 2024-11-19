@@ -41,7 +41,7 @@ export CUDA_LAUNCH_BLOCKING=1
 echo "CUDA_LAUNCH_BLOCKING=1"
 
 echo "srun --gres=gpu:1 main ${ns} ${nt} ${nss} ${nb} ${Q_file} >BTA_output.txt"
-srun ./main_fullCSC ${ns} ${nt} ${nss} ${nb} ${Q_file} >BTA_output_fullCSC_ns${ns}_nt${nt}_nss${nss}_nb${nb}.txt
+srun ./main_fullCSC ${ns} ${nt} ${nss} ${nb} ${Q_file} #>BTA_output_fullCSC_ns${ns}_nt${nt}_nss${nss}_nb${nb}_selINV_oldV.txt
 
 #srun nsys profile -o nsys_output_fullCSC_ns42_nt3_nb2_%h_%p.txt ./main_fullCSC ${ns} ${nt} ${nss} ${nb} ${Q_file} >BTA_output_nsys_fullCSC_ns${ns}_nt${nt}_nss${nss}_nb${nb}.txt
 #srun nsys profile -o nsys_output_fullCSC_ns2865_nt250_nb6_%h_%p.txt ./main_fullCSC ${ns} ${nt} ${nss} ${nb} ${Q_file} >BTA_output_nsys_fullCSC_ns${ns}_nt${nt}_nss${nss}_nb${nb}.txt
