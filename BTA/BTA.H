@@ -256,6 +256,10 @@ private:
     cublasHandle_t handle_trsm;
 #endif // end CUDA_TRSM
 
+#ifdef CUDA_SYRK
+    cublasHandle_t handle_syrk;
+#endif // end CUDA_SYRK
+
 #ifdef MAGMA_EXPERT
     int magma_potrf_init_flag;
 
@@ -464,9 +468,18 @@ BTA<T>::BTA(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 #endif 
 
 #ifdef CUDA_TRSM
-    cublasStatus_t stat = cublasCreate(&handle_trsm);
+    cublasStatus_t stat_trsm = cublasCreate(&handle_trsm);
 
-    if(stat != 0){
+    if(stat_trsm != 0){
+        printf("cublas device selection failed = %d\n", stat);
+        exit(1);
+    }
+#endif
+
+#ifdef CUDA_SYRK
+    cublasStatus_t stat_syrk = cublasCreate(&handle_syrk);
+
+    if(stat_syrk != 0){
         printf("cublas device selection failed = %d\n", stat);
         exit(1);
     }
@@ -562,6 +575,10 @@ BTA<T>::~BTA()
 #ifdef CUDA_TRSM
     //cublasXtDestroy(handle_trsm);
     cublasDestroy(handle_trsm);
+#endif
+
+#ifdef CUDA_SYRK
+    cublasDestroy(handle_syrk);
 #endif
 
 #ifdef MAGMA_EXPERT
@@ -739,8 +756,6 @@ double BTA<T>::FirstStageFactor()
        flop_count += NR * NR * NR;
     }
 
-
-
     if (matrix_nd > 0){
 #ifdef CUDA_TRSM
       //printf("mf_dense_block_offset(IB) : %ld\n", mf_dense_block_offset(IB));
@@ -791,7 +806,13 @@ double BTA<T>::FirstStageFactor()
        // UPDATE NEXT DIAGONAL BLOCK 
        nvtxRangeId_t id_dgemm = nvtxRangeStartA("BigGemm_inLoop");
        t_temp = get_time(0.0);
+
+#ifdef CUDA_SYRK
+       tsyrk_dev('L', 'N', NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), handle_syrk, magma_cudaStream_1);    
+#else
        tgemm_dev('N', 'T', NR, NR, NM, -ONE, &blockM_dev[NM], mf_block_lda(IB, IB-1), &blockM_dev[NM], mf_block_lda(IB, IB-1), ONE, blockR_dev, mf_block_lda(IB, IB), magma_queue_1);
+#endif
+
        t_temp = get_time(t_temp);
        nvtxRangeEnd(id_dgemm);
        t_dgemm += t_temp;

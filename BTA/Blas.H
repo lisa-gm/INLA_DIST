@@ -8,6 +8,7 @@
 
 #define CUDA_POTRF
 #define CUDA_TRSM
+//#define CUDA_SYRK
 
 //#define MAGMA_EXPERT
 
@@ -17,6 +18,10 @@
 
 #ifdef CUDA_TRSM
 //#include "cublasXt.h"
+#include "cublas_v2.h"
+#endif
+
+#ifdef CUDA_SYRK
 #include "cublas_v2.h"
 #endif
 
@@ -542,6 +547,64 @@ inline void tgemm_dev(char transa, char transb, int m, int n, int k, CPX alpha,\
     //zgemm_on_dev(handle,transa,transb,m,n,k,alpha,a,lda,b,ldb,beta,c,ldc);
     magma_zgemm(magma_transa,magma_transb,m,n,k,*reinterpret_cast<magmaDoubleComplex*>(&alpha),(magmaDoubleComplex_ptr)a,lda,(magmaDoubleComplex_ptr)b,ldb,*reinterpret_cast<magmaDoubleComplex*>(&beta),(magmaDoubleComplex_ptr)c,ldc,queue);
 }
+
+
+// if not defined gemm will be used instead
+#ifdef CUDA_SYRK 
+/************************************************************************************************/
+// SYRK ie C = alpha*A*A^T + beta*C, assumes C to be symmetric
+template <typename T>
+inline void tsyrk_dev(char uplo, char trans, int n, int k,T alpha, T *a, int lda, T beta, T *c, int ldc, \
+                        cublasHandle_t handle, cudaStream_t stream);
+
+template <>
+inline void tsyrk_dev(char uplo, char trans, int n, int k, double alpha, double *a, int lda, double beta, double *c, int ldc, cublasHandle_t handle, cudaStream_t stream)
+{
+    cublasFillMode_t uplo_cuda;
+    if(uplo == 'L'){
+        uplo_cuda = CUBLAS_FILL_MODE_LOWER;
+    } else if(uplo =='U') {
+        uplo_cuda = CUBLAS_FILL_MODE_UPPER;
+    } else {
+        printf("invalid syrk argmument uplo: %c\n", uplo);
+        exit(1);
+    }
+
+    cublasOperation_t trans_cuda;
+    if(trans == 'N'){
+        trans_cuda = CUBLAS_OP_N;
+    } else if(trans == 'T'){
+        trans_cuda = CUBLAS_OP_T;
+    } else {
+        printf("invalid syrk argmument trans %c\n", trans_cuda);
+        exit(1);
+    }
+
+    // add specific stream 
+    cublasStatus_t setStreamErr = cublasSetStream(handle, stream);
+    if(setStreamErr != 0){
+        printf("cuBlasError set Stream! cuBlasError = %d\n", setStreamErr);
+        exit(1);
+    }
+
+    cublasStatus_t cuBlasError =  cublasDsyrk(handle, uplo_cuda, trans_cuda, n, k, &alpha, a, lda, &beta, c, ldc);
+
+    if(cuBlasError != 0){
+        printf("cuBlasError syrk! cuBlasError = %d\n", cuBlasError);
+        exit(1);
+    }
+
+}
+
+template <>
+inline void tsyrk_dev(char uplo, char trans, int n, int k, CPX alpha, CPX *A, int lda, CPX beta, CPX *C, int ldc, cublasHandle_t handle, cudaStream_t stream)
+{
+    printf("In SYRK. Not implemented for complex numbers\n");
+    exit(1);
+}
+
+#endif
+
 
 /************************************************************************************************/
 
@@ -1251,17 +1314,6 @@ inline void ttrsm_dev_cuda(cublasHandle_t handle, char side, char uplo, char tra
 template <>
 inline void ttrsm_dev_cuda(cublasHandle_t handle, char side, char uplo, char trans, char diag, int m, int n, double alpha, double *a, int lda, double *b, int ldb, cudaStream_t stream)
 {
-    // magma_side_t magma_side = magma_side_const(side);
-    // magma_uplo_t magma_uplo = magma_uplo_const(uplo);
-    // magma_trans_t magma_trans = magma_trans_const(trans);
-    // magma_diag_t magma_diag = magma_diag_const(diag);
-
-    // magma_int_t trsmErr = magma_dtrsm(magma_side, magma_uplo, magma_trans, magma_diag, m, n, alpha, a, lda, b, ldb, queue);
-
-    // if(trsmErr != 0){
-    //     printf("magma trsm error = %d\n", trsmErr);
-    //     exit(1);
-    // }
 
     cublasSideMode_t side_cuda;
     if(side == 'L'){
@@ -1289,7 +1341,7 @@ inline void ttrsm_dev_cuda(cublasHandle_t handle, char side, char uplo, char tra
     } else if(trans == 'T'){
         trans_cuda = CUBLAS_OP_T;
     } else {
-        printf("invalid trsm argmument trans %c\n", diag);
+        printf("invalid trsm argmument trans %c\n", trans_cuda);
         exit(1);
     }
 
