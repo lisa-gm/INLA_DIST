@@ -217,6 +217,7 @@ private:
     int cpy_indicator; // 0: copy back diagonal, 1: copy back nnzQ, 2: copy back all computed blocks
 
     cudaStream_t cuda_copystream = NULL;
+    cudaStream_t cuda_copystream_to_dev = NULL;
     cudaStream_t magma_cudaStream_1 = NULL;
     cudaStream_t magma_cudaStream_2 = NULL;
 
@@ -227,6 +228,9 @@ private:
 
     cudaEvent_t  initBlock_dev_ev;
     cudaEvent_t  potrf_dev_ev;
+    cudaEvent_t  finishedGEMM_1;
+    cudaEvent_t  finishedGEMM_2;
+
 
     magma_event_t potrf_dev_magma_ev;
 
@@ -409,6 +413,8 @@ BTA<T>::BTA(size_t ns, size_t nt, size_t nd, int GPU_rank_)
    */
 
     gpuErrchk(cudaEventCreate(&initBlock_dev_ev));
+    gpuErrchk(cudaEventCreate(&finishedGEMM_1));
+    gpuErrchk(cudaEventCreate(&finishedGEMM_2));
     gpuErrchk(cudaEventCreate(&potrf_dev_ev));
 
     magma_event_create(&potrf_dev_magma_ev);	
@@ -416,6 +422,7 @@ BTA<T>::BTA(size_t ns, size_t nt, size_t nd, int GPU_rank_)
 
     // initialize cuda streams
     gpuErrchk(cudaStreamCreate ( &cuda_copystream ));
+    gpuErrchk(cudaStreamCreate ( &cuda_copystream_to_dev ));
     gpuErrchk(cudaStreamCreate ( &magma_cudaStream_1 ));
     gpuErrchk(cudaStreamCreate ( &magma_cudaStream_2 ));
 
@@ -525,8 +532,16 @@ BTA<T>::~BTA()
    magma_finalize();
 
    cudaStreamDestroy(cuda_copystream);
+   cudaStreamDestroy(cuda_copystream_to_dev);
    cudaStreamDestroy(magma_cudaStream_1);
    cudaStreamDestroy(magma_cudaStream_2);
+
+   cudaEventDestroy(initBlock_dev_ev);
+   cudaEventDestroy(finishedGEMM_1);
+   cudaEventDestroy(finishedGEMM_2);
+   cudaEventDestroy(potrf_dev_ev);
+   
+   magma_event_destroy(potrf_dev_magma_ev);
 
    delete[] Bmin;
    delete[] Bmax;
@@ -644,10 +659,6 @@ double BTA<T>::FirstStageFactor()
     // count floating point operations
     double flop_count = 0;
 
-//tpotrf_dev('L', NR, M1_dev ,NR ,&info)
-//rj dpotrf MF[0,0]
-//rj dtrsm RLTN MF[0,0] MF[1,0]
-
     IB = 0;
     NR = Bmax[0]-Bmin[0];
 
@@ -666,14 +677,6 @@ double BTA<T>::FirstStageFactor()
     {
        init_supernode(blockDense_dev, matrix_nt, magma_cudaStream_1);
     }
-
-   /*cudaDeviceSynchronize();
-   copy_supernode_to_host_write(blockR_dev, IB);
-   exit(1);*/
-
-    // put it in cudaEvent
-    //gpuErrchk(cudaEventRecord(copy_gpu, magma_cudaStream_1)); // want compute_stream to wait
-    //gpuErrchk(cudaStreamWaitEvent(compute_stream, copy_gpu, 0));
 
 #ifdef PRINT_MSG
     std::cout << "calling first Cholesky factorization now" << std::endl;
@@ -714,8 +717,6 @@ double BTA<T>::FirstStageFactor()
     //flop_count += 1.0/3.0 * NR * NR * NR;
     flop_count += 1.0/3.0 * NR * NR * NR + 0.5 * NR * NR + 1.0/6.0 * NR; 
 
-   // the trsm shouldn't be launched until potrf has finished 
-   //cudaDeviceSynchronize();
    gpuErrchk(cudaEventRecord(potrf_dev_ev, magma_cudaStream_1)); 
    gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, potrf_dev_ev, 0));   
 
@@ -738,6 +739,8 @@ double BTA<T>::FirstStageFactor()
        flop_count += NR * NR * NR;
     }
 
+
+
     if (matrix_nd > 0){
 #ifdef CUDA_TRSM
       //printf("mf_dense_block_offset(IB) : %ld\n", mf_dense_block_offset(IB));
@@ -749,8 +752,16 @@ double BTA<T>::FirstStageFactor()
        flop_count += matrix_nd * NR * NR;
     }
 
-    t_temp = get_time(0.0);
+
+    nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_beforeLoop");
+    init_supernode(blockM_dev, 1,  cuda_copystream);
+    nvtxRangeEnd(id_initSN);
+    
+    // this one is really needed!! Otherwise copy back too early.
     cudaDeviceSynchronize();
+
+    t_temp = get_time(0.0);
+    //cudaDeviceSynchronize();
     // if copy supernode device to host happens while new supernode is being initialized ... memory issues?
     copy_supernode_to_host(blockR_dev, IB, cuda_copystream);
     //copy_supernode_to_host_write(blockR_dev, IB);
@@ -775,17 +786,7 @@ double BTA<T>::FirstStageFactor()
 
        double flop_1iter = 0.0;
 
-       // 
        swap_pointers(&blockR_dev, &blockM_dev);
-
-       nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
-       init_supernode(blockR_dev, IB,  magma_cudaStream_1);
-       nvtxRangeEnd(id_initSN);
-
-       // add cuda_event such that magma_queue_2/magma_cudaStream_2 wait for magma_cudaStream_1 to get here
-       // maybe better to use magma version?
-       gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
-       gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
 
        // UPDATE NEXT DIAGONAL BLOCK 
        nvtxRangeId_t id_dgemm = nvtxRangeStartA("BigGemm_inLoop");
@@ -816,6 +817,19 @@ double BTA<T>::FirstStageFactor()
           flop_count +=  2.0* matrix_nd *matrix_nd *NM;
 
        }
+
+      
+      if(IB < matrix_nt-1) {
+         // start copying after magma_queue_1 & magma_queue_2 have gotten here. blockM_dev not needed after this point until next iteration
+         gpuErrchk(cudaEventRecord(finishedGEMM_1, magma_cudaStream_1));
+         gpuErrchk(cudaEventRecord(finishedGEMM_2, magma_cudaStream_2));
+         gpuErrchk(cudaStreamWaitEvent(cuda_copystream, finishedGEMM_1, 0));	
+         gpuErrchk(cudaStreamWaitEvent(cuda_copystream, finishedGEMM_2, 0));	
+
+         nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
+         init_supernode(blockM_dev, IB+1,  cuda_copystream);
+         nvtxRangeEnd(id_initSN);
+      }
 
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
@@ -1059,6 +1073,7 @@ template <class T>
 double BTA<T>::FirstSecondStageFactor(size_t nrhs)
 {
 
+
 #ifdef PRINT_MSG
     std::cout << "In FirstSecondStageFactor(), omp get thread num = " << omp_get_thread_num() << std::endl;
 #endif
@@ -1176,8 +1191,14 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
        flop_count += matrix_nd * NR * NR;
     }
 
-    t_temp = get_time(0.0);
+    nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_beforeLoop");
+    init_supernode(blockM_dev, 1,  cuda_copystream);
+    nvtxRangeEnd(id_initSN);
+    
+    // really needed, otherwise copy back too early
     cudaDeviceSynchronize();
+
+    t_temp = get_time(0.0);
     // if copy supernode device to host happens while new supernode is being initialized ... memory issues?
     copy_supernode_to_host(blockR_dev, IB, cuda_copystream);
     //copy_supernode_to_host_write(blockR_dev, IB);
@@ -1205,14 +1226,13 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
 
        swap_pointers(&blockR_dev, &blockM_dev);
 
-       nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
-       init_supernode(blockR_dev, IB, magma_cudaStream_1);
+      //  nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
+      //  init_supernode(blockR_dev, IB, magma_cudaStream_1);
        //init_supernode(blockR_dev, IB);
-       nvtxRangeEnd(id_initSN);
+      //  nvtxRangeEnd(id_initSN);
 
        // magma_queue_1 is on top of magma_cudaStream_1
        // add cuda_event such that magma_queue_2/magma_cudaStream_2 wait for magma_cudaStream_1 to get here
-       // maybe better to use magma version?
        gpuErrchk(cudaEventRecord(initBlock_dev_ev, magma_cudaStream_1)); 
        gpuErrchk(cudaStreamWaitEvent(magma_cudaStream_2, initBlock_dev_ev, 0));	
 
@@ -1225,17 +1245,6 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
               
        // dim dgemm: m = , n = , k = 
        flop_count += 2.0 * NR * NR * NM;
-
-      // copy back y1
-      /*T* y_host = new T[NR*NR];
-      cudaMemcpy(y_host, &rhs_dev[Bmin[0]], NR*NR*sizeof(T), cudaMemcpyDeviceToHost );
-      printf("rhs host(%ld) before gemm = ", IB-1);
-      for(int i = 0; i<NR*NR; i++){
-         printf(" %f ", y_host[i]);
-      }
-      printf("\n");
-
-      delete [] y_host;*/
 
       // FORWARD SOLVE
       // compute b_i = b_i - L_ii-1 * x_i-1
@@ -1281,6 +1290,18 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
           // 
        }
 
+      if(IB < matrix_nt-1) {
+         // start copying after magma_queue_1 & magma_queue_2 have gotten here. blockM_dev not needed after this point until next iteration
+         gpuErrchk(cudaEventRecord(finishedGEMM_1, magma_cudaStream_1));
+         gpuErrchk(cudaEventRecord(finishedGEMM_2, magma_cudaStream_2));
+         gpuErrchk(cudaStreamWaitEvent(cuda_copystream, finishedGEMM_1, 0));	
+         gpuErrchk(cudaStreamWaitEvent(cuda_copystream, finishedGEMM_2, 0));	
+
+         nvtxRangeId_t id_initSN = nvtxRangeStartA("initSuperNode_inLoop");
+         init_supernode(blockM_dev, IB+1,  cuda_copystream);
+         nvtxRangeEnd(id_initSN);
+      }
+
        //printf("RJ: tgemm NR: %d, NM: %d, a: %d, lda: %d, b: %d, ldb: %d, c: %d, ldc: %d\n", NR, NM, mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB-1), mf_block_lda(IB, IB-1), mf_block_index(IB, IB), mf_block_lda(IB, IB));
        //rj dpotrf MF[IB,IB]
        t_temp = get_time(0.0);
@@ -1324,16 +1345,6 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
        ttrsm_dev('L', 'L', 'N', 'N', NR, nrhs, ONE, blockR_dev, mf_block_lda(IB,IB), &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
        //flop_count += 2.0*NR * NR * nrhs; 
 #endif
-      // rhs_dev[Bmin[IB]]
-      /*T* rhs_host = new T[NR*NR];
-      cudaMemcpy(rhs_host, &rhs_dev[Bmin[IB-1]], NR*NR*sizeof(T), cudaMemcpyDeviceToHost );
-      printf("\nrhs host(%ld) after ttrsm = ", IB);
-      for(int i = 0; i<NR*NR; i++){
-         printf(" %f ", rhs_host[i]);
-      }
-      printf("\n\n");
-
-      delete [] rhs_host;*/
 
        magma_event_record(potrf_dev_magma_ev, magma_queue_1);	      
        magma_queue_wait_event(magma_queue_2, potrf_dev_magma_ev);	
@@ -1449,7 +1460,7 @@ double BTA<T>::FirstSecondStageFactor(size_t nrhs)
        flop_count += 1.0/3.0 * NR * NR * NR + 0.5*NR*NR + 1.0/6.0 * NR;
 
 #ifdef CUDA_TRSM
-       ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, nrhs, ONE, blockR_dev, mf_block_lda(IB,IB), &rhs_dev[Bmin[IB]], matrix_size, magma_queue_1);
+       ttrsm_dev_cuda(handle_trsm, 'L', 'L', 'N', 'N', NR, nrhs, ONE, blockR_dev, mf_block_lda(IB,IB), &rhs_dev[Bmin[IB]], matrix_size, magma_cudaStream_1);
 #else
        // FORWARD SOLVE: with newly computed Cholesky factor
        // solve for y_i = L^-1_i*b_i (which was updated before)
@@ -3197,26 +3208,26 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
    double gflops = FirstSecondStageFactor(nrhs);
    
    t_firstSecondStage = get_time(t_firstSecondStage);
-   printf("time firstSecondStageFactor : %f\n", t_firstSecondStage);
+   // printf("time firstSecondStageFactor : %f\n", t_firstSecondStage);
    // ************************************************************* // 
 
    //std::string fileName = "L.txt"; 
-   time_t rawtime;
-   struct tm * timeinfo;
-   char buffer[80];
+   // time_t rawtime;
+   // struct tm * timeinfo;
+   // char buffer[80];
 
-   time (&rawtime);
-   timeinfo = localtime(&rawtime);
+   // time (&rawtime);
+   // timeinfo = localtime(&rawtime);
 
-   strftime(buffer,sizeof(buffer),"L_%d-%m-%Y_%H:%M:%S.txt",timeinfo);
-   std::string fileName(buffer);
-   ofstream file(fileName,    ios::out | ::ios::trunc);
+   // strftime(buffer,sizeof(buffer),"L_%d-%m-%Y_%H:%M:%S.txt",timeinfo);
+   // std::string fileName(buffer);
+   // ofstream file(fileName,    ios::out | ::ios::trunc);
 
-   for(int i=0; i<matrix_n_nonzeros; i++){
-      file << std::setprecision(15) << MF[i] << endl;
-   }
+   // for(int i=0; i<matrix_n_nonzeros; i++){
+   //    file << std::setprecision(15) << MF[i] << endl;
+   // }
 
-   file.close();
+   // file.close();
 
    // contains solution vector from forward pass
    memcpy_to_host(rhs, rhs_dev,matrix_size*sizeof(T), NULL);
@@ -3236,7 +3247,7 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
     gflops += BackwardPassSolve(nrhs);
 
     t_SecondStageBackPass = get_time(t_SecondStageBackPass);
-    printf("time backwardPassSolve : %f\n", t_SecondStageBackPass);
+    // printf("time backwardPassSolve : %f\n", t_SecondStageBackPass);
     // ***************************************************** //
     //Copy data
     memcpy(x,rhs,matrix_size*nrhs*sizeof(T));
