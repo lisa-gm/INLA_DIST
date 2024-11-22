@@ -250,14 +250,41 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
 
 }
 
+void call_EigenSolver(SpMat& Q, Vect& rhs, MatrixXd& Qinv, Vect& sol, double& log_det){
 
-// compute variances for timestep ts
-// Ax column-major
-void compute_marginals_ts(size_t ns, size_t nt, size_t nb, size_t ts, T* invBlks, SpMat& Ax, Vect& variance_vec){
-    
-    //int nnz_subQ = ns*ns + 
-    //SpMat Q()
+    int n = Q.rows();
+    // true inv diag from Eigen
+    //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
+    SimplicialLLT<SpMat> solverQ;
+    solverQ.compute(Q);
+
+   if(solverQ.info()!=Success) {
+     cout << "Oh: Very bad" << endl;
+   }
+
+    sol = solverQ.solve(rhs);
+
+    SpMat L = solverQ.matrixL();
+
+   // compute log sum by hand
+   log_det = 0.0;
+   for(int i = 0; i<n; i++){
+        log_det += log(L.coeff(i,i));
+   }
+   log_det *=2.0;
+   
+    SpMat eye(n,n);
+    eye.setIdentity();
+
+    Qinv = solverQ.solve(eye);
+    if(n < 25){
+        MatrixXd inv_Q_dense = MatrixXd(Qinv.triangularView<Lower>());
+        std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
+    }
+
+
 }
+
 
 /* ===================================================================== */
 
@@ -653,7 +680,7 @@ std::string valueType;
             invDiag_Qx_vec[i] = invDiag_Qx[i];
         }
 
-        printf("norm(invDiag_Qx)      : %f\n", invDiag_Qx_vec.norm());
+        //printf("norm(invDiag_Qx)      : %f\n", invDiag_Qx_vec.norm());
         
         T *invQa = new T[Qx_lower.nonZeros()];
         solver_Qx->BTAselInv(ia_Qx, ja_Qx, a_Qx, invQa);
@@ -664,9 +691,9 @@ std::string valueType;
         // TODO: more efficient way to do this?
         //SpMat invQx_new = invQ_new_lower.selfadjointView<Lower>();
 
-        printf("norm(invDiag_full_Qx) : %f\n", invQx_lower.diagonal().norm());
+        //printf("norm(invDiag_full_Qx) : %f\n", invQx_lower.diagonal().norm());
 
-        std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQx_lower.diagonal() - invDiag_Qx_vec).norm() << std::endl;
+        //std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQx_lower.diagonal() - invDiag_Qx_vec).norm() << std::endl;
 
         //Vect invDiag_Qx(nx);
         //solver_Qx->BTAdiag(ia_Qx, ja_Qx, a_Qx, invDiag_Qx);
@@ -690,479 +717,274 @@ std::string valueType;
 
 #if 1
     int n = ns*nt + nss + nb;
+    size_t nnz;
+
     SpMat Q(n,n);
+    SpMat Q_lower(n,n);
     Vect rhs(n);
+
     double exp_theta = exp(theta[0]);
     rhs = exp_theta*Ax.transpose()*y;
     std::cout << "\nConstructing precision matrix Qxy. " << std::endl; 
 
-    //std::cout << "Setting Ax to zero." << std::endl;
-    //Ax.makeCompressed();
-    //Ax.setZero();
-    //for(int c=0; c<1; c++){
-        //theta = theta + Vect::Random(theta.size());
-        //std::cout << "\niter = " << c << ". Constructing precision matrix Qxy. theta : " << theta.transpose() << std::endl;   
-
-#if 0        
-        // test if FLOP rate holds up if blocks are dense
-        // make g1 dense. This should make all blocks dense!
+    double t_constructQ = - omp_get_wtime();
+    construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);        
+    t_constructQ += omp_get_wtime();
+    printf("time spent construct Q :  %f\n", t_constructQ);
+    std::cout << "Q : \n" << Q.block(0,0,6,6) << std::endl;
     
-        // random between [-1,1] -> shift to ensure pos. def.
-        double scalC = 1e-3;
-        MatrixXd tmpBlock = scalC * (MatrixXd::Random(2*ns, 1) - MatrixXd::Ones(2*ns, 1));
+    // =========================================================================== //
+    std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
+
+    // only take lower triangular part of A
+    Q_lower = Q.triangularView<Lower>(); 
+    nnz    = Q_lower.nonZeros();
+    printf("nnz(Q_lower) = %ld\n", nnz);
+
+    size_t* ia; 
+    size_t* ja;
+    T* a; 
+    T *b;
+    T *x;
+    T *x2;
 
-        // manually compute nnz matrix should have if all nonzero blocks dense: 
-        // diagonal blocks: nt*ns*(ns+1)/2 + ns^2*(nt-1) + nss*nt + nss*(nss+1)/2 + nt*ns*nb + nss*nb + nb*(nb+1)/2
-        size_t comp_nnz = nt*ns*(ns+1)/2 + ns*ns*(nt-1) + nss*nt + nss*(nss+1)/2 + nt*ns*nb + nss*nb + nb*(nb+1)/2;
-        printf("ns = %ld, nt = %ld, nb = %ld, nss = %ld, expected nnz(Q_lower) = %ld\n", ns, nt, nb, nss, comp_nnz);
-
-        // CSC format -> fill by column 
-        SpMat Q_lower(n,n);
-        Q_lower.reserve(comp_nnz);
-
-        // only fill lower part
-        for(int j=0; j<n; j++){
-            int cut_off = ( j / ns ) * ns + 2 * ns;
-            for(int i=j; i<cut_off; i++){
-                // j always <= i
-                if(i < ns*nt){
-                    int j_loc = j % ns;
-                    int i_loc = i % 2*ns;
-                    Q_lower.insert(i,j) = tmpBlock(i_loc,0);
-                }
-            }
-
-            // also fill dense columns with whatever
-            for(int i=ns*nt; i<n; i++){
-                if(i >= j){
-                    int j_loc = j % ns;
-                    int i_loc = i % nb;      
-                    Q_lower.insert(i,j) = tmpBlock(i_loc, 0);
-                }
-            }
-        }
-
-        //std::cout << "Q_lower : \n" << MatrixXd(Q_lower) << std::endl;
-
-        SpMat epsId(n,n);
-        epsId.setIdentity();
-        epsId = 100 * epsId;
-
-        Q_lower = Q_lower + epsId;
-        std::cout << "Q : \n" << Q_lower.block(0,0,8,8) << std::endl;
-        //exit(1);
-
-        //std::cout << "g1 dense : " << g1_dense << std::endl;
-#endif   
-
-        double t_constructQ = - omp_get_wtime();
-        construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);        
-        t_constructQ += omp_get_wtime();
-        printf("time spent construct Q :  %f\n", t_constructQ);
-        std::cout << "Q : \n" << Q.block(0,0,6,6) << std::endl;
-
-        //SpMat epsId(n,n);
-        //epsId.setIdentity();
-        //epsId = 1e-4*epsId;
-
-        //Q = Q + epsId;
-    
-    	// =========================================================================== //
-    	std::cout << "Converting Eigen Matrices to CSR format. " << std::endl;
-
-    	// only take lower triangular part of A
-        SpMat Q_lower = Q.triangularView<Lower>(); 
-        size_t nnz    = Q_lower.nonZeros();
-
-        printf("nnz(Q_lower) = %ld\n", nnz);
-
-        /*if(comp_nnz != nnz){
-            printf("expected nonzeros: %ld and actual nonzeros: %ld not the same! Check! \n", comp_nnz, nnz);
-            //exit(1);
-        }*/
-
-#if 1
-    // true inv diag from Eigen
-    //SimplicialLLT<SpMat, Eigen::Lower, Eigen::NaturalOrdering<int>> solverQ;
-    SimplicialLLT<SpMat> solverQ;
-    solverQ.compute(Q);
-
-   if(solverQ.info()!=Success) {
-     cout << "Oh: Very bad" << endl;
-   }
-
-    Vect x_Eigen = solverQ.solve(rhs);
-
-   SpMat L = solverQ.matrixL();
-   if(n < 20){
-        std:cout << "L: \n" << MatrixXd(L) << std::endl;
-    }
-
-    MatrixXd L_d = MatrixXd(L);
-    Vect y_Eigen = L_d.fullPivLu().solve(rhs);
-    // std::cout << "\nrhs  = " << rhs.transpose() << std::endl;
-    // std::cout << "\ny Eigen = " << y_Eigen.transpose() << std::endl;
-
-    std::cout << "norm(L_d*y_Eigen - rhs) = " << (L_d*y_Eigen - rhs).norm() << std::endl;
-
-    /*MatrixXd L_fB = L_d.block(0,0,ns,ns);
-    printf("first block L:\n");
-   for(int i = 0; i<ns*ns; i++){
-      printf(" %f ", L_fB.data()[i]);
-   }
-   printf("\n\n");
-   std::cout << "L21 block : \n" << L_d.block(ns,0,ns,ns) << std::endl;
-
-   std::cout << "rhs(seq(ns,2*ns-1))       = "  << rhs(seq(ns,2*ns-1)).transpose() << std::endl;
-   std::cout << "L_fB*y_Eigen(seq(0,ns-1)) = "  << (L_d.block(ns,0,ns,ns)*y_Eigen(seq(0,ns-1))).transpose() << std::endl;
-   Vect temp = rhs(seq(ns,2*ns-1)) - L_d.block(ns,0,ns,ns)*y_Eigen(seq(0,ns-1));
-   std::cout << "b_2 - L11*y1 = " << temp.transpose() << std::endl;*/
-     
-    SpMat eye(n,n);
-    eye.setIdentity();
-
-   // compute log sum by hand
-   double logDetEigen = 0.0;
-   for(int i = 0; i<n; i++){
-        logDetEigen += log(L.coeff(i,i));
-   }
-   logDetEigen *=2.0;
-
-   //std::cout << "diag(L Eigen) : " << L.diagonal().transpose() << std::endl;
-   //std::cout << "log Det Eigen : " << logDetEigen << std::endl;
-   //std::cout << "diff Log Dets : " << logDetEigen - log_det << std::endl;
-
-   /*SpMat inv_Q = solverQ.solve(eye);
-   if(n < 25){
-    MatrixXd inv_Q_dense = MatrixXd(inv_Q.triangularView<Lower>());
-    std::cout << "inv(Q)\n" << inv_Q_dense << std::endl;
-   }*/
-
-#endif
-
-
-
-#if 0
-        std::string Q_filename =  "Qxy_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nss" + to_string(nss) + "_nb" + to_string(nb) + "_n" + to_string(n) + ".dat"; // + "_" + to_string(theta[0]) + "_" + to_string(theta[1]) + "_" + to_string(theta[2]) + "_" + to_string(theta[3]) 
-        //Eigen::saveMarket(Q_lower, filename);                
-        //std::string Q_fileName = "Q_" + to_string(n) + ".txt";
-        write_sym_CSC_matrix(Q_filename, Q_lower);
-
-        std::string filename_rhs = "b_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nb" + to_string(nb) + ".mtx";
-        //Eigen::saveMarket(rhs, filename_rhs);
-        //write_vector(filename_rhs, rhs, n);
-        exit(1);
-#endif
-
-        size_t* ia; 
-        size_t* ja;
-        T* a; 
-        T *b;
-      	T *x;
-
-      	b        = new T[n];
-      	x        = new T[n];
-
-        // allocate memory
-        ia = new long unsigned int [n+1];
-        ja = new long unsigned int [nnz];
-        a  = new T [nnz];
-
-        Q_lower.makeCompressed();
-
-        for (i = 0; i < n+1; ++i){
-            ia[i] = Q_lower.outerIndexPtr()[i]; 
-        }  
-
-        for (i = 0; i < nnz; ++i){
-            ja[i] = Q_lower.innerIndexPtr()[i];
-        }  
-
-        // cast as double or f
-        for (i = 0; i < nnz; ++i){
-            a[i] = (T) Q_lower.valuePtr()[i];
-        }
-
-        for(i = 0; i < n; i++){
-            b[i] = (T) rhs[i];
-        }
-
-        double t_factorise;
-    	double t_solve;
-
-        // *** pin GPU & combine with appropriate cores *** //
-        int GPU_rank = 0;
-        cudaSetDevice(GPU_rank);
-        int numa_node = topo_get_numNode(GPU_rank);
-
-        int* hwt = NULL;
-        int hwt_count = read_numa_threads(numa_node, &hwt);
-        pin_hwthreads(1, &hwt[omp_get_thread_num()]);
-        std::cout<<"Pinning GPU & hw threads. GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
-        std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
-        // *********************************************** //
-
-        printf("call BTA constructor. nt = %ld\n", nt); 
-        BTA<T> *solver;
-        solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
-
-        int m = 2;
-        Vect t_factorize_vec(m-1);
-        T log_det;
-
-        double t_firstStageFactor;
-        double t_secondStageForwardPass;
-        double t_secondStageBackwardPass1;
-        double t_firstSecondStage;
-        double t_secondStageBackwardPass2;
-
-        double flops_factorize;
-
-#ifdef RECORD_TIMES
-        std::string log_file_name = "log_file_factorize_solve_" + solver_type + "_MAGMAnative_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(omp_get_max_threads()) + ".txt";
-        std::ofstream log_file(log_file_name);
-        log_file << "iter t_firstStageFactor t_secondStageForwardPass t_secondStageBackwardPass t_total_solveCPU t_firstSecondStage t_SecondStageBackPass t_total_solveHybrid" << std::endl;
-        log_file.close();
-#endif
-
-        for(int iter=0; iter<m; iter++){
-            printf("\niter = %d\n", iter);
-            printf("a[1:10] = ");
-            for(int i=0; i<10; i++){
-                printf(" %f", a[i]);
-            }
-            printf("\n");
-
-            t_factorise = get_time(0.0);
-            flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
-            t_factorise = get_time(t_factorise);
-            printf("log det noCopyHost: %f\n", log_det);
-            printf("time factorize noCopyHost: %f\n", t_factorise);
-
-            //exit(1);
-
-            t_factorise = get_time(0.0);
-            //solver->solve_equation(GR);
-            flops_factorize = solver->factorize(ia, ja, a, t_firstStageFactor);
-            log_det = solver->logDet(ia, ja, a);
-            printf("logdet: %f\n", log_det);
-            t_factorise = get_time(t_factorise);
-            //printf("time factorize:             %f\n", t_factorise);
-
-            t_solve = get_time(0.0); 
-            double flops_solve = solver->solve(ia, ja, a, x, b, 1, t_secondStageForwardPass, t_secondStageBackwardPass1);
-            t_solve = get_time(t_solve);
-
-            printf("x(1:10) = ");
-            for(int i=0; i<10; i++){
-                printf(" %f", x[i]);
-            }
-            printf("\n");
-            //printf("flops solve:     %f\n", flops_solve);
-
-            //printf("time chol(Q): %lg\n",t_factorise);
-            printf("time solve:                %f\n",t_solve);
-            printf("time factorize + solve     %f\n", t_factorise+t_solve);
-
-            printf("Residual norm. :           %e\n", solver->residualNorm(x, b));
-            printf("Residual norm normalized : %e\n", solver->residualNormNormalized(x, b));
-            /*printf("x.head(10) = ");
-            for(i = 0; i<10; i++){
-                printf(" %f ", x[i]);
-            }
-            printf("\n");*/
-#if 0 
-
-#ifdef DOUBLE_PREC
-            printf("Calling single precision solve using double precision Cholesky factor.\n");
-            t_solve = get_time(0.0); 
-            flops_solve = solver->solve_s(ia, ja, a, x, b, 1);
-            t_solve = get_time(t_solve);
-
-            printf("time single precision solve: %f\n",t_solve);
-
-            printf("Residual norm. single prec :           %e\n", solver->residualNorm(x, b));
-            printf("Residual norm normalized single prec : %e\n", solver->residualNormNormalized(x, b));
-            /*printf("x.head(10) = ");
-            for(i = 0; i<10; i++){
-                printf(" %f ", x[i]);
-            }
-            printf("\n"); */
-#endif
-
-#ifdef SINGLE_PREC
-            printf("Calling double precision solve using single precision Cholesky factor.\n");
-            t_solve = get_time(0.0); 
-            flops_solve = solver->solve_d(ia, ja, a, x, b, 1);
-            t_solve = get_time(t_solve);
-
-            printf("time double precision solve: %f\n",t_solve);
-
-            printf("Residual norm. double prec :           %e\n", solver->residualNorm(x, b));
-            printf("Residual norm normalized double prec : %e\n", solver->residualNormNormalized(x, b));   
-            /*printf("x.head(10) = ");
-            for(i = 0; i<10; i++){
-                printf(" %f ", x[i]);
-            }
-            printf("\n");*/   
-#endif
-
-#endif
-
-#if 0
-      	    T *x_new = new T[n];
-
-            t_factorise = get_time(0.0);
-            flops_factorize = solver->factorizeSolve(ia, ja, a, x_new, b, 1, t_firstSecondStage, t_secondStageBackwardPass2);
-            t_factorise = get_time(t_factorise);
-            log_det = solver->logDet(ia, ja, a);
-
-            Vect x_new_vec(n);
-            Vect x_vec(n);
-
-            for(int i=0; i<n; i++){
-                x_new_vec[i] = x_new[i];
-                x_vec[i]     = x[i];
-            }
-            std::cout << "norm(x-x_new) = " << (x_vec - x_new_vec).norm() << std::endl;
-
-            printf("log det factorizeSolve   : %f\n", log_det);
-            printf("time factorizeSolve      : %f\n", t_factorise);
-#endif
-
-#ifdef RECORD_TIMES
-            // ========================================================================== 
-            //iter t_firstStageFactor t_secondStageForwardPass t_secondStageBackwardPass t_total_solveCPU t_firstSecondStage t_SecondStageBackPass t_total_solveHybrid
-            std::ofstream log_file(log_file_name, std::ios_base::app | std::ios_base::out);
-            log_file << iter << " " << t_firstStageFactor << " " << t_secondStageForwardPass << " " << t_secondStageBackwardPass1 << " " << t_firstStageFactor + t_secondStageForwardPass + t_secondStageBackwardPass1 << " ";
-            log_file << t_firstSecondStage << " " << t_secondStageBackwardPass2 << " " << t_firstSecondStage+t_secondStageBackwardPass2 << std::endl;
-	        log_file.close(); 
-            // ========================================================================== //
-#endif
-            //printf("logdet: %f\n", log_det);
-
-            // write out results. collect:
-            // iter ns nt nb no t_factorize t_solve t_total_solveCPU t_factorizeForwardPass t_backwardPass t_total_solveHybrid
-
-
-            // assign b to correct format
-            /*for (int i = 0; i < n; i++){
-                b[i] = rhs[i];
-                //printf("%f\n", b[i]);
-            }*/
-
-        }
-
-        //std::cout << "factorize times: " << t_factorize_vec.transpose() << std::endl;
-
-
-    //}
-
-#if 0
-  	// create file with solution vector
-    std::string sol_x_file_name = "x_sol_BTA_" + valueType + "_ns" + ns_s + "_nt" + nt_s + "_nb" + nb_s + "_no" + no_s +".dat";
-  	std::ofstream sol_x_file(sol_x_file_name,    std::ios::out | std::ios::trunc);
-
-	for (i = 0; i < n; i++) {
-		sol_x_file << x[i] << std::endl;
-		// sol_x_file << x[i] << std::endl; 
-	}
-    sol_x_file.close();
-#endif   
-
-
-#if 0
-
-    T *invDiag;
-    invDiag  = new T[n];
-
-    double t_invDiag;
-    t_invDiag = get_time(0.0);
-    double flops_invDiag = solver->BTAdiag(ia, ja, a, invDiag);
-    t_invDiag = get_time(t_invDiag);
-    double log_detBTAdiag = solver->logDet(ia, ja, a);
-
-    if(n < 25){
-        printf("\nBTAinvDiag: ");
-        for(i=0; i<n; i++){
-            printf(" %f", invDiag[i]);
-        }
-        printf("\n");
-    }
-
-    //printf("computed BTAdiag\n");
-
-    //printf("flops inv:      %f\n", flops_invDiag);
-
-    //solver->init_supernode()
     T* invQa;
-    invQa = new T[nnz];
-    //printf("before BTAselinv\n");
-    double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
 
-    //printf("before logDetselInv\n");
-    T log_detBTAselInv = solver->logDet(ia, ja, a);
+    b        = new T[n];
+    x        = new T[n];
+    x2       = new T[n];
 
-    double* invQa_d = new double[nnz];
-    for(int i=0; i<nnz; i++){
-        invQa_d[i] = (double) invQa[i];
+    // allocate memory
+    ia = new long unsigned int [n+1];
+    ja = new long unsigned int [nnz];
+    a  = new T [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    // cast as double or f
+    for (i = 0; i < nnz; ++i){
+        a[i] = (T) Q_lower.valuePtr()[i];
     }
 
-    if(n < 25){
-        printf("invQa : ");
-        for(int i=0; i<nnz; i++){
-            printf(" %f", invQa[i]);
+    for(i = 0; i < n; i++){
+        b[i] = (T) rhs[i];
+    }
+
+    double t_factorise;
+    double t_solve;
+
+    // *** pin GPU & combine with appropriate cores *** //
+    int GPU_rank = 0;
+    cudaSetDevice(GPU_rank);
+    int numa_node = topo_get_numNode(GPU_rank);
+
+    int* hwt = NULL;
+    int hwt_count = read_numa_threads(numa_node, &hwt);
+    pin_hwthreads(1, &hwt[omp_get_thread_num()]);
+    std::cout<<"Pinning GPU & hw threads. GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+    std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
+    // *********************************************** //
+
+    printf("call BTA constructor. nt = %ld\n", nt); 
+    BTA<T> *solver;
+    solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
+
+    int m = 3;
+    Vect t_factorize_vec(m-1);
+    T log_det;
+
+    double t_firstStageFactor;
+    double t_secondStageForwardPass;
+    double t_secondStageBackwardPass1;
+    double t_firstSecondStage;
+    double t_secondStageBackwardPass2;
+
+    double flops_factorize;
+
+#ifdef RECORD_TIMES
+    std::string log_file_name = "log_file_factorize_solve_" + solver_type + "_MAGMAnative_ns" + std::to_string(ns) + "_nt" + std::to_string(nt) + "_nb" + std::to_string(nb) + "_" + std::to_string(omp_get_max_threads()) + ".txt";
+    std::ofstream log_file(log_file_name);
+    log_file << "iter t_firstStageFactor t_secondStageForwardPass t_secondStageBackwardPass t_total_solveCPU t_firstSecondStage t_SecondStageBackPass t_total_solveHybrid" << std::endl;
+    log_file.close();
+#endif
+
+    for(int iter=0; iter<m; iter++){
+        printf("\niter = %d\n", iter);
+
+        // t_factorise = get_time(0.0);
+        // flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
+        // t_factorise = get_time(t_factorise);
+        // printf("log det noCopyHost: %f\n", log_det);
+        // printf("time factorize noCopyHost: %f\n", t_factorise);
+
+        t_factorise = get_time(0.0);
+        //solver->solve_equation(GR);
+        flops_factorize = solver->factorize(ia, ja, a, t_firstStageFactor);
+        //log_det = solver->logDet(ia, ja, a);
+        t_factorise = get_time(t_factorise);
+        //printf("time factorize:             %f\n", t_factorise);
+
+        t_solve = get_time(0.0); 
+        double flops_solve = solver->solve(ia, ja, a, x, b, 1, t_secondStageForwardPass, t_secondStageBackwardPass1);
+        t_solve = get_time(t_solve);
+
+        double res_norm_normalized = solver->residualNormNormalized(x, b);
+        if(res_norm_normalized > 1e-10){
+            printf("\nResidual norm.:           %e\n", solver->residualNorm(x, b));
+            printf("Residual norm normalized: %e\n", res_norm_normalized); 
+            printf("Residual norm too large. Exiting. \n");
+            exit(1);
         }
-        printf("\n");
-    }
 
-    //printf("computed BTAselInv\n");
+        // Vect sol(n);
+        // for(int i=0; i<n; i++){
+        //     sol[i] = x[i];
+        // }
 
-    SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
-                               Q_lower.innerIndexPtr(),invQa_d);
+        double t_factoriseSolve = get_time(0.0);
+        //solver->solve_equation(GR);
+        flops_factorize = solver->factorizeSolve(ia, ja, a, x2, b, 1, t_firstStageFactor, t_secondStageBackwardPass1);
+        //log_det = solver->logDet(ia, ja, a);
+        t_factoriseSolve = get_time(t_factoriseSolve);
+
+        double res_norm_normalized2 = solver->residualNormNormalized(x2, b);
+        if(res_norm_normalized2 > 1e-10){
+            printf("\nResidual norm.:           %e\n", solver->residualNorm(x2, b));
+            printf("Residual norm normalized: %e\n", res_norm_normalized2); 
+            printf("Residual norm too large. Exiting. \n");
+            exit(1);
+        }
+
+        // Vect sol2(n);
+        // for(int i=0; i<n; i++){
+        //     sol2[i] = x2[i];
+        // }
+
+        //printf("time chol(Q): %lg\n",t_factorise);
+        printf("time factorize:            %f\n",t_factorise);
+        printf("time solve:                %f\n", t_solve);
+        printf("time factorizeSolve:       %f\n", t_factoriseSolve);
+
+#if 0
+        T *x_new = new T[n];
+
+        t_factorise = get_time(0.0);
+        flops_factorize = solver->factorizeSolve(ia, ja, a, x_new, b, 1, t_firstSecondStage, t_secondStageBackwardPass2);
+        t_factorise = get_time(t_factorise);
+        log_det = solver->logDet(ia, ja, a);
+
+        Vect x_new_vec(n);
+        Vect x_vec(n);
+
+        for(int i=0; i<n; i++){
+            x_new_vec[i] = x_new[i];
+            x_vec[i]     = x[i];
+        }
+        std::cout << "norm(x-x_new) = " << (x_vec - x_new_vec).norm() << std::endl;
+
+        printf("log det factorizeSolve   : %f\n", log_det);
+        printf("time factorizeSolve      : %f\n", t_factorise);
+#endif
+
+#ifdef RECORD_TIMES
+        // ========================================================================== 
+        //iter t_firstStageFactor t_secondStageForwardPass t_secondStageBackwardPass t_total_solveCPU t_firstSecondStage t_SecondStageBackPass t_total_solveHybrid
+        std::ofstream log_file(log_file_name, std::ios_base::app | std::ios_base::out);
+        log_file << iter << " " << t_firstStageFactor << " " << t_secondStageForwardPass << " " << t_secondStageBackwardPass1 << " " << t_firstStageFactor + t_secondStageForwardPass + t_secondStageBackwardPass1 << " ";
+        log_file << t_firstSecondStage << " " << t_secondStageBackwardPass2 << " " << t_firstSecondStage+t_secondStageBackwardPass2 << std::endl;
+        log_file.close(); 
+        // ========================================================================== //
+#endif
+
+  
+#if 1
+
+        T *invDiag;
+        invDiag  = new T[n];
+
+        double t_invDiag;
+        t_invDiag = get_time(0.0);
+        double flops_invDiag = solver->BTAdiag(ia, ja, a, invDiag);
+        t_invDiag = get_time(t_invDiag);
+        double log_detBTAdiag = solver->logDet(ia, ja, a);
+
+        if(n < 25){
+            printf("\nBTAinvDiag: ");
+            for(i=0; i<n; i++){
+                printf(" %f", invDiag[i]);
+            }
+            printf("\n");
+        }
+
+        //printf("computed BTAdiag\n");
+        //printf("flops inv:      %f\n", flops_invDiag);
+
+        //solver->init_supernode()
+        invQa = new T[nnz];
+        //printf("before BTAselinv\n");
+        double flops_invQa = solver->BTAselInv(ia, ja, a, invQa);
+
+        //printf("before logDetselInv\n");
+        // T log_detBTAselInv = solver->logDet(ia, ja, a);
+
+        // double* invQa_d = new double[nnz];
+        // for(int i=0; i<nnz; i++){
+        //     invQa_d[i] = (double) invQa[i];
+        // }
+
+        // if(n < 25){
+        //     printf("invQa : ");
+        //     for(int i=0; i<nnz; i++){
+        //         printf(" %f", invQa[i]);
+        //     }
+        //     printf("\n");
+        // }
+
+        //printf("computed BTAselInv\n");
+
+        // SpMat invQ_new_lower = Eigen::Map<Eigen::SparseMatrix<double> >(n,n,nnz,Q_lower.outerIndexPtr(), // read-write
+        //                         Q_lower.innerIndexPtr(),invQa_d);
 
 
-    if(n < 25){
-        std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
-    }
+        // if(n < 25){
+        //     std::cout << "invQ_new:\n" << MatrixXd(invQ_new_lower) << std::endl;
+        // }
 
-  // TODO: more efficient way to do this?
-    SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
+    // TODO: more efficient way to do this?
+        // SpMat invQ_new = invQ_new_lower.selfadjointView<Lower>();
 
-    Vect invDiag_vec(n);
-    for(int i=0; i<n; i++){
-        invDiag_vec[i] = invDiag[i];
-    }
+        // Vect invDiag_vec(n);
+        // for(int i=0; i<n; i++){
+        //     invDiag_vec[i] = invDiag[i];
+        // }
 
-    std::cout << "norm(diag(invQ_new)) = " << invQ_new.diagonal().norm() << std::endl;
-    std::cout << "norm(invDiag))       = " << invDiag_vec.norm() << std::endl;    
-    std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
-    //std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
+        // std::cout << "norm(diag(invQ_new)) = " << invQ_new.diagonal().norm() << std::endl;
+        // std::cout << "norm(invDiag))       = " << invDiag_vec.norm() << std::endl;    
+        // std::cout << "norm(diag(invQ_new) - diag(invDiag)) = " << (invQ_new.diagonal() - invDiag_vec).norm() << std::endl;
+        
+        // check with Eigen solver for small test cases
+        // if(n < 5000){
+        //     MatrixXd Qinv_eigen(n,n);
+        //     Vect sol_eigen(n);
+        //     double log_det_eigen;
 
-    //std::string invQ_fileName = "invQ_seq_" + to_string(n) + ".txt";
-    //write_sym_CSC_matrix(invQ_fileName, invQ_new_lower);
+        //     // call Eigen solver
+        //     call_EigenSolver(Q, rhs, Qinv_eigen, sol_eigen, log_det_eigen);
+        //     std::cout << "norm(x_BTA - x_Eigen)             = " << (sol_eigen - sol).norm() << std::endl;
+        //     std::cout << "norm(log_det_BTA - log_det_Eigen) = " << (log_det_eigen - log_det) << std::endl;
+        //     std::cout << "norm(diag(invQ_new) - diag(invEigen)) = " << (invQ_new.diagonal() - Qinv_eigen.diagonal()).norm() << std::endl;
 
-    /*
-    std::string invQ_new_fileName = "invQ_new_diag_" + to_string(n) + ".txt";
-    ofstream invQ_new_file(invQ_new_fileName,    ios::out | ::ios::trunc);
+        // }
 
-    std::string invQ_diag_fileName = "invQ_diag_" + to_string(n) + ".txt";
-    ofstream invQ_diag_file(invQ_diag_fileName,    ios::out | ::ios::trunc);
-
-    //std::string invQ_full_fileName = "invQ_full_diag_" + to_string(n) + ".txt";
-    //ofstream invQ_full_file(invQ_full_fileName,    ios::out | ::ios::trunc);
-
-    for(int i=0; i<n; i++){
-        invQ_new_file << std::setprecision(7) << invQ_new.diagonal()[i] << endl;
-        invQ_diag_file << std::setprecision(7) << invDiag_vec[i] << std::endl;
-        //invQ_full_file << std::setprecision(7) << inv_Q.diagonal()[i] << endl;
-    }
-
-    invQ_new_file.close();
-    invQ_diag_file.close();
-    //invQ_full_file.close();
-
-    */
+    } // end loop over m
 
 #if 0
     // create file with inv Diag vector
@@ -1189,140 +1011,28 @@ std::string valueType;
 
     // now assemble invBlks to correct sparse matrix -> column major -> iterate through columns
     // careful with block structure, need to be alternating betwen diagonal & off diagonal dense blocks
-#if 0
-    SpMat QinvBlks_comp(n,n);
-    QinvBlks_comp.reserve(ns*ns*nt+2*ns*nb*nt+nb*ns);
-
-    double t_constrQinvBlks_comp = -omp_get_wtime();
-    construct_spInvQBlks(ns, nt, nb, nnz_invBlks, invBlks, QinvBlks_comp);
-    t_constrQinvBlks_comp += omp_get_wtime();
-    printf("Assemble QinvBlks comp time: %lg\n",t_constrQinvBlks_comp);
-#endif
-
-    /*
-    size_t nnz_lower_invBlks = nt*ns*(ns+1)/2 + ns*nb*nt + (nb+1)*nb/2;
-    SpMat QinvBlks_comp(n,n);
-    QinvBlks_comp.reserve(nnz_lower_invBlks);
-
-    double t_constrQinvBlks = -omp_get_wtime();
-    construct_lower_CSC_invBlks(ns, nt, nb, nnz_lower_invBlks, invBlks, QinvBlks_comp);
-    t_constrQinvBlks += omp_get_wtime();
-    printf("Assemble QinvBlks lower time: %lg\n \n",t_constrQinvBlks);
-    
-    SpMat QinvBlks(n,n);
-    size_t nnz_full_invBlks = ns*ns*nt + 2*ns*nb*nt + nb*nb;
-    double t_constrQinvBlks = -omp_get_wtime();
-    construct_full_CSC_invBlks(ns, nt, nb, nnz_full_invBlks, invBlks, QinvBlks);
-    t_constrQinvBlks += omp_get_wtime();
-    printf("Assemble QinvBlks full time : %lg\n \n",t_constrQinvBlks);
-    */
-
-//#ifdef PRINT_MSG
-    //std::cout << "diff(Q_inv_comp - QinvBlks) :\n" << MatrixXd(QinvBlks_comp - QinvBlks_full) << std::endl;
-
-    //std::cout << "inv(Q):\n" << MatrixXd(inv_Q) << std::endl;
-    //std::cout << "norm(QinvBlks_comp - QinvBlks) : " << (QinvBlks_comp - QinvBlks).norm() << std::endl;
-//#endif
-
-    // print/write diag 
-    /*
-    string sel_inv_file_name = "sel_inv_BTA_ns"+to_string(ns)+"_nt"+to_string(nt)+"_nb"+ to_string(nb) + "_no" + to_string(no) +".dat";
-    cout << sel_inv_file_name << endl;
-    ofstream sel_inv_file(sel_inv_file_name,    ios::out | ::ios::trunc);
-
-    for (int i = 0; i < n; i++){
-        sel_inv_file << invDiag[i] << endl;
-    }
-
-    sel_inv_file.close();
-    cout << "after writing file " << endl;
-    */
-
-   /*
-   Vect invDiag_vec(n);
-    // assign b to correct format
-    for (int i = 0; i < n; i++){
-        invDiag_vec[i] = invDiag[i];
-        //printf("%f\n", b[i]);
-    }
-
-    Vect invDiagfBlks(n);
-    invDiagfBlks = QinvBlks.diagonal();
-
-   //cout << "Q:\n" << Q << endl;
-
-    //std::cout << "inv_Q - invQ_new :\n" << inv_Q - invQ_new << std::endl;
-
-    printf("norm(invDiag - invDiagfBlks)   : %f\n", (invDiag_vec - invDiagfBlks).norm());
-    cout << "norm(invQ_new - inv(Q))         : " << (invQ_new.diagonal() - inv_Q.diagonal()).norm() << std::endl;
-    cout << "norm(diag(invQ))   : " << inv_Q.diagonal().norm() << std::endl;
-    printf("norm(invDiagfBlks) : %f\n", invDiagfBlks.norm());
-    printf("norm(invDiag)      : %f\n", invDiag_vec.norm());
-
-    // to file
-    std::string invQ_Eigen_fileName = "invQ_diag_Eigen.txt";
-    ofstream invQ_Eigen_file(invQ_Eigen_fileName,    ios::out | ::ios::trunc);
-
-    std::string invQ_selInv_fileName = "invQ_diag_selInv.txt";
-     ofstream invQ_selInv_file(invQ_selInv_fileName,    ios::out | ::ios::trunc);
-
-    for(int i=0; i<n; i++){
-        invQ_Eigen_file << std::setprecision(15) << inv_Q.diagonal()[i] << endl;
-        invQ_selInv_file << std::setprecision(15) << invQ_new.diagonal()[i] << std::endl;
-    }
-
-    invQ_Eigen_file.close();
-    invQ_selInv_file.close();
-    */
-
-    /*
-    MatrixXd Qinv_proj_fullInv = Ax * inv_Q * Ax.transpose();
-    MatrixXd Qinv_proj         = Ax * invQ_new * Ax.transpose();
-
-    std::cout << "diag(Qinv_proj_fullInv) : " << Qinv_proj_fullInv.diagonal().head(10).transpose() << std::endl;
-    std::cout << "diag(Qinv)              : " << Qinv_proj.diagonal().head(10).transpose() << std::endl;
-    MatrixXd temp = Qinv_proj_fullInv - Qinv_proj;
-    std::cout << "norm(Qinv_proj - Qinv_proj_fullInv) : " << temp.diagonal().norm() << std::endl;
-    */
-
-    if(n < 20){
-        //cout << "\ninvDiag BTA            : " << invDiag_vec.transpose() << std::endl;
-        //cout << "invDiag from blks BTA  : "   << invDiagfBlks.transpose() << std::endl;
-        //cout << "Eigen diag(inv_Q)      : "   << inv_Q.diagonal().transpose() << endl;
-    } else {
-#ifdef PRINT_MSG
-        cout << "\ninvDiag BTA[1:20]       : " << invDiag_vec.head(20).transpose() << std::endl;
-        //cout << "invDiag from blks BTA   : "   << invDiagBlks.transpose() << std::endl;
-        //cout << "Eigen diag(inv_Q)[1:20] : " << inv_Q.diagonal().head(20).transpose() << endl;
-        //cout << "norm(invDiag - inv(Q))  : " << (invDiag - inv_Q.diagonal()).norm() << std::endl;
-#endif   
-    }
-
-
-  delete[] invDiag;
+    //delete[] invDiag;
 
 #endif
 
   
-  // free memory
-  delete solver;
+    // free memory
+    delete solver;
 
-  delete[] ia;
-  delete[] ja;
-  delete[] a;
+    delete[] ia;
+    delete[] ja;
+    delete[] a;
 
-  delete[] x;
-  delete[] b;
+    delete[] invQa;
 
-  //} // end if
+    delete[] x;
+    delete[] b;
 
-  #endif
+    //} // end if
 
-  //} // end omp parallel
-
-
-    
-  return 0;
+    #endif
+        
+    return 0;
 
 
   }

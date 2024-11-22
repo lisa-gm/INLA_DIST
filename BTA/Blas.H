@@ -8,7 +8,7 @@
 
 #define CUDA_POTRF
 #define CUDA_TRSM
-//#define CUDA_SYRK
+#define CUDA_SYRK
 
 //#define MAGMA_EXPERT
 
