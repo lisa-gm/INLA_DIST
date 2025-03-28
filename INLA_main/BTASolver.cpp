@@ -62,6 +62,7 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
       
     } else {
         cudaGetDevice(&GPU_rank);
+        GPU_rank = MPI_rank % noGPUs;
         printf("nummber of available GPUs: %d, currently set device: %d\n", noGPUs, GPU_rank);
 
     }

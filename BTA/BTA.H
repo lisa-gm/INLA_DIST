@@ -4065,17 +4065,14 @@ inline void BTA<T>::init_supernode(T *M_dev, size_t supernode, cudaStream_t stre
 
     cudaMemsetAsync((void*)M_dev, 0, supernode_size*sizeof(T), stream );
 
-    //printf("in init supernode. a[0] = %f\n", matrix_a[supernode_offset]);
-
     memcpy_to_device( &matrix_ia[supernode_fc],     ia_dev, (cols+1)*sizeof(size_t),       stream );
     memcpy_to_device( &matrix_ja[supernode_offset], ja_dev,  supernode_nnz*sizeof(size_t), stream );
     memcpy_to_device( &matrix_a[supernode_offset],  a_dev,   supernode_nnz*sizeof(T),      stream );
-        
+
     init_supernode_dev(M_dev, ia_dev, ja_dev, a_dev, supernode, supernode_nnz, supernode_offset, matrix_ns, matrix_nt, matrix_nd, stream );
 
-    /*double a_host;
-    gpuErrchk(cudaMemcpy(&a_host, &M_dev[0], sizeof(double), cudaMemcpyDeviceToHost)); 
-    printf("in init supernode. IB = %d, a[0] = %f\n", supernode, a_host);*/
+   //  gpuErrchk(cudaMemcpy(&a_host, &M_dev[0], sizeof(double), cudaMemcpyDeviceToHost)); 
+   //  printf("in init supernode. IB = %d, M_dev[0] = %f\n", supernode, a_host);
 
 }
 

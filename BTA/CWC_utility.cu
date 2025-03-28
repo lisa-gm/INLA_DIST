@@ -15,6 +15,18 @@
 
 static volatile size_t c_memory = 0;
 
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+
+inline void gpuAssert(cudaError_t code, const char *file, int line)
+{
+    if (code != cudaSuccess)
+    {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+        exit(code);
+        abort();
+    }
+}
+
 extern "C"
 void set_gpu(int dev,char *gpu_string){
      struct cudaDeviceProp dprop;
@@ -1262,7 +1274,7 @@ __global__ void d_init_supernode(double *M, size_t *ia, size_t *ja, double *a, s
       size_t r = ja[idx];
 
       size_t i = getPos(r, c, ns, nt, nd) - offset;
-      //printf("initSN: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
+      // printf("initSN: c=%ld, idx=%ld, i=%ld, r=%ld, ns=%ld, nt=%ld, nd=%ld, supernode_offset=%ld\n", c, idx, i, r, ns, nt, nd, supernode_offset);
       
       M[i] = a[idx];
    }
@@ -1279,9 +1291,9 @@ void d_init_supernode_on_dev(double *M, size_t *ia, size_t *ja, double *a, size_
     size_t supernode_fc = supernode * ns;
     size_t supernode_lc = supernode < nt ? (supernode+1) * ns : ns * nt + nd;
 
-    d_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(M, ia, ja, a, supernode_fc, 
-	supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
-    //cudaDeviceSynchronize(); // needed for the printf() from getPos()
+    d_init_supernode<<<i_size/BLOCK_DIM, BLOCK_DIM, 0, stream>>>(M, ia, ja, a, supernode_fc, supernode_lc, supernode_nnz, supernode_offset, ns, nt, nd);
+    // gpuErrchk( cudaPeekAtLastError() );
+    // cudaDeviceSynchronize(); // needed for the printf() from getPos()
 
 }
 
@@ -1420,18 +1432,6 @@ __global__ void s_extract_nnzA(float *a, size_t *ia, size_t *ja, float *M, size_
 }
 
 // ************************** //
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-
-inline void gpuAssert(cudaError_t code, const char *file, int line)
-{
-    if (code != cudaSuccess)
-    {
-        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        exit(code);
-        abort();
-    }
-}
 
 extern "C"
 void d_extract_nnzA_on_dev(double *a, size_t *ia, size_t *ja, double *M, size_t supernode, size_t supernode_nnz, size_t supernode_offset, size_t ns, size_t nt, size_t nd)

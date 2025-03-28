@@ -1172,8 +1172,8 @@ inline void tpotrf_dev(char uplo,int n,double *a,int lda,int *info)
     // Of powers of 2 64 appears to be the best for our test case - 128 would be second-best.
     // Did not evaluate intervening values.
     //magma_int_t potrfErr = magma_dpotrf_expert_gpu(magma_uplo,n,a,lda,info, 64, MagmaNative ); // native: gpu only
-    magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
-    //magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version    
+    //magma_int_t potrfErr = magma_dpotrf_gpu(magma_uplo,n,a,lda,info); // hybrid version
+    magma_int_t potrfErr = magma_dpotrf_native(magma_uplo,n,a,lda,info); // gpu only version    
 
     /*double a_problem_host;
     int ind_error = 991;

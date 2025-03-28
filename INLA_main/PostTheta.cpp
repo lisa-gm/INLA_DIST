@@ -301,6 +301,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 		// CAREFUL 1e-3 is arbitrary choice!!
 		Qx.coeffRef(i,i) = 1e-3;
 	}	  
+	Qx.makeCompressed();
+
 
 	//prior = "gaussian";
 	prior = "pc";
@@ -483,30 +485,45 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	Vect theta_dummy(theta_prior_param.size());
 	theta_dummy.setOnes();
 	construct_Q_spat_temp(theta_dummy, Qst);
-
-	/*for(int i=0; i<200; i++){
-		printf("%d  ", Qst.outerIndexPtr()[i]);
-		printf("%d  ", Qst.innerIndexPtr()[i]);
-		printf("%f\n", Qst.valuePtr()[i]);
-	}*/
-
 	int nnz = Qst.nonZeros();
+
+	// SpMat Qx_ref(n, n);
+	// Qx_ref.reserve(nnz);
+
+	// //print("inserting values Qx.\n");
+	// double t_Qu = - omp_get_wtime();
+	// for (int k=0; k<Qst.outerSize(); ++k){
+	// 	for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
+	// 	{
+	// 		Qx_ref.insert(it.row(),it.col()) = it.value();               
+	// 	}
+	// }
+	// t_Qu += omp_get_wtime();
+	// printf("time construct Qu first time: %f\n", t_Qu);
+
 	Qx.resize(n,n);
 	Qx.reserve(nnz);
-	
-	//print("inserting values Qx.\n");
 
-	for (int k=0; k<Qst.outerSize(); ++k){
-		for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
-		{
-			Qx.insert(it.row(),it.col()) = it.value();               
+	std::vector<Eigen::Triplet<double>> triplets;
+	triplets.reserve(nnz);
+
+	double t_Qu = -omp_get_wtime();
+	for (int k = 0; k < Qst.outerSize(); ++k) {
+		for (SparseMatrix<double>::InnerIterator it(Qst, k); it; ++it) {
+			triplets.emplace_back(it.row(), it.col(), it.value());
 		}
 	}
+	Qx.setFromTriplets(triplets.begin(), triplets.end());
+	t_Qu += omp_get_wtime();
+	printf("time Qst insert: %f\n", t_Qu);
 
 	for(int i=nu; i < n; i++){
 		// CAREFUL 1e-3 is arbitrary choice!!
 		Qx.insert(i,i) = 1e-3;
 	}
+	Qx.makeCompressed();
+
+	std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 
 	/*for(int i=0; i<200; i++){
 		printf("%d  ", Qx.outerIndexPtr()[i]);
@@ -752,6 +769,8 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 		// CAREFUL 1e-3 is arbitrary choice!!
 		Qx.insert(i,i) = 1e-3;
 	}
+
+	Qx.makeCompressed();
 
 	//std::cout << "Qx = \n" << Qx << std::endl;
 
@@ -2954,7 +2973,12 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 #endif
 
 	// assemble overall precision matrix Q.st
-	Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+	SpMat tmp1 = KroneckerProductSparse<SpMat, SpMat>(M0, q3s);
+	SpMat tmp2 = KroneckerProductSparse<SpMat, SpMat>(M1, q2s);
+	SpMat tmp3 = KroneckerProductSparse<SpMat, SpMat>(M2, q1s);
+	Qst = pow(exp_theta1,2)*(tmp1 + exp_theta3 * tmp2 + pow(exp_theta3, 2)* tmp3);
+
+	//Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
 	/*if(MPI_rank == 0){
 		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
 	}*/
@@ -2985,7 +3009,7 @@ void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	////////////////////////////////////////////////////////////// 
 
 #ifdef PRINT_MSG
-		//std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
+		std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
 #endif
 }
 
@@ -3160,6 +3184,9 @@ void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 			std::cout << "Q : \n" << Q << std::endl;
 			std::cout << "theta : \n" << theta.transpose() << std::endl;
 #endif 
+
+	printf("before end construct_Q()\n");
+	exit(1);
 
 	}
 

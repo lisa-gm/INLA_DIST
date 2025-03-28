@@ -16,7 +16,7 @@
 
 #include <optional>
 
-#include <armadillo>
+//#include <armadillo>
 
 
 using Eigen::VectorXd;

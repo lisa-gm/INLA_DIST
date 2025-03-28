@@ -20,7 +20,7 @@
 
 //#define WRITE_RESULTS
 
-//#define PRINT_MSG
+#define PRINT_MSG
 //#define WRITE_LOG
 
 #include "mpi.h"
@@ -1057,7 +1057,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-7;
     //param.delta = 1e-9; // ref sol
     // maximum line search iterations
-    param.max_iterations = 200; //200;
+    param.max_iterations = 5; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -1511,7 +1511,7 @@ double time_bfgs = 0.0;
 
  double t_get_covariance = 0.0;
 
-#if 1
+#if 0
     Vect theta_max(dim_th);
     //theta_max << -2.15, 9.57, 11.83, 3.24;    // theta
     //theta_max << 1.377415, -4.522942, 0.6501593, 1.710503, -4.603187, 2.243890;
@@ -1573,7 +1573,7 @@ double time_bfgs = 0.0;
 
 #endif
 
-#if 1
+#if 0
 
     /*
     //theta_param << -1.407039,  8.841431,  9.956879,  3.770581;
@@ -1693,7 +1693,7 @@ double time_bfgs = 0.0;
     // =================================== compute marginal variances =================================== //
     double t_get_marginals = 0.0;
 
-#if 1
+#if 0
     Vect marg(n);
 
     // when the range of u is large the variance of b0 is large.

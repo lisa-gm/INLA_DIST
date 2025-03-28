@@ -13,7 +13,7 @@
 #include <unsupported/Eigen/KroneckerProduct>
 #include <unsupported/Eigen/SparseExtra>   // includes saveMarket
 
-#include <armadillo>
+//#include <armadillo>
 #include "generate_testMat_selInv.cpp"
 #include "../read_write_functions.cpp"
 #include "helper_functions.h"
@@ -80,101 +80,43 @@ void construct_Q_spat_temp(SpMat& Qst, Vect& theta, SpMat& c0, SpMat& g1, SpMat&
 	double exp_theta2 = exp(1.039721);
 	double exp_theta3 = exp(3.688879);*/
 
-	//std::cout << "exp(theta) : " << exp(theta[0]) << " " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << " " << std::endl;	
+	std::cout << "exp(theta) : " << exp(theta[0]) << " " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << " " << std::endl;	
 
 	// g^2 * fem$c0 + fem$g1
 	SpMat q1s = pow(exp_theta2, 2) * c0 + g1;
 
 	 // g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2
-		SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
+	SpMat q2s = pow(exp_theta2, 4) * c0 + 2 * pow(exp_theta2,2) * g1 + g2;
 
 		// g^6 * fem$c0 + 3 * g^4 * fem$g1 + 3 * g^2 * fem$g2 + fem$g3
-		SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
+	SpMat q3s = pow(exp_theta2, 6) * c0 + 3 * pow(exp_theta2,4) * g1 + 3 * pow(exp_theta2,2) * g2 + g3;
 
-		#ifdef PRINT_MSG
-			/*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
+#ifdef PRINT_MSG
+		/*std::cout << "theta u : " << exp_theta1 << " " << exp_theta2 << " " << exp_theta3 << std::endl;
 		std::cout << "pow(exp_theta1,2) : \n" << pow(exp_theta1,2) << std::endl;
 		std::cout << "pow(exp_theta2,2) : \n" << pow(exp_theta2,2) << std::endl;
 		std::cout << "q1s : \n" << q1s.block(0,0,10,10) << std::endl;
         std::cout << "q2s : \n" << q2s.block(0,0,10,10) << std::endl;
-        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;*/
-		#endif
+        std::cout << "q3s : \n" << q3s.block(0,0,10,10) << std::endl;
+        std::cout << "m0  : \n" << M0 << std::endl;
+        std::cout << "m1  : \n" << M1 << std::endl;
+        std::cout << "m2  : \n" << M2 << std::endl;*/
+#endif
 
 		// assemble overall precision matrix Q.st
-		Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
-
+        printf("before kronecker\n");
+        double t_kron = - omp_get_wtime();
+        SpMat tmp1 = KroneckerProductSparse<SpMat, SpMat>(M0, q3s);
+        SpMat tmp2 =  exp_theta3 * KroneckerProductSparse<SpMat, SpMat>(M1, q2s);
+        SpMat tmp3 =  pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s);
+		Qst = pow(exp_theta1,2)*(tmp1 + tmp2 + tmp3);
+        // Qst = pow(exp_theta1,2)*(KroneckerProductSparse<SpMat, SpMat>(M0, q3s) + exp_theta3 *KroneckerProductSparse<SpMat, SpMat>(M1, q2s) + pow(exp_theta3, 2)* KroneckerProductSparse<SpMat, SpMat>(M2, q1s));
+        Qst.makeCompressed();
+        t_kron += omp_get_wtime();
+        printf("time kron Qst: %f\n", t_kron);
 		//std::cout << "Qst : \n" << Qst.block(0,0,10,10) << std::endl;
+        //exit(1);                            
 }
-
-#if 0
-void construct_Q(SpMat& Q, int ns, int nt, int nb, Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3,\
-									  SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Ax){
-
-	double exp_theta0 = exp(theta[0]);
-	int nu = ns*nt;
-
-	SpMat Q_b = 1e-5*Eigen::MatrixXd::Identity(nb, nb).sparseView(); 
-	std::cout << "Q_b " << std::endl;
-	std::cout << Eigen::MatrixXd(Q_b) << std::endl;
-
-	if(ns > 0){
-		SpMat Qu(nu, nu);
-		// TODO: find good way to assemble Qx
-		if(nt > 1){
-			construct_Q_spat_temp(Qu, theta, c0, g1, g2, g3, M0, M1, M2);
-		} else {	
-			construct_Q_spatial(Qu, theta, c0, g1, g2);
-		}	
-
-		//Qub0 <- sparseMatrix(i=NULL,j=NULL,dims=c(nb, ns))
-		// construct Qx from Qs values, extend by zeros 
-		size_t n = ns*nt + nb;
-		SpMat Qx(n,n);         // default is column major			
-
-		int nnz = Qu.nonZeros();
-		Qx.reserve(nnz);
-
-		for (int k=0; k<Qu.outerSize(); ++k)
-		  for (SparseMatrix<double>::InnerIterator it(Qu,k); it; ++it)
-		  {
-		    Qx.insert(it.row(),it.col()) = it.value();                 
-		  }
-
-		//Qs.makeCompressed();
-		//SpMat Qx = Map<SparseMatrix<double> >(ns+nb,ns+nb,nnz,Qs.outerIndexPtr(), // read-write
-        //                   Qs.innerIndexPtr(),Qs.valuePtr());
-
-		for(int i=nu; i<(n); i++){
-			Qx.coeffRef(i,i) = 1e-5;
-		}
-
-		Qx.makeCompressed();
-
-#ifdef PRINT_MSG
-			//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
-			//std::cout << "Ax : \n" << Ax.block(0,0,10,10) << std::endl;
-#endif
-
-		Q =  Qx + exp_theta0 * Ax.transpose() * Ax;
-
-	} else {
-        Q = Q_b + exp_theta0 * Ax.transpose() * Ax;
-    }
-
-	/*std::cout << "Q -  exp(theta)*B'*B " << std::endl;
-	std::cout << Eigen::MatrixXd(*Q) - exp_theta*B.transpose()*B << std::endl;*/
-
-#ifdef PRINT_MSG
-			std::cout << "exp(theta0) : " << exp_theta0 << std::endl;
-			//std::cout << "Qx dim : " << Qx.rows() << " " << Qx.cols() << std::endl;
-			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
-			std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-			std::cout << "theta : \n" << theta.transpose() << std::endl;
-
-#endif
-
-}
-#endif
 
 
 void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3,\
@@ -188,19 +130,46 @@ void construct_Q(SpMat& Q, int ns, int nt, int nss, int nb, Vect& theta, SpMat& 
     }
     else if(ns > 0 && nt > 1 && nss == 0){
         SpMat Qst(ns*nt, ns*nt);
+        double time_Qst = - omp_get_wtime();
         construct_Q_spat_temp(Qst, theta, c0, g1, g2, g3, M0, M1, M2);
-		
+        time_Qst += omp_get_wtime();
+        printf("time Qst: %f\n", time_Qst);
+
 		int nnz = Qst.nonZeros();
-		Qx.reserve(nnz);
+        // SpMat Qx_ref(n, n);
+		// Qx_ref.reserve(nnz);
 
-		for (int k=0; k<Qst.outerSize(); ++k){
-		  for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
-		  {
-		    Qx.insert(it.row(),it.col()) = it.value();                 
-		  }
+        // time_Qst = - omp_get_wtime();
+		// for (int k=0; k<Qst.outerSize(); ++k){
+		//   for (SparseMatrix<double>::InnerIterator it(Qst,k); it; ++it)
+		//   {
+		//     Qx_ref.insert(it.row(),it.col()) = it.value();                 
+		//   }
+        // }
+        // time_Qst += omp_get_wtime();
+        // printf("time Qst insert: %f\n", time_Qst);
+
+        Qx.reserve(nnz);
+        std::vector<Eigen::Triplet<double>> triplets;
+        triplets.reserve(nnz);
+
+        time_Qst = -omp_get_wtime();
+        for (int k = 0; k < Qst.outerSize(); ++k) {
+            for (SparseMatrix<double>::InnerIterator it(Qst, k); it; ++it) {
+                triplets.emplace_back(it.row(), it.col(), it.value());
+            }
         }
+        Qx.setFromTriplets(triplets.begin(), triplets.end());
+        time_Qst += omp_get_wtime();
+        printf("time Qst insert: %f\n", time_Qst);
 
-        printf("here.\n");
+        // std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
+        // std::cout << "Qx_ref : \n" << Qx_ref.block(0,0,10,10) << std::endl;
+
+        // // compute norm between Qx and Qx_ref
+        // double diff = (Qx - Qx_ref).norm();
+        // printf("diff Qx - Qx_ref: %f\n", diff);
+
     } else if(ns > 0 && nt > 0 && nss > 0){
         SpMat Qst(ns*nt, ns*nt);
         std::cout << "theta:           " << theta.transpose() << std::endl;
@@ -564,7 +533,7 @@ std::string valueType;
     valueType = "single";
 #endif
 
-#if 1
+#if 0
 
     std::string solver_type = "BTA";
 
@@ -982,12 +951,12 @@ std::string valueType;
 
 
 #if 1
-    /*int n = ns*nt + nss + nb;
+    int n = ns*nt + nss + nb;
     SpMat Q(n,n);
     Vect rhs(n);
     double exp_theta = exp(theta[0]);
     rhs = exp_theta*Ax.transpose()*y;
-    std::cout << "\nConstructing precision matrix Qxy. " << std::endl;*/
+    std::cout << "\nConstructing precision matrix Qxy. " << std::endl;
     //std::cout << "Setting Ax to zero." << std::endl;
     //Ax.makeCompressed();
     //Ax.setZero();
@@ -1046,10 +1015,10 @@ std::string valueType;
 
         //std::cout << "g1 dense : " << g1_dense << std::endl;
 #endif        
-        /*double t_constructQ = - omp_get_wtime();
+        double t_constructQ = - omp_get_wtime();
         construct_Q(Q, ns, nt, nss, nb, theta, c0, g1, g2, g3, M0, M1, M2, Ax);        
         t_constructQ += omp_get_wtime();
-        printf("time spent construct Q :  %f\n", t_constructQ);*/
+        printf("time spent construct Q :  %f\n", t_constructQ);
         std::cout << "Q : \n" << Q.block(0,0,6,6) << std::endl;
 
         //SpMat epsId(n,n);
@@ -1182,22 +1151,25 @@ std::string valueType;
     	double t_solve;
 
         // *** pin GPU & combine with appropriate cores *** //
-        int GPU_rank = 0;
-        cudaSetDevice(GPU_rank);
-        int numa_node = topo_get_numNode(GPU_rank);
+        // int GPU_rank = 0;
+        // cudaSetDevice(GPU_rank);
+        // int numa_node = topo_get_numNode(GPU_rank);
 
-        int* hwt = NULL;
-        int hwt_count = read_numa_threads(numa_node, &hwt);
-        pin_hwthreads(1, &hwt[omp_get_thread_num()]);
-        std::cout<<"Pinning GPU & hw threads. GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
-        std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
+        // int* hwt = NULL;
+        // int hwt_count = read_numa_threads(numa_node, &hwt);
+        // pin_hwthreads(1, &hwt[omp_get_thread_num()]);
+        // std::cout<<"Pinning GPU & hw threads. GPU rank : "<<GPU_rank <<", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
+        // std::cout<<", hwthreads: " << hwt[omp_get_thread_num()] << std::endl;
         // *********************************************** //
+        int GPU_rank;
+        cudaGetDevice(&GPU_rank);
+        printf("allocated GPU: %d\n", GPU_rank);
 
         printf("call BTA constructor. nt = %ld\n", nt); 
         BTA<T> *solver;
         solver = new BTA<T>(ns, nt, nss+nb, GPU_rank);
 
-        int m = 2;
+        int m = 4;
         Vect t_factorize_vec(m-1);
         T log_det;
 
@@ -1218,6 +1190,8 @@ std::string valueType;
 
         for(int iter=0; iter<m; iter++){
             printf("iter = %d\n", iter);
+
+            printf("a[0] = %f\n", a[0]);
 
             t_factorise = get_time(0.0);
             flops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
@@ -1246,7 +1220,7 @@ std::string valueType;
             printf("\n");
             //printf("flops solve:     %f\n", flops_solve);
 
-            //printf("time chol(Q): %lg\n",t_factorise);
+            printf("time chol(Q): %lg\n",t_factorise);
             printf("time solve:                %f\n",t_solve);
             printf("time factorize + solve     %f\n", t_factorise+t_solve);
 
