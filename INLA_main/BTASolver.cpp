@@ -28,9 +28,9 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
 
     int noGPUs;
     cudaGetDeviceCount(&noGPUs);
-#ifdef PRINT_MSG
+//#ifdef PRINT_MSG
     std::cout << "available GPUs : " << noGPUs << std::endl;
-#endif
+//#endif
 
     if(strcmp ("KW60890", processor_name) == 0){
         GPU_rank = 0;
@@ -62,10 +62,14 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
       
     } else {
         cudaGetDevice(&GPU_rank);
-        GPU_rank = MPI_rank % noGPUs;
+        //GPU_rank = MPI_rank % noGPUs;
+        GPU_rank = (2*MPI_rank + thread_ID) % noGPUs; // 
         printf("nummber of available GPUs: %d, currently set device: %d\n", noGPUs, GPU_rank);
 
     }
+    // on daint we have 4 gpus per node and if thread ID level 1 is 2 -> we want those two on the same node
+    // -> this means the GPU rank is 2*MPI_rank + thread_ID if MPI_size is 18
+
     //GPU_rank = MPI_rank % noGPUs;
     cudaError_t cudaErr = cudaSetDevice(GPU_rank);
     if(cudaErr != cudaSuccess){
@@ -73,16 +77,16 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
         exit(1);
     }
 
-    int numa_node = topo_get_numNode(GPU_rank);
+    //int numa_node = topo_get_numNode(GPU_rank);
     
-    int* hwt = NULL;
-    int hwt_count = read_numa_threads(numa_node, &hwt);
+    //int* hwt = NULL;
+    //int hwt_count = read_numa_threads(numa_node, &hwt);
 
     // now they will be directly next to each other ... lets see if this is a problem
     //pin_hwthreads(1, &hwt[omp_get_thread_num()]);
-    pin_hwthreads(1, &hwt[thread_ID]);
-    std::cout<<"In BTA constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", threadID " << thread_ID << ", tid: "<<omp_get_thread_num()<<", NUMA domain ID: "<<numa_node;
-    std::cout<<", hwthreads: " << hwt[thread_ID] << std::endl;
+    // pin_hwthreads(1, &hwt[thread_ID]);
+    std::cout<<"In BTA constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", threadID " << thread_ID << ", tid: "<<omp_get_thread_num() << std::endl; //<<", NUMA domain ID: "<<numa_node;
+    // std::cout<<", hwthreads: " << hwt[thread_ID] << std::endl;
 
 #ifdef PRINT_MSG
     std::cout << "BTA constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;

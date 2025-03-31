@@ -523,7 +523,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	}
 	Qx.makeCompressed();
 
-	std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
+	//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 
 	/*for(int i=0; i<200; i++){
 		printf("%d  ", Qx.outerIndexPtr()[i]);
@@ -2183,7 +2183,7 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 }
 
 
-#if 1
+#if 0
 // ============================================================================================ //
 // new EvalPostTheta function -> can handle non-Gaussian likelihoods as well -> requires different structure
 // it will be evaluated in the mode x^* of the conditional p(x | theta, y) -> which needs to be found first
@@ -2363,7 +2363,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 }
 #endif
 
-#if 0 // old post theta function
+#if 1 // old post theta function
 // ============================================================================================ //
 // ALL FOLLOWING FUNCTIONS CONTRIBUTE TO THE EVALUATION OF F(THETA) & GRADIENT
 // INCLUDE: OpenMP division for computation of nominator & denominator : ie. 2 tasks -> 2 threads!
@@ -2544,7 +2544,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
   	double val = -1 * (log_prior_sum + val_prior_lat + log_det_l + val_l - val_d);
 
 
-//#ifdef PRINT_MSG
+#ifdef PRINT_MSG
   	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
   	std::cout << " " << std::fixed << std::setprecision(12);
   	std::cout << log_prior_sum << " ";
@@ -2552,7 +2552,7 @@ double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 
     std::cout << "sum nominator : " << log_prior_sum + val_prior_lat + log_det_l + val_l  << ", sum denominator : " << val_d << ", f theta : " << val << std::endl;
-//#endif
+#endif
 
   	return val;
 }

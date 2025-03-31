@@ -20,7 +20,7 @@
 
 //#define WRITE_RESULTS
 
-#define PRINT_MSG
+//#define PRINT_MSG
 //#define WRITE_LOG
 
 #include "mpi.h"
@@ -1057,7 +1057,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-7;
     //param.delta = 1e-9; // ref sol
     // maximum line search iterations
-    param.max_iterations = 5; //200;
+    param.max_iterations = 2; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
