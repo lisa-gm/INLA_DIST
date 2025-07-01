@@ -23,8 +23,8 @@ BTA_NVCCFLAGS     = -arch=compute_90 -code=sm_90
 BTA_CUDA_SDK      = 3
 BTA_COMMONFLAGS   = -DCUDA_SDK=$(CUDA_SDK)
 
-INCMAG            = -I$(BASE_PATH)/applications/magma-2.9.0/include
-MAGMA             = -L$(BASE_PATH)/applications/magma-2.9.0/magma/lib -lmagma
+INCMAG            = -I$(MAGMADIR)/include
+MAGMA             = -L$(MAGMADIR)/magma/lib -lmagma
 
 CUDAHOME          = $(CUDA_HOME)
 INCCUD	          = -I$(CUDAHOME)/include
