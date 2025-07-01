@@ -99,11 +99,11 @@ folder_path=$BASEPATH/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nb${nb}
 source ~/.profile
 
 echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-#srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${solver_type}_${num_ranks}_${l1t}_${l2t}_test.txt
+srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${solver_type}_${num_ranks}_${l1t}_${l2t}_test.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 
-srun -n ${num_ranks} nsys profile -o nsys_output_ns${ns}_nt${nt}_${nb}_${num_ranks}_${l1t}_${l2t}_%h%p --stats=true ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${solver_type}_${num_ranks}_${l1t}_${l2t}_nsys.txt
+#srun -n ${num_ranks} nsys profile -o nsys_output_ns${ns}_nt${nt}_${nb}_${num_ranks}_${l1t}_${l2t}_%h%p --stats=true ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${solver_type}_${num_ranks}_${l1t}_${l2t}_nsys.txt
 
 #./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${solver_type}_${num_ranks}_${l1t}_${l2t}_test.txt
 

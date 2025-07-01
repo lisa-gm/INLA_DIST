@@ -4,7 +4,7 @@
 ## PATHS TO BE ADAPTED
 
 # usually home directory
-BASE_PATH=/users/lgaedkem
+BASE_PATH=$(HOME)
 
 #####################
 
@@ -21,9 +21,6 @@ INCEIGEN=-I$(BASE_PATH)/applications/eigen
 
 $(info ============== Library paths ==============)
 
-#$(info MKL    : $(MKLHOME))
-#$(info LAPACK : $(LAPACK))
-#$(info BLASDIR : $(BLASDIR))
 $(info OPENBLAS : $(OPENBLAS))
 $(info CUDA   : $(CUDA))
 $(info MAGMA  : $(MAGMA))
