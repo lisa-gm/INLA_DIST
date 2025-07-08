@@ -1057,7 +1057,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-7;
     //param.delta = 1e-9; // ref sol
     // maximum line search iterations
-    param.max_iterations = 2; //200;
+    param.max_iterations = 11; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
