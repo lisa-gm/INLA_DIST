@@ -61,10 +61,17 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
         }
       
     } else {
+
+        // setup ALPS
         cudaGetDevice(&GPU_rank);
         //GPU_rank = MPI_rank % noGPUs;
-        GPU_rank = (2*MPI_rank + thread_ID) % noGPUs; // 
+        GPU_rank = thread_ID % noGPUs; 
         printf("nummber of available GPUs: %d, currently set device: %d\n", noGPUs, GPU_rank);
+
+        // cudaGetDevice(&GPU_rank);
+        // //GPU_rank = MPI_rank % noGPUs;
+        // GPU_rank = (2*MPI_rank + thread_ID) % noGPUs; // 
+        // printf("nummber of available GPUs: %d, currently set device: %d\n", noGPUs, GPU_rank);
 
     }
     // on daint we have 4 gpus per node and if thread ID level 1 is 2 -> we want those two on the same node
@@ -77,6 +84,7 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
         exit(1);
     }
 
+    // UNCOMMENT ON ALEX
     //int numa_node = topo_get_numNode(GPU_rank);
     
     //int* hwt = NULL;
@@ -86,10 +94,12 @@ BTASolver::BTASolver(size_t ns, size_t nt, size_t nb, size_t no, int thread_ID_)
     //pin_hwthreads(1, &hwt[omp_get_thread_num()]);
     // pin_hwthreads(1, &hwt[thread_ID]);
     std::cout<<"In BTA constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", threadID " << thread_ID << ", tid: "<<omp_get_thread_num() << std::endl; //<<", NUMA domain ID: "<<numa_node;
-    // std::cout<<", hwthreads: " << hwt[thread_ID] << std::endl;
+    // std::cout<<", hwthreads: " << hwt[thread_ID] << std::endl;    // get cpu core
+    int cpu = sched_getcpu();
+
 
 #ifdef PRINT_MSG
-    std::cout << "BTA constructor, nb = " << nb << ", MPI rank : " << MPI_rank << ", hostname : " << processor_name << ", GPU rank : " << GPU_rank << std::endl;
+    std::cout<<"In BTA constructor. nb = "<<nb<<", MPI rank: "<<MPI_rank<< ", hostname: "<<processor_name<<", GPU rank : "<<GPU_rank <<", threadID " << thread_ID << ", tid: "<< omp_get_thread_num() << ", CPU core: " << cpu << std::endl; //<<", NUMA domain ID: "<<numa_node;
 #endif	
     
     solver = new BTA<double>(ns_t, nt_t, nb_t, GPU_rank);
@@ -148,9 +158,8 @@ void BTASolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol) {
 
 #ifdef PRINT_MSG
     printf("Calling BTA solver in BTA factorize now.\n");
+    std::cout << "BTA factorize, nb = " << nb_t << " , MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", core: " << sched_getcpu() << ", GPU rank : " << GPU_rank << std::endl;
 #endif
-
-       // std::cout << "BTA factorzie, nb = " << nb_t << " , MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
 
     t_priorLatChol = get_time(0.0);
     double gflops_factorize = solver->factorize_noCopyHost(ia, ja, a, log_det);
@@ -333,9 +342,8 @@ void BTASolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
 
 #ifdef PRINT_MSG
     printf("Calling BTA solver in BTA factorize_solver now.\n");
-#endif
-
-       // std::cout << "BTA factorize solve, nb = " << nb_t << ", MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", GPU rank : " << GPU_rank << std::endl;
+    std::cout << "BTA factorize, nb = " << nb_t << " , MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", core: " << sched_getcpu() << ", GPU rank : " << GPU_rank << std::endl;
+    #endif
 
     t_condLatChol = get_time(0.0);
 
@@ -398,6 +406,114 @@ void BTASolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det,
   	delete[] b;
 
 } // factorize solve
+
+void BTASolver::fused_factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve) {
+    
+    nvtxRangeId_t id_factForwS = nvtxRangeStartA("fused_factorize_solve");
+    int nrhs = 1;
+
+#ifdef PRINT_MSG
+    std::cout << "MPI rank : " << MPI_rank << ", in BTA FACTORIZE_SOLVE()." << std::endl;	
+#endif
+
+    // check if n and Q.size() match
+    if(n != Q.rows()){
+        printf("\nInitialised matrix size and current matrix size don't match!\n");
+        printf("n = %ld.\nnrows(Q) = %ld.\n", n, Q.rows());
+        exit(1);
+    }
+
+	// only take lower triangular part of A
+    SpMat Q_lower = Q.triangularView<Lower>(); 
+    nnz = Q_lower.nonZeros();
+
+#ifdef PRINT_MSG
+    std::cout << "nnz Q = " << nnz << std::endl;
+#endif
+
+    // allocate memory
+    size_t* ia = new long unsigned int [n+1];
+    size_t* ja = new long unsigned int [nnz];
+    double* a = new double [nnz];
+
+    Q_lower.makeCompressed();
+
+    for (i = 0; i < n+1; ++i){
+        ia[i] = Q_lower.outerIndexPtr()[i]; 
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        ja[i] = Q_lower.innerIndexPtr()[i];
+    }  
+
+    for (i = 0; i < nnz; ++i){
+        a[i] = Q_lower.valuePtr()[i];
+    }
+
+    double* b      = new double[n];
+    double* x      = new double[n];
+
+    // assign b to correct format
+    for (i = 0; i < n; i++){
+      b[i] = rhs[i];
+      //printf("%f\n", b[i]);
+    }
+
+#ifdef PRINT_MSG
+    printf("Calling BTA solver in BTA fused factorize_solver now.\n");
+    std::cout << "BTA factorize, nb = " << nb_t << " , MPI rank : " << MPI_rank << ", tid : " << omp_get_thread_num() << ", core: " << sched_getcpu() << ", GPU rank : " << GPU_rank << std::endl;
+#endif
+    
+    t_condLatChol = get_time(0.0);
+
+    double gflops_factorize = solver->factorizeSolve(ia, ja, a, x, b, nrhs, dummy_time_1, dummy_time_2);
+
+	//double gflops_factorize = solver->factorize(ia, ja, a, dummy_time_1);
+    //double gflops_factorize = solver->factorize();
+
+    t_condLatChol = get_time(t_condLatChol);
+    
+	log_det = solver->logDet(ia, ja, a);
+    //log_det = solver->logDet();
+
+#ifdef GFLOPS
+    if(MPI_rank == 0){
+        std::cout << "Gflop/s for the numerical factorization Qxy: " << gflops_factorize << std::endl;
+    }
+#endif
+    
+#ifdef PRINT_MSG
+	printf("logdet: %f\n", log_det);
+#endif
+    
+#ifdef PRINT_MSG
+  	//printf("flops solve:     %f\n", flops_solve);
+	printf("Residual norm: %e\n", solver->residualNorm(x, b));
+	printf("Residual norm normalized: %e\n", solver->residualNormNormalized(x, b));
+#endif
+
+#ifdef PRINT_TIMES
+	printf("BTA factorise time: %lg\n",t_condLatChol);
+  	printf("BTA solve     time: %lg\n",t_condLatSolve);
+#endif
+
+	//std::cout << "In factorize_solve. hostname : " << processor_name << ", MPI_rank : " << MPI_rank << ", GPU rank : " << GPU_rank << ", time Chol : " << t_condLatChol << ", time Solve : " << t_condLatSolve << std::endl;
+    
+  	// assign b to correct format
+  	for (i = 0; i < n; i++){
+	    sol[i] = x[i];
+  	}	
+
+  	delete[] ia;
+  	delete[] ja;
+  	delete[] a;
+
+  	delete[] x;
+  	delete[] b;
+
+    nvtxRangeEnd(id_factForwS);
+
+}
 
 void BTASolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
 

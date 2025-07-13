@@ -524,12 +524,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	Qx.makeCompressed();
 
 	//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
-
-	/*for(int i=0; i<200; i++){
-		printf("%d  ", Qx.outerIndexPtr()[i]);
-		printf("%d ", Qx.innerIndexPtr()[i]);
-		printf("%f\n", Qx.valuePtr()[i]);
-	}*/
 	
 	// set prior to be gaussian
 	//prior = "gaussian";
@@ -1068,7 +1062,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 		if(MPI_rank == 0){
 			Vect theta_interpret(dim_th);
 			convert_theta2interpret(theta, theta_interpret);
-			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
+			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << ", f_theta: " << std::right << std::fixed << f_theta << ", gradient f: " << std::right << std::fixed << std::setprecision(4) << grad.transpose()  << std::endl;
 		}
 
 		// alternatively ...
@@ -1090,7 +1084,7 @@ double PostTheta::operator()(Vect& theta, Vect& grad){
 	t_f_grad_f += omp_get_wtime();
 
 	if(MPI_rank == 0){
-		std::cout << "time f + grad f eval : " << t_f_grad_f << std::endl;
+		std::cout << "iter_count: " << iter_count << ", time_f+grad_f_eval: " << t_f_grad_f << std::endl;
 	}
 
 	return f_theta;
@@ -2736,33 +2730,6 @@ void PostTheta::eval_log_prior_lat(Vect& theta, Vect& mu, double &val){
 		exit(1);
 	}
 
-	/*std::string Qprior_fileName = "Q_prior_InEvalPriorLat.txt";
-	SpMat A_lower = Qu.triangularView<Lower>();
-	std::cout << "theta in eval log prior lat : " << theta.transpose() << std::endl;
-
-	int n = A_lower.cols();
-	int nnz = A_lower.nonZeros();
-
-	ofstream sol_file(Qprior_fileName);
-	sol_file << n << "\n";
-	sol_file << n << "\n";
-	sol_file << nnz << "\n";
-
-	for (int i = 0; i < nnz; i++){
-		sol_file << A_lower.innerIndexPtr()[i] << "\n";
-	}   
-	for (int i = 0; i < n+1; i++){
-			sol_file << A_lower.outerIndexPtr()[i] << "\n";
-	}     
-	for (int i = 0; i < nnz; i++){
-		sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
-	}
-
-	sol_file.close();
-	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
-	*/
-
-	//exit(1);
 
 #ifdef RECORD_TIMES
 	t_priorLatAMat += omp_get_wtime();
@@ -3292,13 +3259,12 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 		} else {
 			// solve linear system
 			// returns vector mu, which is of the same size as rhs
-			//solve_cholmod(Q, rhs, mu, log_det);
-			solverQ->factorize_solve(Q, rhs, mu, log_det, t_condLatChol, t_condLatSolve);
+			//solverQ->factorize_solve(Q, rhs, mu, log_det, t_condLatChol, t_condLatSolve);
+			solverQ->fused_factorize_solve(Q, rhs, mu, log_det, t_condLatChol, t_condLatSolve);
 
 			// compute value
 			val = 0.5*log_det - 0.5 * mu.transpose()*(Q)*(mu);
 			//printf("val demoninator = %f\n", val);
-
 		}
 
 		time_solve_Q += omp_get_wtime();

@@ -24,7 +24,8 @@ INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 
 CXX=mpicxx    # cscs
 #CXX=mpicxx     # FAU
-CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -std=c++14 #-Wall -llikwid -DLIKWID_PERFMON
+#CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -march=native -ffast-math -funroll-loops -std=c++14 #  -Wall -llikwid -DLIKWID_PERFMON
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -lopenblas -std=c++14 -fPIC -lm -march=native -ffast-math -funroll-loops -ftree-vectorize -DMPICH_IGNORE_CXX_SEEK #-Wall -llikwid -DLIKWID_PERFMON
 
 DEBUG=  -lnvToolsExt # -g -Wall
 

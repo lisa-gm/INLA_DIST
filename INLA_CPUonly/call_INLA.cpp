@@ -32,7 +32,7 @@
 #include <Eigen/SparseCholesky>
 
 
-#include <armadillo>
+//#include <armadillo>
 #include <LBFGS.h>
 
 #include "PostTheta.h"

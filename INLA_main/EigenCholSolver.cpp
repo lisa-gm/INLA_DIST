@@ -93,6 +93,15 @@ void EigenCholSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &lo
 
 }
 
+void EigenCholSolver::fused_factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatCholForwardSolve, double& t_condLatBackwardSolve){
+	n = Q.rows();
+	
+	std::cout << "in dummy Pardiso FUSED_FACTORIZE_SOLVE()." << std::endl;
+
+	log_det = 0;
+  	sol = Vect::Ones(n);
+}
+
 void EigenCholSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
     printf("in factorize_solve_w_constr Eigen solver DUMMY.\n");
     exit(1);      

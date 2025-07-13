@@ -94,6 +94,8 @@ public:
      */    
     void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve);
 
+    void fused_factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatCholForwardSolve, double& t_condLatBackwardSolve);
+
     void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);
     
     /**

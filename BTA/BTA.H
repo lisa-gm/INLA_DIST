@@ -3503,22 +3503,22 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
    // ************************************************************* // 
 
    //std::string fileName = "L.txt"; 
-   time_t rawtime;
-   struct tm * timeinfo;
-   char buffer[80];
+   // time_t rawtime;
+   // struct tm * timeinfo;
+   // char buffer[80];
 
-   time (&rawtime);
-   timeinfo = localtime(&rawtime);
+   // time (&rawtime);
+   // timeinfo = localtime(&rawtime);
 
-   strftime(buffer,sizeof(buffer),"L_%d-%m-%Y_%H:%M:%S.txt",timeinfo);
-   std::string fileName(buffer);
-   ofstream file(fileName,    ios::out | ::ios::trunc);
+   // strftime(buffer,sizeof(buffer),"L_%d-%m-%Y_%H:%M:%S.txt",timeinfo);
+   // std::string fileName(buffer);
+   // ofstream file(fileName,    ios::out | ::ios::trunc);
 
-   for(int i=0; i<matrix_n_nonzeros; i++){
-      file << std::setprecision(15) << MF[i] << endl;
-   }
+   // for(int i=0; i<matrix_n_nonzeros; i++){
+   //    file << std::setprecision(15) << MF[i] << endl;
+   // }
 
-   file.close();
+   // file.close();
 
    // contains solution vector from forward pass
    memcpy_to_host(rhs, rhs_dev,matrix_size*sizeof(T), NULL);

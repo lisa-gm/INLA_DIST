@@ -2,11 +2,16 @@
 #define BTASOLVER_H
 
 #include "mpi.h"
+#include "sched.h"
+
 
 #include "Solver.h"
 #include "../BTA/BTA.H"
 #include "helper_functions.h"
 //#include "BTA.H"
+
+// #include "nvToolsExt.h" // for nvtx ranges
+
 
 //#define PRINT_MSG
 //#define PRINT_TIMES
@@ -98,6 +103,15 @@ class BTASolver: public Solver {
          * @param[inout]    log_det log determinant of Q.
          */ 
 		void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve);
+
+        /**
+     * @brief factorises and solves matrix in one call with constraints
+     * @param[in]       Q precision matrix.
+     * @param[in]       rhs right-hand side of the system.
+     * @param[inout]    sol solution of the system.
+     * @param[inout]    log_det log determinant of Q.
+     */
+    void fused_factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatCholForwardSolve, double& t_condLatBackwardSolve);
 
         // function description TODO ...
         void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V);

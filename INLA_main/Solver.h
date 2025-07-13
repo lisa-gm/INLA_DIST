@@ -31,6 +31,7 @@ class Solver {
 		virtual void factorize(SpMat& Q, double& log_det, double& t_priorLatChol) = 0;
 		virtual void factorize_w_constr(SpMat& Q, const MatrixXd& D, double& log_det, MatrixXd& V) = 0;
 		virtual void factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatChol, double& t_condLatSolve) = 0;
+		virtual void fused_factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatCholForwardSolve, double& t_condLatBackwardSolve) = 0;
 		virtual void factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V) = 0;
 		virtual void selected_inversion(SpMat&Q, Vect& inv_diag) = 0;
 		virtual void selected_inversion_w_constr(SpMat& Q, const MatrixXd& D, Vect& inv_diag, MatrixXd& V) = 0;

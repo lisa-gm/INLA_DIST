@@ -40,6 +40,16 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
 
 }
 
+void PardisoSolver::fused_factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_det, double& t_condLatCholForwardSolve, double& t_condLatBackwardSolve){
+	n = Q.rows();
+	
+	std::cout << "in dummy Pardiso FUSED_FACTORIZE_SOLVE()." << std::endl;
+
+	log_det = 0;
+  	sol = Vect::Ones(n);
+}
+
+
 void PardisoSolver::factorize_solve_w_constr(SpMat& Q, Vect& rhs, const MatrixXd& Dxy, double &log_det, Vect& sol, MatrixXd& V){
 	n = Q.rows();
 
