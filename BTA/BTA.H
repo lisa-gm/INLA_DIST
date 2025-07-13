@@ -3499,7 +3499,7 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
    double gflops = FirstSecondStageFactor(nrhs);
    
    t_firstSecondStage = get_time(t_firstSecondStage);
-   printf("time firstSecondStageFactor : %f\n", t_firstSecondStage);
+   // printf("time firstSecondStageFactor : %f\n", t_firstSecondStage);
    // ************************************************************* // 
 
    //std::string fileName = "L.txt"; 
@@ -3538,7 +3538,7 @@ double BTA<T>::factorizeSolve(size_t *ia, size_t *ja, T *a, T *x, T *b, size_t n
     gflops += BackwardPassSolve(nrhs);
 
     t_SecondStageBackPass = get_time(t_SecondStageBackPass);
-    printf("time backwardPassSolve : %f\n", t_SecondStageBackPass);
+    //printf("time backwardPassSolve : %f\n", t_SecondStageBackPass);
     // ***************************************************** //
     //Copy data
     memcpy(x,rhs,matrix_size*nrhs*sizeof(T));
