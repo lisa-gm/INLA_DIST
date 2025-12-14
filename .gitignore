@@ -1,6 +1,11 @@
 # ignore data folders
 ./BFGS/RGF/data
 
+# ignore known executables
+./BTA/mainEigen
+./INLA_main/call_INLA
+./INLA_main/call_INLA_sliding_windows
+
 # ignoring data files
 *.dat
 *.mtx
@@ -30,12 +35,17 @@
 *.mtc1
 *.out
 *.synctex.gz
+*.json
 
 # ignoring object files
 *.o
 
 # ignoring error files
 *.err
+*.out
+
+# ignoring crash reports
+core_nid*
 
 # ignoring nvidia profiler files
 *.nsys-rep
