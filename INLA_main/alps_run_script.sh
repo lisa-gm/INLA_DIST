@@ -2,12 +2,12 @@
 #SBATCH --job-name=INLAdist
 #SBATCH --time=00:25:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=2
+#SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=32
 #SBATCH --account=sm96
-#SBATCH --gpus-per-task=2
-####SBATCH --partition=debug
-#SBATCH --partition=normal
+#SBATCH --gpus-per-task=1
+#SBATCH --partition=debug
+####SBATCH --partition=normal
 #SBATCH --error=output_INLAdist.err 		#The .error file name
 #SBATCH --output=output_INLAdist.out 	#The .output file name
 
@@ -15,7 +15,6 @@
 # threads=$SLURM_CPUS_PER_TASK
 
 BASEPATH=/users/lgaedkem
-
 
 num_ranks=1
 
@@ -27,33 +26,33 @@ num_ranks=1
 #nb=6
 #no=200
 
-ns=492
+ns=267
 nss=0
-ntFit=100
+ntFit=150
 ntPred=0
 nt=$((${ntFit}+${ntPred}))
-nb=6
+nb=3
 noPerTs=$((2*${ns}))
-no=$((2*${ns}*${ntFit}))
+#no=$((2*${ns}*${ntFit}))
+no=400500
 
-
-#ns=4002
+# ns=492
 #nss=1442
 #ns=20252
 #ns=16002
-#ntFit=60
-#nss=0
+# ntFit=100
+# nss=0
 #ns=642
 #ntFit=250
 #ntPred=0
-nt=$((${ntFit}+${ntPred}))
+# nt=$((${ntFit}+${ntPred}))
 #nss=642
 #nt=30
 #nb=2
 #nb=6
 #no=7872
-#no=$((2*${ns}*${ntFit}))
-#noPerTs=$((2*${ns}))
+# no=$((2*${ns}*${ntFit}))
+# noPerTs=$((2*${ns}))
 #no=126
 
 #solver_type=$1
@@ -64,7 +63,8 @@ solver_type=BTA
 data_type=synthetic
 #data_type=regression
 	
-likelihood=gaussian
+#likelihood=gaussian
+likelihood=poisson
 
 export PARDISOLICMESSAGE=1
 export OMP_NESTED=TRUE
@@ -76,7 +76,7 @@ export OMP_NESTED=TRUE
 # -N : how nodes
 # -n : how many processes per node
 # --cpus-per-task=64 : how many threads per task
-l1t=2
+l1t=1
 l2t=1
 
 # machine has 104 cores, so probably 8 x 8 = 64 current best setting. 
@@ -99,7 +99,7 @@ folder_path=$BASEPATH/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nb${nb}
 source ~/.profile
 
 echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${solver_type}_${num_ranks}_${l1t}_${l2t}_test.txt
+srun -n ${num_ranks} ./call_INLA_sliding_windows ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_output_moving_windows_ns${ns}_nt${nt}_nb${nb}_${likelihood}_${solver_type}_${num_ranks}_${l1t}_${l2t}.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 

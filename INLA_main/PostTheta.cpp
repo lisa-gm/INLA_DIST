@@ -340,11 +340,25 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	MPI_Comm_size(MPI_COMM_WORLD, &MPI_size);   
     MPI_Comm_rank(MPI_COMM_WORLD, &MPI_rank);
 
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: PostTheta spatial-temporal constructor started" << std::endl;
+		std::cout << "  Input parameters: ns=" << ns_ << ", nt=" << nt_ << ", nb=" << nb_ << ", no=" << no_ << std::endl;
+		std::cout << "  Ax dimensions: " << Ax_.rows() << " x " << Ax_.cols() << std::endl;
+		std::cout << "  y size: " << y_.size() << std::endl;
+		std::cout << "  mu_initial size: " << mu_initial_.size() << std::endl;
+		std::cout << "  extraCoeffVecLik size: " << extraCoeffVecLik_.size() << std::endl;
+	}
+
 	dim_th      = 4;    	 	// 4 hyperparameters, precision for the observations, 3 for the spatial-temporal model
 	nss         = 0;
 	nu          = ns*nt;
 	n           = nb + ns*nt;
 	min_f_theta = 1e10;			// initialise min_f_theta, min_theta
+
+	if(MPI_rank == 0){
+		std::cout << "  Calculated dimensions: nu=" << nu << ", n=" << n << std::endl;
+		std::cout << "  Expected: nu should be " << (ns_*nt_) << ", n should be " << (nb_+ns_*nt_) << std::endl;
+	}
 
 	// slow for large datasets!!
 	if(validate){
@@ -484,8 +498,31 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	// get dimension of theta from theta_prior_param (has same dim. as theta)
 	Vect theta_dummy(theta_prior_param.size());
 	theta_dummy.setOnes();
+	
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: About to construct Q_spat_temp" << std::endl;
+		std::cout << "  theta_dummy.size() = " << theta_dummy.size() << std::endl;
+		std::cout << "  ns = " << ns << ", nt = " << nt << std::endl;
+		std::cout << "  Expected Qst dimensions should be " << (ns*nt) << " x " << (ns*nt) << std::endl;
+	}
+	
 	construct_Q_spat_temp(theta_dummy, Qst);
 	int nnz = Qst.nonZeros();
+
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: Q_spat_temp constructed" << std::endl;
+		std::cout << "  Qst dimensions: " << Qst.rows() << " x " << Qst.cols() << std::endl;
+		std::cout << "  nnz = " << nnz << std::endl;
+		std::cout << "  nu = ns*nt = " << nu << std::endl;
+		std::cout << "  n = nb + ns*nt = " << n << std::endl;
+		if(Qst.rows() != nu || Qst.cols() != nu) {
+			std::cout << "ERROR: Qst dimensions don't match expected nu!" << std::endl;
+			std::cout << "  Expected: " << nu << " x " << nu << std::endl;
+			std::cout << "  Actual: " << Qst.rows() << " x " << Qst.cols() << std::endl;
+			std::cout << "FATAL: Exiting due to dimension mismatch!" << std::endl;
+			exit(1);
+		}
+	}
 
 	// SpMat Qx_ref(n, n);
 	// Qx_ref.reserve(nnz);
@@ -504,24 +541,62 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	Qx.resize(n,n);
 	Qx.reserve(nnz);
 
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: About to construct Qx sparse matrix" << std::endl;
+		std::cout << "  Qx.resize(" << n << ", " << n << ")" << std::endl;
+		std::cout << "  Qx.reserve(" << nnz << ")" << std::endl;
+		std::cout << "  Qst dimensions: " << Qst.rows() << " x " << Qst.cols() << std::endl;
+		std::cout << "  Qst.nonZeros(): " << Qst.nonZeros() << std::endl;
+	}
+
 	std::vector<Eigen::Triplet<double>> triplets;
 	triplets.reserve(nnz);
 
 	double t_Qu = -omp_get_wtime();
 	for (int k = 0; k < Qst.outerSize(); ++k) {
 		for (SparseMatrix<double>::InnerIterator it(Qst, k); it; ++it) {
+			if(MPI_rank == 0 && (it.row() >= n || it.col() >= n)) {
+				std::cout << "ERROR: Triplet out of bounds!" << std::endl;
+				std::cout << "  it.row() = " << it.row() << ", it.col() = " << it.col() << std::endl;
+				std::cout << "  Matrix size: " << n << " x " << n << std::endl;
+				std::cout << "  k = " << k << ", Qst.outerSize() = " << Qst.outerSize() << std::endl;
+				std::cout << "FATAL: Exiting due to out-of-bounds triplet!" << std::endl;
+				exit(1);
+			}
 			triplets.emplace_back(it.row(), it.col(), it.value());
 		}
 	}
+	
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: About to call setFromTriplets with " << triplets.size() << " triplets" << std::endl;
+	}
+	
 	Qx.setFromTriplets(triplets.begin(), triplets.end());
 	t_Qu += omp_get_wtime();
 	printf("time Qst insert: %f\n", t_Qu);
 
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: setFromTriplets completed, now inserting diagonal elements" << std::endl;
+		std::cout << "  Adding diagonal from nu=" << nu << " to n-1=" << (n-1) << std::endl;
+	}
+
 	for(int i=nu; i < n; i++){
 		// CAREFUL 1e-3 is arbitrary choice!!
+		if(MPI_rank == 0 && (i >= n)) {
+			std::cout << "ERROR: Diagonal insertion out of bounds!" << std::endl;
+			std::cout << "  i = " << i << ", n = " << n << std::endl;
+			std::cout << "FATAL: Exiting due to out-of-bounds diagonal insertion!" << std::endl;
+			exit(1);
+		}
 		Qx.insert(i,i) = 1e-3;
 	}
 	Qx.makeCompressed();
+
+	if(MPI_rank == 0){
+		std::cout << "DEBUG: Qx construction completed successfully" << std::endl;
+		std::cout << "  Final Qx dimensions: " << Qx.rows() << " x " << Qx.cols() << std::endl;
+		std::cout << "  Final Qx.nonZeros(): " << Qx.nonZeros() << std::endl;
+	}
 
 	//std::cout << "Qx : \n" << Qx.block(0,0,10,10) << std::endl;
 	

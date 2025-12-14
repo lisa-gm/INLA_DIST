@@ -4,10 +4,10 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 ####SBATCH --mem=32G              # Request 32 GB total memory
-#SBATCH --cpus-per-task=32
+#SBATCH --cpus-per-task=1
 #SBATCH --account=sm96
-####SBATCH --partition=debug
-#SBATCH --partition=normal
+#SBATCH --partition=debug
+####SBATCH --partition=normal
 #SBATCH --error=output_BTA.err 		#The .error file name
 #SBATCH --output=output_BTA.out 	#The .output file name
 

@@ -1269,7 +1269,7 @@ std::string valueType;
 
 #endif
 
-#if 0
+#if 1
       	    T *x_new = new T[n];
 
             t_factorise = get_time(0.0);
