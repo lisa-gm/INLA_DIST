@@ -19,7 +19,7 @@
 
 //#include "helper_functions.h"
 
-#include "nvToolsExt.h"
+#include "nvtx3/nvToolsExt.h"
 
 //#define PRINT_MSG
 //#define SEPARATE_DEV_BUFFER_ALLOC

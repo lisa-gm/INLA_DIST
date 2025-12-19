@@ -21,7 +21,7 @@ include $(BTA_PATH)/make.inc
 CXX=mpicxx     # FAU
 CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
 
-DEBUG=  -lnvToolsExt # -g -Wall
+DEBUG=  #-lnvToolsExt # -g -Wall
 
 # LIBRARIES
 LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)

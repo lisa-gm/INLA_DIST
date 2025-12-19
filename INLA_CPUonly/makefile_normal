@@ -13,8 +13,8 @@ LAPHOME       = $(MKLHOME)
 SCAHOME       = $(MKLHOME)
 
 
-BTA_PATH      = ../BTA
-include $(BTA_PATH)/make.inc
+# BTA_PATH      = ../BTA
+# include $(BTA_PATH)/make.inc
 #############################################################################################################
 
 #CXX=CC    # cscs
@@ -42,19 +42,21 @@ INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
-BTA_INCLUDEDIR  = $(INCCUD) $(INCMAG)
-BTA_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
+# BTA_INCLUDEDIR  = $(INCCUD) $(INCMAG)
+# BTA_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
 
-BTA_CC_FILES   = $(BTA_PATH)/Utilities.o #BTA/main.o
-BTA_CU_FILES   = $(BTA_PATH)/CWC_utility.o
+# BTA_CC_FILES   = $(BTA_PATH)/Utilities.o #BTA/main.o
+# BTA_CU_FILES   = $(BTA_PATH)/CWC_utility.o
 
 $(info ============== Library paths ==============)
 $(info MKL      : $(MKLHOME))
-$(info CUDA     : $(CUDAHOME))
-$(info MAGMA    : $(MAGMA))
+# $(info CUDA     : $(CUDAHOME))
+# $(info MAGMA    : $(MAGMA))
 $(info BFGS     : $(INCBFGS))
 $(info EIGEN    : $(INCEIGEN))
-$(info BTA      : $(BTA_PATH))
+# $(info BTA      : $(BTA_PATH))
+# $(info PARDISO  : $(PARDISO_DIR))
+
 
 
 $(info )
@@ -63,26 +65,26 @@ $(info ============== Compiling ==============)
 
 all: call_INLA
 
-$(BTA_PATH)/Utilities.o: $(BTA_PATH)/Utilities.C
-	$(BTA_MPICXX) -c $^ $(BTA_CXXFLAGS) $(DEBUG) $(BTA_FLAGS) $(BTA_INCLUDEDIR) -fPIC -o $@
+# $(BTA_PATH)/Utilities.o: $(BTA_PATH)/Utilities.C
+# 	$(BTA_MPICXX) -c $^ $(BTA_CXXFLAGS) $(DEBUG) $(BTA_FLAGS) $(BTA_INCLUDEDIR) -fPIC -o $@
 
-$(BTA_PATH)/CWC_utility.o: $(BTA_PATH)/CWC_utility.cu
-	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
+# $(BTA_PATH)/CWC_utility.o: $(BTA_PATH)/CWC_utility.cu
+# 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver.o BTASolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
-	$(CXX) $^ $(LIBS) $(BTA_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
+call_INLA: call_INLA.o PostTheta.o PardisoSolver.o EigenCholSolver.o BTASolver_dummy.o #solver_cholmod.o 
+	$(CXX) $^ $(LIBS) $(CXXFLAGS) $(INCDIR) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp
-	$(CXX) -c $< $(CXXFLAGS) $(BTA_CXXFLAGS) $(BTA_FLAGS) $(INCLUDES) $(BTA_INCLUDEDIR) -o $@ 
+	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@ 
 
 %.o : %.cpp %.h
-	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) $(BTA_INCLUDEDIR) -o $@ 
+	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@
 
 
 clean:	
 	rm -f *.o call_INLA
-	rm -f BTA/*.o
-	rm -f BTA/main
+# 	rm -f BTA/*.o
+# 	rm -f BTA/main
 
 
 

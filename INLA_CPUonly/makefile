@@ -1,53 +1,91 @@
 
 MKLROOT?=$(shell echo $$MKLROOT)
 
-# PARDISO only -- doesn't require CUDA or MAGMA
-#############################################################################################################
-### BASE_PATH TO BE ADAPTED
 #BASE_PATH=/home/x_gaedkelb
-#BASE_PATH=/users/lgaedkem
 BASE_PATH=/home/hpc/ihpc/ihpc060h
+#BASE_PATH=/users/lgaedkem
+
+############# BTA ################
+
+MKLHOME       = $(MKLROOT)/lib/intel64
+BLAHOME       = $(MKLHOME)
+LAPHOME       = $(MKLHOME)
+SCAHOME       = $(MKLHOME)
+
+
+# BTA_PATH      = ../BTA
+# include $(BTA_PATH)/make.inc
 #############################################################################################################
 
-#CXX=CC     #mpic++
-CXX=mpicxx
-CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm -Wall #-llikwid -DLIKWID_PERFMON
+#CXX=CC    # cscs
+CXX=mpicxx     # FAU
+CXXFLAGS=-O3 -lpthread -lm -lgomp -lgfortran -fPIC -fopenmp -fPIC -lm #-Wall -llikwid -DLIKWID_PERFMON
+
+DEBUG= # -g -Wall
 
 # LIBRARIES
 LIBPARDISO=-lpardiso720-GNU840-X86-64-RINLA_newSelInv 	#expects the path in .bashrc (LD_LIBRARY_PATH, LIBRARY)
-LIBMKL=-L${MKLROOT}/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
+LIBMKL=-L$(MKLROOT)/lib/intel64 -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core
+#LIBBTA=-lBTA
 
+
+#LIBCHOLMOD=-lcholmod
 ARMADILLO=-larmadillo
 
-LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO)
+LIBS=$(LIBPARDISO) $(LIBMKL) $(ARMADILLO) #$(LIBCHOLMOD)
 
 # INCLUDES
 #INCEIGEN=-I/usr/include/eigen3
-#INCEIGEN=-I$(BASE_PATH)/applications/eigen-3.4.0
 INCEIGEN=-I$(BASE_PATH)/applications/eigen
-
 INCBFGS=-I$(BASE_PATH)/applications/adapted_LBFGSpp/include
 #INCCHOLMOD= -I/usr/include/suitesparse
 
 INCLUDES=$(INCEIGEN) $(INCBFGS) #$(INCCHOLMOD)
 
-$(info =============== Library paths ==============)
-$(info MKL      : $(MKLROOT))
+# BTA_INCLUDEDIR  = $(INCCUD) $(INCMAG)
+# BTA_LIBS	    = $(LAPACK) $(OPENMP) $(CUDA) $(MAGMA)
+
+# BTA_CC_FILES   = $(BTA_PATH)/Utilities.o #BTA/main.o
+# BTA_CU_FILES   = $(BTA_PATH)/CWC_utility.o
+
+$(info ============== Library paths ==============)
+$(info MKL      : $(MKLHOME))
+# $(info CUDA     : $(CUDAHOME))
+# $(info MAGMA    : $(MAGMA))
+$(info BFGS     : $(INCBFGS))
 $(info EIGEN    : $(INCEIGEN))
+# $(info BTA      : $(BTA_PATH))
+# $(info PARDISO  : $(PARDISO_DIR))
+
+
 
 $(info )
-$(info ===== Compiling w/ BTA dummy version =======)
+$(info ============== Compiling ==============)
+
 
 all: call_INLA
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver.o BTASolver_dummy.o
-	$(CXX) $^ $(LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
+# $(BTA_PATH)/Utilities.o: $(BTA_PATH)/Utilities.C
+# 	$(BTA_MPICXX) -c $^ $(BTA_CXXFLAGS) $(DEBUG) $(BTA_FLAGS) $(BTA_INCLUDEDIR) -fPIC -o $@
+
+# $(BTA_PATH)/CWC_utility.o: $(BTA_PATH)/CWC_utility.cu
+# 	$(NVCC) -c $^ $(NVCCFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
+
+call_INLA: call_INLA.o PostTheta.o PardisoSolver.o EigenCholSolver.o BTASolver_dummy.o #solver_cholmod.o 
+	$(CXX) $^ $(LIBS) $(CXXFLAGS) $(INCDIR) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
 call_INLA.o: call_INLA.cpp
 	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@ 
 
 %.o : %.cpp %.h
-	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@ 
+	$(CXX) -c $< $(CXXFLAGS) $(INCLUDES) -o $@
+
 
 clean:	
 	rm -f *.o call_INLA
+# 	rm -f BTA/*.o
+# 	rm -f BTA/main
+
+
+
+

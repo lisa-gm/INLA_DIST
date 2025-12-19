@@ -45,7 +45,7 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, MatrixXd B_, Vect y_, V
 #endif
 
 	if(solver_type == "PARDISO"){
-		solverQ   = new PardisoSolver(MPI_rank);
+		solverQ   = new PardisoSolver(MPI_rank);  // replace with other solver
 		solverQst = new PardisoSolver(MPI_rank);
 	} else if(solver_type == "BTA"){
 		solverQ   = new BTASolver(ns, nt, nb, no);
@@ -209,8 +209,15 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	// set up PardisoSolver class in constructor 
 	// to be independent of BFGS loop
-	threads_level1 = 0;
-   	threads_level2 = omp_get_max_threads();
+	threads_level1 = omp_get_max_threads();
+	//threads_level1 = 2;
+
+	threads_level2;
+
+	#pragma omp parallel
+    {  
+   		threads_level2 = omp_get_max_threads();
+    }
 
 	
 #ifdef PRINT_MSG
@@ -225,6 +232,9 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 	if(solver_type == "PARDISO"){
 		solverQ   = new PardisoSolver(MPI_rank);
 		solverQst = new PardisoSolver(MPI_rank);
+
+		//solverQ   = new EigenCholSolver(MPI_rank);
+		//solverQst = new EigenCholSolver(MPI_rank);
 	} else if(solver_type == "BTA"){
 		solverQ   = new BTASolver(ns, nt, nb, no);
 		solverQst = new BTASolver(ns, nt, 0, no);  // solver for prior random effects. best way to handle this? 
@@ -1920,7 +1930,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta, double &val){
 	} else{
 
 		solverQst->factorize(Qu, log_det, t_priorLatChol);
-		//printf("time chol(Qst) = %f\n", t_priorLatChol);
+		printf("time chol(Qst) = %f\n", t_priorLatChol);
 		//std::cout << "Log det : " << log_det << std::endl;
 		val = 0.5 * (log_det);
 
@@ -2362,8 +2372,9 @@ void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, 
 		// solve linear system
 		// returns vector mu, which is of the same size as rhs
 		//solve_cholmod(Q, rhs, mu, log_det);
-		solverQ->factorize_solve(Q, rhs, mu, log_det, t_condLatChol, t_condLatSolve);
-		//printf("time chol(Q) = %f, solve = %f\n", t_condLatChol, t_condLatSolve);
+		std::string filename = "Cholesky_factor_Q_" + std::to_string(iter_count);
+		solverQ->factorize_solve(Q, rhs, mu, log_det, t_condLatChol, t_condLatSolve, filename);
+		printf("time chol(Q) = %f, solve = %f\n", t_condLatChol, t_condLatSolve);
 	
 		// compute value
 		val = 0.5*log_det - 0.5 * mu.transpose()*(Q)*(mu);

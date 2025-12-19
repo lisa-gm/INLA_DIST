@@ -3,11 +3,11 @@
 #SBATCH --job-name=stdTests           #Your Job Name
 #SBATCH --nodes=1                   #Number of Nodes desired e.g 1 nodea
 #SBATCH --time=00:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
-#SBATCH --gres=gpu:a100:8
+#SBATCH --gres=gpu:a100:1
 #SBATCH --partition=a100
 ###SBATCH --constraint=a100_80
 ###SBATCH --qos=a100multi
-#SBATCH --exclusive
+####SBATCH --exclusive
 #SBATCH --error=%x.err          #The .error file name
 #SBATCH --output=%x.out         #The .output file name
 
@@ -54,7 +54,7 @@ no=200
 
 data_type=regression
 likelihood=gaussian
-folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/GaussianData/nb${nb}_no${no}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/GaussianData/nb${nb}_no${no}
 test1_output=${results_folder}/INLA_testCase_I_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE I. regression model. Gaussian Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -94,7 +94,7 @@ no=595
 
 data_type=synthetic
 likelihood=gaussian
-folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 test2_output=${results_folder}/INLA_testCase_II_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE II. spatial model. Gaussian Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${nb}."
@@ -132,7 +132,7 @@ no=$((2*${ns}*${nt}))
 
 data_type=synthetic
 likelihood=gaussian
-folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 test3_output=${results_folder}/INLA_testCase_III_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE III. Spatial-Temporal model. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -176,7 +176,7 @@ noPerTs=$((2*${ns}))
 no=$((2*${ns}*${nt}))
 
 data_type=synthetic
-folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_ntFit${ntFit}_ntPred0_noPerTs${noPerTs}_nss${nss}_nb${nb}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/ns${ns}_ntFit${ntFit}_ntPred0_noPerTs${noPerTs}_nss${nss}_nb${nb}
 test4_output=${results_folder}/INLA_testCase_IV_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${num_ranks}_${l1t}_${l2t}_${solver_type}.txt
 
 echo "TEST CASE IV. Spatial-Temporal model with add. spatial field. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -228,7 +228,7 @@ no=100
 
 data_type=regression
 likelihood=Poisson
-folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/${likelihood}Data/nb${nb}_no${no}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/nb${nb}_no${no}
 test5_output=${results_folder}/INLA_testCase_V_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE V. regression model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -263,7 +263,7 @@ no=966
 
 data_type=synthetic
 likelihood=Poisson
-folder_path=${base_path}/../data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
 test6_output=${results_folder}/INLA_testCase_VI_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VI. spatial model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -302,7 +302,7 @@ no=16320
 
 data_type=synthetic
 likelihood=Poisson
-folder_path=${base_path}/../data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
 test7_output=${results_folder}/INLA_testCase_VII_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VII. spatial-temporal model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -342,7 +342,7 @@ no=16320
 
 data_type=synthetic
 likelihood=Poisson
-folder_path=${base_path}/../data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nss${nss}_nb${nb}_no${no}
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nss${nss}_nb${nb}_no${no}
 test8_output=${results_folder}/INLA_testCase_VIII_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VIII. spatial-temporal model with add. spatial field. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."

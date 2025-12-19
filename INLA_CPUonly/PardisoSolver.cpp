@@ -42,13 +42,28 @@ PardisoSolver::PardisoSolver(int MPI_rank_) : MPI_rank(MPI_rank_){
     // to get number of threads on the second level 
     iparm[2] = threads_level2;
 
+    // ************* PREVIOUS VERSION *************** //
     iparm[33] = 1;      /* always returns the same result, even when executed in parallel,
                            becomes a problem when doing multiple solves at once */
+    // ********************************************** // 
 
-    maxfct = 1;         /* Maximum number of numerical factorizations.  */
+
+    // ************* ITERATIVE VERSION *************** //
+   // iparm[33] = 0; // bit-by-bit identical results
+    /* iparm[50] = 0; */
+    /* iparm[51] = 0; */
+    // iparm[7] = 5;
+    // iparm[8] = 14; // redidualreduction = 10^-7
+    // iparm[10] =  1; // no scaling
+    // iparm[12] =  1; // no matching
+    // iparm[20] =  0; // no pivoting
+
+    // ********************************************** // 
+    maxfct = 1;		/* Maximum number of numerical factorizations.  */
     mnum   = 1;         /* Which factorization to use. */
 
     msglvl = 0;         /* Print statistical information  */
+    // ********************************************** // 
 
 #ifdef MEAS_GFLOPS
     if(MPI_rank == 0)
@@ -253,10 +268,12 @@ void PardisoSolver::factorize(SpMat& Q, double& log_det, double& t_priorLatChol)
         for(i = 0; i < nnz; i++){
             if(isnan(a[i])){
                 std::cout << "In factorize!Found NaN value in *a. a[" << i << "] = " << a[i] << std::endl;
+                exit(1);
             }
 
             if(isinf(a[i])){
                 std::cout << "In factorize!Found Inf value in *a. a[" << i << "] = " << a[i] << std::endl;
+                exit(1);
             }
         }
 
@@ -453,6 +470,13 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     msglvl = 0;
 #endif
 
+    iparm[32] = 1; /* compute determinant */
+    // ************** ITERATIVE VERSION *************** //
+    // if(init == 1){
+    //     iparm[32]=3;
+    // }
+    printf("iparm[32] = %d\n", iparm[32]);
+
     if(init == 0){
         symbolic_factorization(Q, init);
     }
@@ -573,13 +597,20 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
 #endif
     
     log_det = dparm[32];
+    printf("log det Q = %f\n", log_det);
 
     /* -------------------------------------------------------------------- */    
     /* ..  Back substitution and iterative refinement.                      */
     /* -------------------------------------------------------------------- */    
     phase = 33;
 
+    // ******************* DIRECT VERSION ******************* //
     iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
+
+
+    // ******************* ITERATIVE VERSION ******************* //
+    // iparm[7] = 5;
+    // iparm[8] = 14;        // residual reduction = 10^{-7}
 
     t_condLatSolve = -omp_get_wtime();
    
@@ -599,6 +630,66 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
         //printf("\n x [%d] = % f", i, x[i] );
         sol(i) = x[i];
     }
+
+    // compute residual
+    //std::cout << "norm(Q*sol - rhs) = " << (Q*sol - rhs).norm() << std::endl;
+    printf("norm(Q*sol - rhs) = %e\n", (Q*sol - rhs).norm());
+
+    if (getenv("PARDISO_WRITE_MAT")) {
+        /* Write header */
+        FILE *mat_file;
+        char output_filename[256];
+
+        int neqns_in = n;
+        int matrix_type_in = mtype;
+        int ido2 = 3; // phase
+        int ido_in = 23;
+
+        int NNZ = ia[neqns_in] - 1;
+        int i;
+        static int iter_cnt = 0;
+        static int sol_cnt = 0;
+
+        sprintf(output_filename, "%s_%03d-phase-%02d.iajaa",
+                filename.c_str(), iter_cnt, ido_in);
+
+        /* Open and write matrix file. */
+        mat_file = fopen(output_filename, "w");
+
+        fprintf(mat_file, "%d\n", neqns_in);
+        fprintf(mat_file, "%d\n", NNZ);
+
+        for (i = 0; i < neqns_in + 1; i++)
+            fprintf(mat_file, "%d\n", ia[i]);
+        for (i = 0; i < NNZ; i++)
+            fprintf(mat_file, "%d\n", ja[i]);
+
+        if (abs(ido2) >= 2) {
+            if (matrix_type_in == 6 || matrix_type_in == 13 || matrix_type_in == 3 || matrix_type_in == 4 || matrix_type_in == -4) {
+                for (i = 0; i < NNZ; i++)
+                    fprintf(mat_file, "%32.24e %32.24e\n", a[2 * i], a[2 * i + 1]);
+            } else {
+                for (i = 0; i < NNZ; i++)
+                    fprintf(mat_file, "%32.24e\n", a[i]);
+            }
+        }
+
+        /* Right hand side. */
+        if (ido2 == 3) {
+            printf("in rhs.\n");
+            if (matrix_type_in == 6 || matrix_type_in == 13 || matrix_type_in == 3 || matrix_type_in == 4 || matrix_type_in == -4) {
+                for (i = 0; i < neqns_in; i++)
+                    fprintf(mat_file, "%32.24e %32.24e \n", b[2 * i], b[2 * i + 1]);
+            } else {
+                for (i = 0; i < neqns_in; i++)
+                    fprintf(mat_file, "%32.24e\n", b[i]);
+            }
+        }
+
+        fclose(mat_file);
+        sol_cnt += 1;
+        iter_cnt += 1;
+    } 
 
     delete[] ia;
     delete[] ja;

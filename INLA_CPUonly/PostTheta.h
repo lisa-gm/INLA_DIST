@@ -24,6 +24,7 @@
 #include "PardisoSolver.h"
 //#include "BTASolver.h"
 #include "BTASolver_dummy.h"
+#include "EigenCholSolver.h"
 
 //#define SMART_GRAD
 //#define EST_LOGDET_QST

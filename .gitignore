@@ -1,5 +1,6 @@
 # ignore data folders
 ./BFGS/RGF/data
+./dev
 
 # ignoring data files
 *.dat

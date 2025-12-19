@@ -127,7 +127,8 @@ int main(int argc, char* argv[])
     int threads_level1;
     int threads_level2;
 
-    if(omp_get_nested() == true){
+    //if(omp_get_nested() == true){
+    if(omp_get_max_active_levels() == 2){
         threads_level1 = omp_get_max_threads();
     #pragma omp parallel
     {
@@ -517,7 +518,7 @@ int main(int argc, char* argv[])
         // using PC prior, choose lambda  
         theta_prior_param << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0;
 
-        theta_param << 4, 0, 0, 0;
+        theta_param << 2, 0, 0, 0;
         //theta_param << 4,4,4,4;
         //theta_param << 1.366087, 2.350673, 0.030923, 1.405511;
 
@@ -832,7 +833,7 @@ int main(int argc, char* argv[])
     //param.delta = 1e-3;
     param.delta = 1e-7;
     // maximum line search iterations
-    param.max_iterations = 200; //200;
+    param.max_iterations = 3; //200;
 
     // Create solver and function object
     LBFGSSolver<double> solver(param);
@@ -1123,7 +1124,7 @@ double time_bfgs = 0.0;
 
     double t_get_covariance = 0.0;
 
-#if 1
+#if 0
     Vect theta_max(dim_th);
     //theta_max << 2.675054, -2.970111, 1.537331;    // theta
     //theta_max = theta_prior;
@@ -1256,7 +1257,7 @@ double time_bfgs = 0.0;
     double t_get_marginals = 0.0;
   
     // =================================== compute marginal variances =================================== //
-#if 1
+#if 0
     Vect marg(n);
 
     // when the range of u is large the variance of b0 is large.
@@ -1415,7 +1416,7 @@ double time_bfgs = 0.0;
         std::cout << "time get marginals FE        : " << t_get_marginals << " sec" << std::endl;
         std::cout << "total time                   : " << t_total << " sec" << std::endl;
     }
-    #endif
+#endif
 
 
     // ======================== write LOG file ===================== //

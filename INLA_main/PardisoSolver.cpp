@@ -41,7 +41,7 @@ PardisoSolver::PardisoSolver(int& MPI_rank_) : MPI_rank(MPI_rank_){
     // make sure that this is called inside upper level parallel region 
     // to get number of threads on the second level 
     iparm[2] = threads_level2;
-
+ 
     iparm[33] = 1;      /* always returns the same result, even when executed in parallel,
                            becomes a problem when doing multiple solves at once */
 
@@ -49,6 +49,8 @@ PardisoSolver::PardisoSolver(int& MPI_rank_) : MPI_rank(MPI_rank_){
     mnum   = 1;         /* Which factorization to use. */
 
     msglvl = 0;         /* Print statistical information  */
+
+
 
 #ifdef MEAS_GFLOPS
     if(MPI_rank == 0)
@@ -445,6 +447,8 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
     msglvl = 0;
 #endif
 
+
+
     if(init == 0){
         symbolic_factorization(Q, init);
     }
@@ -573,6 +577,7 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
 
     iparm[7] = 1;       /* Max numbers of iterative refinement steps. */
 
+
     t_condLatSolve = -omp_get_wtime();
    
     pardiso (pt, &maxfct, &mnum, &mtype, &phase,
@@ -591,6 +596,9 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
         //printf("\n x [%d] = % f", i, x[i] );
         sol(i) = x[i];
     }
+
+    // compute residual
+    std::cout << "norm(Q*sol - rhs) = " << (Q*sol - rhs).norm() << std::endl;
 
     delete[] ia;
     delete[] ja;
