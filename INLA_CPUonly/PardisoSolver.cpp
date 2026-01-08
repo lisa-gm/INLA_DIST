@@ -633,7 +633,7 @@ void PardisoSolver::factorize_solve(SpMat& Q, Vect& rhs, Vect& sol, double &log_
 
     // compute residual
     //std::cout << "norm(Q*sol - rhs) = " << (Q*sol - rhs).norm() << std::endl;
-    printf("norm(Q*sol - rhs) = %e\n", (Q*sol - rhs).norm());
+    //printf("norm(Q*sol - rhs) = %e\n", (Q*sol - rhs).norm());
 
     if (getenv("PARDISO_WRITE_MAT")) {
         /* Write header */

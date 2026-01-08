@@ -606,6 +606,19 @@ class PostTheta{
      */
     double cond_negLogBinom(SpMat& Qprior, Vect& x);
 
+    /** @brief evaluate analytical negative gradient log Binomial likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+     * @param[out] grad Vect. gradient.
+     */
+    Vect grad_cond_negLogBinomLik(Vect& eta);
+
+    /** @brief evaluate analytical negative diagonal Hessian of log Binomial likelihood
+     * @param[in] eta Vector. linear predictor eta = A*x
+     * @param[out] diagHess Vect. diagonal of Hessian (off-diagonal entries are zero)
+     */
+    Vect diagHess_cond_negLogBinomLik(Vect& eta);
+
+
     /** @brief evaluate negative condiational log likelihood + Gaussian prior
      * @param[in] extraCoeffVecLik Vector. 
      * @param[in] Qprior SpMat. precision matrix.

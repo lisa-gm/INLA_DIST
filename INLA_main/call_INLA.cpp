@@ -949,7 +949,7 @@ int main(int argc, char* argv[])
                 std::cout << "using SYNTHETIC DATASET" << std::endl; 
             }
             dim_spatial_domain = 2; 
-            // read in original theta for comparison. order: prec obs, range s, prec sigma u
+            // read in original theta for comparison. order: range s, range_t, prec sigma u
             std::string theta_original_param_file        =  base_path + "/theta_interpretS_original_" + to_string(dim_th) + "_1" + ".dat";
             //std::string theta_original_param_file        =  base_path + "/theta_interpretS_INLA_" + to_string(dim_th) + "_1" + ".dat";
             file_exists(theta_original_param_file); 
@@ -963,7 +963,7 @@ int main(int argc, char* argv[])
 
             //theta_prior_param << 1, -2.3, 2.1;
             //theta_prior_test.update_modelS(theta_prior_param);
-            theta_param << theta_original_param + 2*Vect::Random(dim_th);
+            theta_param << theta_original_param; // + 2*Vect::Random(dim_th);
             if(MPI_rank == 0){
                 std::cout << "initial theta param : "  << theta_param.transpose() << std::endl; 
             }
@@ -1422,11 +1422,6 @@ double time_bfgs = 0.0;
         int niter = solver.minimize(*fun, theta, fx, MPI_rank);
         //int niter = solver.minimize(*fun, theta_test.flat, fx, MPI_rank);
 
-        /*theta_test.update_modelS(theta_test.flat);
-        if(MPI_rank == 0){
-            std::cout << "theta test flatten modelS : " <<  theta_test.flatten_modelS().transpose() << std::endl;
-        }*/
-
         time_bfgs += omp_get_wtime();
 
         // get number of function evaluations.
@@ -1445,6 +1440,17 @@ double time_bfgs = 0.0;
         Vect grad = fun->get_grad();
         if(MPI_rank == 0){
             std::cout << "grad                         : " << grad.transpose() << std::endl;
+        }
+
+        Vect mu(n);
+        fun->get_mu(theta, mu);
+
+        if(MPI_rank == 0){
+            std::cout << "\nmean fixed effects           : " << mu.tail(nb).transpose() << std::endl;
+
+            // write to file
+            std::string file_name_x_star = base_path + "/mean_latent_INLA_DIST_" + to_string(n) + "_1.dat";
+            write_vector(file_name_x_star, mu, n);
         }
 
 #ifdef WRITE_RESULTS

@@ -3411,6 +3411,37 @@ double PostTheta::cond_negLogBinom(SpMat& Qprior, Vect& x){
     return f_val;
 }
 
+Vect PostTheta::grad_cond_negLogBinomLik(Vect& eta){
+	//std::cout << "MPI rank: " << MPI_rank << ", in grad_cond_negLogBinomLik. norm(eta) = " << eta.norm() << ", eta(1:10) = " << eta.head(10).transpose() << std::endl;
+	int m = eta.size();
+
+    Vect linkEta(m);
+    // hardcode sigmoid for now
+    link_f_sigmoid(eta, linkEta);  
+	Vect grad = y.array() - extraCoeffVecLik.array() * linkEta.array();
+
+	for(int i=0; i<no; i++){
+		if(isnan(grad[i]) || isinf(grad[i])){
+			printf("MPI rank = %d, grad[%d] = %f, y[%d] = %f, extraCoeffVecLik[%d] = %f, eta[%d] = %f\n", MPI_rank, i, grad[i], i, y[i], i, extraCoeffVecLik[i], i, eta[i]);
+			printf("Potential problem: unreasonable values mu.\n");
+			exit(1);
+		}
+	}
+
+	return -1*grad;
+}
+
+Vect PostTheta::diagHess_cond_negLogBinomLik(Vect& eta){
+	int m = eta.size();
+
+    Vect linkEta(m);
+    // hardcode sigmoid for now
+    link_f_sigmoid(eta, linkEta); 
+
+	Vect diagHess = - extraCoeffVecLik.array()*(linkEta.array()*(1-linkEta.array()));
+	return -1*diagHess;
+}
+
 // general formulation for evaluating log conditional distribution
 // pass likelihood & link function as an argument
 // later fix these things in class constructor ...
@@ -3561,19 +3592,21 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
 			eta = Ax * x_new;
 		}
 
-		//std::cout << "mu(1:10)     = " << x_new.head(10).transpose() << std::endl;
-		//std::cout << "eta(1:10)    = " << eta.head(10).transpose() << std::endl;
-		//std::cout << "eta(-10:end) = " << eta.tail(10).transpose() << std::endl;
-		//std::cout << "norm(x_new) = " <<  x_new.norm() << ", norm(x_update) = " << x_update.norm() << ", norm(eta) = " << eta.norm() << std::endl;
-
-        // compute gradient
+        // compute gradient & hessian of log likelihood
         //FD_gradient(eta, gradLik);
-		gradLik = grad_cond_negLogPoisLik(eta);
+		if(likelihood.compare("poisson") == 0){
+			gradLik = grad_cond_negLogPoisLik(eta);
+			diag_hess_eta = diagHess_cond_negLogPoisLik(eta);
+		}
 
-		// compute hessian
+		if(likelihood.compare("binomial") == 0){
+			gradLik = grad_cond_negLogBinomLik(eta);
+			diag_hess_eta = diagHess_cond_negLogBinomLik(eta);
+		}
+
+		// extract hessian
         //std::cout << "x: " << x_new.head(min(10, (int) n)).transpose() << std::endl;
         //FD_diag_hessian(eta, diag_hess_eta);
-		diag_hess_eta = diagHess_cond_negLogPoisLik(eta);
         hess_eta.diagonal() = diag_hess_eta;
 		//std::cout << "diagHessEta = " << diag_hess_eta.head(min(10, (int) n)).transpose() << std::endl;
 

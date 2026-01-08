@@ -2,20 +2,20 @@
 
 #SBATCH --job-name=call_INLA_PARD          #Your Job Name
 #####SBATCH --partition=multinode
-#SBATCH --partition=singlenode
-#SBATCH --nodes=1                       #Number of Nodes desired e.g 1 node
+#SBATCH --partition=sqrt1tb
+#SBATCH --nodes=3                       #Number of Nodes desired e.g 1 node
 #SBATCH --ntasks-per-core=1
 ####SBATCH --ntasks-per-node=1
-####SBATCH --cpus-per-task=64
+#SBATCH --cpus-per-task=64
 #SBATCH --hint=nomultithread
-#SBATCH --time=19:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
+#SBATCH --time=01:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
 #SBATCH --exclusive
 #SBATCH --error=%x.err          #The .error file name
 #SBATCH --output=%x.out         #The .output file name
 #####SBATCH --cpu-freq=2400000-2400000:performance         ### fix frequency
 
 
-num_ranks=1
+num_ranks=3
 
 ############################################################################
 
@@ -60,7 +60,7 @@ export OMP_PROC_BIND=close
 #export OMP_PROC_BIND=spread
 #export OMP_PLACES=cores  #{0:36:1}
 
-export OMP_PLACES={0:8:1},{18:8:1},{36:8:1},{54:8:1}
+#export OMP_PLACES={0:8:1},{18:8:1},{36:8:1},{54:8:1}
 #export OMP_PLACES={0:16:1},{18:16:1},{36:16:1},{54:16:1}
 ##echo "OMP_PLACES={0:${l2t}:1}"
 

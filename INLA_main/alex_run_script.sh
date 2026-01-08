@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name=call_INLA_RGF           #Your Job Name
+#SBATCH --job-name=call_INLA_BTA # Pardiso #          #Your Job Name
 #SBATCH --nodes=1                   #Number of Nodes desired e.g 1 nodea
 #SBATCH --time=00:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
 #SBATCH --gres=gpu:a100:4
@@ -21,14 +21,15 @@ num_ranks=4
 #nb=6
 #no=200
 
-#ns=492
-#nss=0
-#ntFit=50
-#ntPred=0
-#nt=$((${ntFit}+${ntPred}))
-#nb=6
-#noPerTs=$((2*${ns}))
-#no=$((2*${ns}*${ntFit}))
+# ns=129
+# nss=0
+# ntFit=8
+# ntPred=0
+# nt=$((${ntFit}+${ntPred}))
+# nb=8
+# #noPerTs=$((2*${ns}))
+# #no=$((2*${ns}*${ntFit}))
+# no=2928
 
 
 ns=3044
@@ -55,8 +56,9 @@ no=30240
 solver_type=BTA
 #solver_type=Eigen
 
-data_type=swiss_rainfall
+#data_type=swiss_rainfall
 #data_type=regression
+data_type=synthetic
 
 likelihood=binomial
 #likelihood=gaussian
@@ -64,13 +66,6 @@ likelihood=binomial
 export PARDISOLICMESSAGE=1
 export OMP_NESTED=TRUE
 
-# LAUNCH 10 MPI processes with x threads each. 8 or 16 threads for larger matrices seems appropriate.
-# SEEMS 
-# SLURM:
-# --ntasks-per-node=
-# -N : how nodes
-# -n : how many processes per node
-# --cpus-per-task=64 : how many threads per task
 l1t=1
 l2t=16
 
@@ -82,8 +77,8 @@ echo "OMP_NUM_THREADS=${l1t},${l2t}"
 #export OMP_NUM_THREADS="${l2t}"
 #echo "OMP_NUM_THREADS=${l2t}"
 
-#export MKL_NUM_THREADS=1
-#echo "OMP_NUM_THREADS = ${omp_threads}"
+# Generate timestamp for output file
+timestamp=$(date +%Y%m%d_%H%M%S)
 
 folder_path=/home/hpc/ihpc/ihpc060h/repositories/approx_non_stationary_models/rainfall_dataset/data/ns${ns}_nt${nt}_nb${nb}
 
@@ -96,7 +91,7 @@ folder_path=/home/hpc/ihpc/ihpc060h/repositories/approx_non_stationary_models/ra
 #source ~/.profile
 
 echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${likelihood}_${num_ranks}_${l1t}_${l2t}_test.txt
+srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${likelihood}_${num_ranks}_${l1t}_${l2t}_${timestamp}.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 
