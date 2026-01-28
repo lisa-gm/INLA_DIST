@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
 #SBATCH --cpus-per-task=32
-#SBATCH --account=sm96
+#SBATCH --account=c33
 #SBATCH --gpus-per-task=1
 #SBATCH --partition=debug
 ####SBATCH --partition=normal

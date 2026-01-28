@@ -61,7 +61,7 @@ $(info )
 $(info ============== Compiling ==============)
 
 
-all: call_INLA
+all: call_INLA_sliding_windows #call_INLA
 
 #BTA/main: $(BTA_CC_FILES) $(BTA_CU_FILES) 
 #	$(BTA_LOADER) $^ $(BTA_LOADFLAGS) $(BTA_LIBS) $(OPENMP) -lm -o $@ $(DEBUG)
@@ -75,10 +75,10 @@ $(BTA_PATH)/Utilities.o: $(BTA_PATH)/Utilities.C
 $(BTA_PATH)/CWC_utility.o: $(BTA_PATH)/CWC_utility.cu
 	$(NVCC) -c $^ $(NVCCFLAGS) $(BTA_CXXFLAGS) $(INCCUD) --compiler-options '-fPIC' -o $@
 
-call_INLA: call_INLA.o PostTheta.o PardisoSolver_dummy.o BTASolver.o EigenCholSolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
+call_INLA_sliding_windows: call_INLA_sliding_windows.o PostTheta.o PardisoSolver_dummy.o BTASolver.o EigenCholSolver.o $(BTA_CC_FILES) $(BTA_CU_FILES) #solver_cholmod.o 
 	$(CXX) $^ $(LIBS) $(BTA_LIBS) $(CXXFLAGS) $(DEBUG) -lm -o $@  #$(LDFLAGS) $(LDLIBS) 
 
-call_INLA.o: call_INLA.cpp
+call_INLA_sliding_windows.o: call_INLA_sliding_windows.cpp
 	$(CXX) -c $< $(CXXFLAGS) $(BTA_CXXFLAGS) $(BTA_FLAGS) $(INCLUDES) $(BTA_INCLUDEDIR) -o $@ 
 
 %.o : %.cpp %.h
@@ -86,7 +86,7 @@ call_INLA.o: call_INLA.cpp
 
 
 clean:	
-	rm -f *.o call_INLA
+	rm -f *.o call_INLA_sliding_windows call_INLA
 	rm -f BTA/*.o
 	rm -f BTA/main
 
