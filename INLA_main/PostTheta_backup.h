@@ -157,7 +157,7 @@ class PostTheta{
 
 #ifdef SMART_GRAD
     bool thetaDiff_initialized; /**< flag in smart gradient                 */
-    VectorXd theta_interpret_prev;
+    VectorXd theta_prev;
     MatrixXd ThetaDiff;
 #endif
 
@@ -302,16 +302,16 @@ class PostTheta{
 
 
     /**
-     * @brief structure required by BFGS solver, requires : theta_interpret, gradient theta
+     * @brief structure required by BFGS solver, requires : theta, gradient theta
      * \note Gradient call is already parallelised using nested OpenMP. 
      * --> there are l1 threads (usually 8, one for each function evaluation), that themselves
      * then split into another e.g. 8 threads, when calling PARDISO to factorise the system.
      * --> somehow introduce additional parallelism to compute f(theta), possible to do in parallel
      */
-    double operator()(Vect& theta_interpret, Vect& grad);
+    double operator()(Vect& theta, Vect& grad);
 
 #ifdef DATA_SYNTHETIC
-    double compute_error_bfgs(Vect& theta_interpret);
+    double compute_error_bfgs(Vect& theta);
 #endif
 
 	//Hyperparameters create_hp(Vect param, char scale);
@@ -319,16 +319,16 @@ class PostTheta{
     /**
      * @brief overwriting G every time, not explicitly listed, better way to do this? needs to be 
      * stored after every iteration for smart hessian ...       */
-    void computeG(Vect& theta_interpret);
+    void computeG(Vect& theta);
 
     int get_fct_count();
 
     // ============================================================================================ //
     // CONVERT MODEL PARAMETRISATION TO INTERPRETABLE PARAMETRISATION & VICE VERSA
 
-	void convert_theta2interpret(Vect& theta_spde, Vect& theta_interpret);
+	void convert_theta2interpret(Vect& theta, Vect& theta_interpret);
 
-	void convert_interpret2theta(Vect& theta_interpret, Vect& theta_spde);
+	void convert_interpret2theta(Vect& theta_interpret, Vect& theta);
 	
 	/**
 	 * @brief convert hyperparameters theta from the model parametrisation to the interpretable
@@ -383,7 +383,7 @@ class PostTheta{
      * @param [in]    theta hyperparameter vector
      * @param [inout] mu_ vector of the conditional mean
      */ 
-    void get_mu(Vect& theta_interpret, Vect& mu_);
+    void get_mu(Vect& theta, Vect& mu_);
 
     #if 0
     /**
@@ -400,7 +400,7 @@ class PostTheta{
      */ 
     Vect get_grad();
 
-    void get_Qprior(Vect theta_interpret,SpMat& Qprior);
+    void get_Qprior(Vect theta, SpMat& Qprior);
 
     /**
      * @brief Compute Covariance matrix of hyperparameters theta, at theta.
@@ -409,7 +409,9 @@ class PostTheta{
      * @param [in] theta hyperparameter Vector
      * @return cov covariance matrix of the hyperparameters
      */ 
-    MatrixXd get_Covariance(Vect theta_interpret,double eps);
+    MatrixXd get_Covariance(Vect theta, double eps);
+
+    MatrixXd get_Cov_interpret_param(Vect interpret_theta, double eps);
 
     double f_eval(Vect& theta);
 
@@ -419,7 +421,7 @@ class PostTheta{
      * @param[in]    Vector theta.
      * @param[inout] Vector with marginals of f.
      */ 
-    void get_marginals_f(Vect& theta_interpret, Vect& mu, Vect& vars);
+    void get_marginals_f(Vect& theta, Vect& mu, Vect& vars);
 
     /**
      * @brief Compute the marginal variances of the latent parameters at theta. 
@@ -427,9 +429,9 @@ class PostTheta{
      * @param[in]    Vector theta.
      * @param[inout] Vector with selected inverse for all non-zero entries of Q.
      */ 
-    void get_fullFact_marginals_f(Vect& theta_interpret,SpMat& Qinv);
+    void get_fullFact_marginals_f(Vect& theta, SpMat& Qinv);
 
-    void compute_fullInverseQ(Vect& theta_interpret, MatrixXd& Qinv);
+    void compute_fullInverseQ(Vect& theta, MatrixXd& Qinv);
 
     /**
      * @brief computes the hessian at theta using second order finite difference.
@@ -438,7 +440,9 @@ class PostTheta{
      * @return Dense Matrix with Hessian. 
      * \todo not yet parallelised .... 
      */ 
-    MatrixXd hess_eval(Vect theta_interpret, double eps);
+    MatrixXd hess_eval(Vect theta, double eps);
+
+    MatrixXd hess_eval_interpret_theta(Vect interpret_theta, double eps);
 
     /**
      * @brief check if Hessian positive definite (matrix assumed to be dense & small since dim(theta) small)
@@ -455,7 +459,7 @@ class PostTheta{
      * @param[inout] mu vector of the conditional mean
      * @return       f(theta) value
      */
-    double eval_post_theta(Vect& theta_interpret, Vect& mu);
+    double eval_post_theta(Vect& theta, Vect& mu);
 
     /**
      * @brief evaluate log prior of the hyperparameters using original theta value
@@ -465,7 +469,7 @@ class PostTheta{
  	 * @details variance / precision of 1 : no normalising constant. 
  	 * computed through -0.5 * (theta_i* - theta_i)*(theta_i*-theta_i) 
      */	
-	void eval_log_gaussian_prior_hp(Vect& theta_interpret, Vect& theta_prior_param, double& log_prior);
+	void eval_log_gaussian_prior_hp(Vect& theta_param, Vect& theta_prior_param, double& log_prior);
 
     /**
      * @brief evaluate log prior using PC prior 
@@ -486,7 +490,7 @@ class PostTheta{
          * @param[inout] log_det inserts log determinant.
          * \todo construct spatial matrix (at the moment this is happening twice. FIX)
      */ 
-    void eval_log_prior_lat(Vect& theta_interpret, Vect& mu, double &val);
+    void eval_log_prior_lat(Vect& theta, Vect& mu, double &val);
 
     /**
      * @brief compute log likelihood : log_det tau*no and value -theta*yTy
@@ -494,23 +498,23 @@ class PostTheta{
      * @param[inout] log_det inserts log determinant of log likelihood.
      * @param[inout] val inserts the value of -theta*yTy
      */ 
-    void eval_likelihood(Vect& theta_interpret, Vect& mu, double &log_det, double &val);
+    void eval_likelihood(Vect& theta, Vect& mu, double &log_det, double &val);
     
     /**
      * @brief spatial model : SPDE discretisation -- matrix construction
      * @param[in] theta current theta vector
      * @param[inout] Qs fills spatial precision matrix
      */
-    void construct_Q_spatial(Vect& theta_interpret, SpMat& Qs);
+    void construct_Q_spatial(Vect& theta, SpMat& Qs);
 
     /**
      * @brief spatial temporal model : SPDE discretisation. DEMF(1,2,1) model.
      * @param[in] theta current theta vector
      * @param[inout] Qst fills spatial-temporal precision matrix
      */
-    void construct_Q_spat_temp(Vect& theta_interpret, SpMat& Qst);
+    void construct_Q_spat_temp(Vect& theta, SpMat& Qst);
 
-    void construct_Qprior(Vect& theta_interpret, SpMat& Qx);
+    void construct_Qprior(Vect& theta, SpMat& Qx);
 
     /** @brief construct precision matrix. 
      * Calls spatial, spatial-temporal, etc.
@@ -518,14 +522,14 @@ class PostTheta{
      * @param[in] mu     mode latent parameters
      * @param[inout] Q fills precision matrix
      */
-    void construct_Q(Vect& theta_interpret, Vect& mu, SpMat& Q);
+    void construct_Q(Vect& theta, Vect& mu, SpMat& Q);
 
     /** @brief Assemble right-handside. 
      * @param[in] theta current theta vector
      * @param[inout] rhs right-handside
      * /todo Could compute Ax^T*y once, and only multiply with appropriate exp_theta.
      */ 
-    void construct_b(Vect& theta_interpret, Vect &rhs);
+    void construct_b(Vect& theta, Vect &rhs);
 
     //void update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V, MatrixXd& W);
 
@@ -537,7 +541,7 @@ class PostTheta{
      * @param[inout] rhs construct right-handside
      * @param[inout] mu insert mean of latent parameters
      */
-    void eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, Vect& rhs, Vect& mu);
+    void eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, Vect& mu);
 
     // ============================================================================================ //
     // INNER ITERATION & everything that is needed for it
@@ -647,7 +651,7 @@ class PostTheta{
      * @param[inout] Q SpMat. precision matrix.
      * @param[inout] x log det of Q.
      */
-    void NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log_det);
+    void NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det);
 
 
     // measure times within each iterationstd::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 

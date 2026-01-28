@@ -45,38 +45,6 @@ typedef Eigen::VectorXd Vect;
 
 using namespace LBFGSpp;
 
-/*void create_validation_set(int& no, int& size_valSet, std::vector<int> &indexSet, std::vector<int> &valSet){
-
-    //int no = 30;
-    //int size_valSet = 8;
-
-    // requires C++-17 !!
-    // create sorted index vector
-    std::mt19937 rbg { 42u }; 
-
-    //std::vector<int> indexSet(no);
-    std::iota(indexSet.begin(), indexSet.end(), 0);
-    //std::vector<int> valSet(size_valSet);
-    // sample random indices
-    std::sample(indexSet.begin(), indexSet.end(), valSet.begin(), valSet.size(), rbg);
-    
-    for (int valIndex: indexSet) std::cout << valIndex << ' '; 
-    std::cout << '\n';
-
-    for (int valIndex: valSet) std::cout << valIndex << ' '; 
-    std::cout << '\n';
-
-    // assuming sorted vectors : removes all elements of valSet that are in indexSet
-    indexSet.erase( remove_if( begin(indexSet),end(indexSet),
-    [&valSet](auto x){return binary_search(begin(valSet),end(valSet),x);}), end(indexSet) );
-
-    for( int elem: valSet) std::cout << elem << ' '; 
-    std::cout << '\n';
-
-    for( int elem: indexSet) std::cout << elem << ' '; 
-    std::cout << '\n';
-}*/
-
 
 void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3, SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Qst){
 
@@ -160,7 +128,8 @@ int main(int argc, char* argv[])
     if(argc != 1 + 8 && MPI_rank == 0){
         std::cout << "wrong number of input parameters. " << std::endl;
 
-        std::cerr << "INLA Call : ns nt nss nb no path/to/files solver_type" << std::endl;
+        std::cerr << "INLA Call    : ns nt nss nb no path/to/files solver_type" << std::endl;
+        std::cerr << "./call_INLA  : " << atoi(argv[1]) << " " << atoi(argv[2]) << " " << atoi(argv[3]) << " " << atoi(argv[4]) << " " << atoi(argv[5]) << " " << argv[6] << " " << argv[7] << " " << argv[8] << std::endl;
 
         std::cerr << "[integer:ns]                number of spatial grid points " << std::endl;
         std::cerr << "[integer:nt]                number of temporal grid points " << std::endl;
@@ -963,7 +932,7 @@ int main(int argc, char* argv[])
 
             //theta_prior_param << 1, -2.3, 2.1;
             //theta_prior_test.update_modelS(theta_prior_param);
-            theta_param << theta_original_param; // + 2*Vect::Random(dim_th);
+            theta_param << theta_original_param + 2*Vect::Random(dim_th);
             if(MPI_rank == 0){
                 std::cout << "initial theta param : "  << theta_param.transpose() << std::endl; 
             }
@@ -1155,52 +1124,6 @@ int main(int argc, char* argv[])
         Vect extraCoeffVecLik = read_matrix(extraCoeffVecLik_file, no, 1);  
         std::cout << "extraCoeffVecLik: " << extraCoeffVecLik.head(10).transpose() << std::endl;
 
-        // no separate function to construct Qprior
-        SpMat Qprior(n,n);
-        fun->get_Qprior(theta_original, Qprior);
-        //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(0, 0, min(10, (int) n), min(10, (int) n)) << std::endl;
-        //std::cout << "Qprior(1:10,1:10) = \n" << Qprior.block(399, 399, 30, 30) << std::endl;
-
-
-        double val_logPriorLat = fun->cond_LogPriorLat(Qprior, mean_latent_original);
-        printf("val_logPriorLat:   %f\n", val_logPriorLat);
-
-        Vect eta = Ax * mean_latent_original;
-        std::cout << "eta(1:10) = " << eta.head(10).transpose() << std::endl;
-
-        double val_negLogPoisLik  = fun->cond_negLogPoisLik(eta);
-        printf("val_negLogPoisLik: %f\n", val_negLogPoisLik);
-
-        double val_negLogPois  = fun->cond_negLogPois(Qprior, mean_latent_original);
-        printf("val_negLogPois:    %f\n", val_negLogPois);
-
-        /*
-        Vect sigmoidEta(no);
-        fun->link_f_sigmoid(eta, sigmoidEta);
-        std::cout << "sigmoidEta(1:10): " << sigmoidEta.head(10).transpose() << std::endl;
-
-        double val_negLogBinomLik = fun->cond_negLogBinomLik(eta);
-        printf("val_negLogBinomLik: %f\n", val_negLogBinomLik);
-        */
-
-#if 1
-        //Vect gradEta(no);
-        //fun->FD_gradient(eta, gradEta);
-        Vect gradEta = fun->grad_cond_negLogPoisLik(eta);
-        //std::cout << "gradEta = " << gradEta.head(10).transpose() << std::endl;
-        //std::cout << "grad    = " << (Ax.transpose() * gradEta).head(min(10, (int) n)).transpose() << std::endl;
-        std::cout << "norm(grad(eta)) = " << gradEta.norm() << std::endl;
-
-        //Vect diagHessEta(no);
-        //fun->FD_diag_hessian(eta, diagHessEta);
-        Vect diagHessEta = fun->diagHess_cond_negLogPoisLik(eta);
-        //std::cout << "diagHessEta = " << diagHessEta.head(10).transpose() << std::endl;
-        SpMat hess_eta(no,no);
-        hess_eta.setIdentity();
-        hess_eta.diagonal() = diagHessEta;
-        std::cout << "norm(diagHess(eta)) = " << diagHessEta.norm() << std::endl;
-        //std::cout << "hess    = \n" << B.transpose() * hess_eta * B << std::endl;
-
         SpMat Qxy(n,n);
         double log_det;
 
@@ -1228,18 +1151,6 @@ int main(int argc, char* argv[])
         std::cout << "original  fixed effects : " << mean_latent_original.tail(nb).transpose() << std::endl;
         std::cout << "norm(est. lat - orig lat) : " << (mu - mean_latent_original).norm() << std::endl;
 
-        Vect eta_est = Ax * mean_latent_original;
-        //fun->FD_diag_hessian(eta_est, diagHessEta);
-        diagHessEta = fun->diagHess_cond_negLogPoisLik(eta_est);
-        MatrixXd hessModeCond = Qprior + Ax.transpose() * hess_eta * Ax;
-
-        if(n < 25){
-            std::cout << "hessModeCond = \n" << hessModeCond << std::endl;
-            MatrixXd invHessModeCond = hessModeCond.inverse();
-            std::cout << "invHessModeCond = \n" << invHessModeCond << std::endl;
-            std::cout << "\nsd fixed effects = " << invHessModeCond.diagonal().cwiseSqrt().transpose() << std::endl; 
-        }
-
        // exit(1);
 
         Vect marg(n);
@@ -1249,7 +1160,6 @@ int main(int argc, char* argv[])
             std::cout << "sd random effects: " << marg.head(min(10,(int) n)).cwiseSqrt().transpose() << std::endl;
 
         }
-#endif
     } // end testing inner iteration
 #endif
 

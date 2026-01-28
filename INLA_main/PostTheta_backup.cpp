@@ -831,7 +831,7 @@ Restructure operator() :
 call all eval_post_theta() evaluations from here. This way all 9 can run in parallel. then compute gradient from these values.
 */
 
-double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
+double PostTheta::operator()(Vect& theta, Vect& grad){
 
 	if(iter_count == 0){
 		t_bfgs_iter = -omp_get_wtime();
@@ -850,7 +850,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 
 	iter_count += 1; 
 	//printf("\nBFGS iter = %d\n", iter_count);
-	int dim_th = theta_interpret.size();
+	int dim_th = theta.size();
 
 	// configure finite difference approximation (along coordinate axes or smart gradient)
 	//double eps = 1e-5;
@@ -866,7 +866,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 
 #ifdef SMART_GRAD
 	// changing G here, however G needs to be available Hessian later
-	computeG(theta_interpret) ;
+	computeG(theta);
 #else
 	G = MatrixXd::Identity(dim_th, dim_th);
 #endif
@@ -889,7 +889,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 	// then, keep it. 
 	//std::cout << "norm(mu) = " << mu.norm() << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
 
-	// ===================================== compute f(theta_interpret)  ===================================== //
+	// ===================================== compute f(theta) ===================================== //
 	if(MPI_rank == task_to_rank_list_grad[0])
 	{ 
 		//mu.setZero(n);
@@ -898,14 +898,14 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 #ifdef RECORD_TIMES
 		t_Ftheta_ext = -omp_get_wtime();
 #endif
-		//printf("\ni = 0. eval f(theta_interpret) , ");
-		//std::cout << "theta = " << theta_interpret.transpose() << std::endl;
+		//printf("\ni = 0. eval f(theta), ");
+		//std::cout << "theta = " << theta.transpose() << std::endl;
 		mu =  mu_matrix.col(0);
 		//std::cout << "rank: " << MPI_rank << ", mu_matrix(1:10,0) = " << mu_matrix.col(0).head(10).transpose() << std::endl;
-		f_temp_list_loc(0) = eval_post_theta(theta_interpret, mu);
+		f_temp_list_loc(0) = eval_post_theta(theta, mu);
 		mu_matrix.col(0) = mu;
 		//std::cout << "rank: " << MPI_rank << ", mu_matrix(1:10,0) = " << mu_matrix.col(0).head(10).transpose() << std::endl;
-		//std::cout << "theta   : " << std::right << std::fixed << theta_interpret.transpose() << std::endl;
+		//std::cout << "theta   : " << std::right << std::fixed << theta.transpose() << std::endl;
 		//std::cout << "before record times section." << std::endl;
 
 #ifdef RECORD_TIMES		
@@ -923,8 +923,8 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 
 	// TODO: distribute mu_k from f(theta^k) to all other ranks as initial guess for next iteration
 
-	// ===================================== compute grad f(theta_interpret)  ============================== //
-	// fill f_temp_list_loc such that first entry f(theta_interpret) , next dim_th forward difference, last 
+	// ===================================== compute grad f(theta) ============================== //
+	// fill f_temp_list_loc such that first entry f(theta), next dim_th forward difference, last 
 	// dim_th backward difference -> each process has their own copy, rest zero (important), then combine
 	int divd = ceil(no_f_eval / double(2));
 
@@ -944,7 +944,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 				Vect theta_forw(dim_th);
 				Vect mu_dummy = mu_matrix.col(i);
 
-				theta_forw = theta_interpret + eps*G.col(k);
+				theta_forw = theta + eps*G.col(k);
 #ifdef RECORD_TIMES
 		        t_Ftheta_ext = -omp_get_wtime();
 #endif			
@@ -975,7 +975,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 				Vect theta_backw(dim_th);
 				Vect mu_dummy = mu_matrix.col(i);
 
-				theta_backw = theta_interpret - eps*G.col(k);
+				theta_backw = theta - eps*G.col(k);
 #ifdef RECORD_TIMES
                 t_Ftheta_ext = -omp_get_wtime();
 #endif
@@ -1024,7 +1024,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 
 #ifdef PRINT_TIMES
 		if(MPI_rank == 0){
-			std::cout << "time spent evaluation f(theta_interpret)          : " << timespent_f_theta_eval << std::endl;
+			std::cout << "time spent evaluation f(theta)         : " << timespent_f_theta_eval << std::endl;
 			std::cout << "time spent for all funct. evaluations  : " << timespent_fct_eval << std::endl;
 		}
 #endif 
@@ -1047,8 +1047,18 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 		iter_acc += 1;
 		double t_bfgs_iter_temp = omp_get_wtime() + t_bfgs_iter; 
 		if(MPI_rank == 0){
+			Vect theta_interpret(dim_th);
+			convert_theta2interpret(theta, theta_interpret);
 			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 		}
+
+		// alternatively ...
+		Vect theta_interpret_test(dim_th);
+		convert_theta2interpret(theta, theta_interpret_test);
+		//std::cout << "TEST: theta interpret: " << std::right << std::fixed << theta_interpret_test.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
+		Vect theta_test(dim_th);
+		convert_interpret2theta(theta_interpret_test, theta_test);
+		//std::cout << "TEST: theta: " << std::right << std::fixed << theta_test.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
 	}
 
 #ifdef PRINT_MSG
@@ -1070,7 +1080,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 
 #ifdef DATA_SYNTHETIC
 
-double PostTheta::compute_error_bfgs(Vect& theta_spde) {
+double PostTheta::compute_error_bfgs(Vect& theta){
         Vect theta_original(4);
         theta_original << 1.386294, -5.882541,  1.039721,  3.688879;
         double err = (theta - theta_original).norm();
@@ -1082,9 +1092,9 @@ double PostTheta::compute_error_bfgs(Vect& theta_spde) {
 
 #ifdef SMART_GRAD
 // compute transformation of derivative directions smart gradient
-void PostTheta::computeG(Vect& theta_interpret){
+void PostTheta::computeG(Vect& theta){
 
-	//int n = theta_interpret.size();
+	//int n = theta.size();
 
     // construct/update ThetaDiff matrix
     // go to else in first call otherwise true
@@ -1096,7 +1106,7 @@ void PostTheta::computeG(Vect& theta_interpret){
             ThetaDiff.col(i) = temp_col;
         }
 
-        ThetaDiff.col(0) = theta_interpret - theta_interpret_prev;
+        ThetaDiff.col(0) = theta - theta_prev;
         //std::cout << "theta_diff = \n" << ThetaDiff << std::endl;
 
         // add small noise term to diagonal, in case columns are linearly dependent
@@ -1119,7 +1129,7 @@ void PostTheta::computeG(Vect& theta_interpret){
 #endif
 
     // store current iterate
-    theta_interpret_prev = theta_interpret;
+    theta_prev = theta;
 
     // do modified GRAM-SCHMIDT-ORTHONORMALIZATION
     G = MatrixXd::Zero(dim_th, dim_th);
@@ -1195,11 +1205,11 @@ int PostTheta::get_fct_count(){
 
 // umbrella function that calls respective sub functions 
 // by assumption ns > 0 -> otherwise nothing to convert but check anyway
-void PostTheta::convert_theta2interpret(Vect& theta_spde, Vect& theta_interpret){
+void PostTheta::convert_theta2interpret(Vect& theta, Vect& theta_interpret){
 
 	int count = 0;
 	if(likelihood.compare("gaussian") == 0){
-		theta_interpret[count] = theta_spde[count];
+		theta_interpret[count] = theta[count];
 		count++;
 	}
 
@@ -1210,15 +1220,15 @@ void PostTheta::convert_theta2interpret(Vect& theta_spde, Vect& theta_interpret)
 		}
 #endif
 	}else if(ns > 0 && nt <= 1){
-		convert_theta2interpret_spat(theta_spde[count], theta_spde[count+1], theta_interpret[count], theta_interpret[count+1]);
+		convert_theta2interpret_spat(theta[count], theta[count+1], theta_interpret[count], theta_interpret[count+1]);
 		count = count + 2;
 
 	} else if(ns > 0 && nt > 1){
-		convert_theta2interpret_spatTemp(theta_spde[count], theta_spde[count+1], theta_spde[count+2], theta_interpret[count], theta_interpret[count+1], theta_interpret[count+2]);
+		convert_theta2interpret_spatTemp(theta[count], theta[count+1], theta[count+2], theta_interpret[count], theta_interpret[count+1], theta_interpret[count+2]);
 		count = count + 3;
 		
 		if(nss > 0){
-			convert_theta2interpret_spat(theta_spde[count], theta_spde[count+1], theta_interpret[count], theta_interpret[count+1]);
+			convert_theta2interpret_spat(theta[count], theta[count+1], theta_interpret[count], theta_interpret[count+1]);
 			count = count + 2;
 		}
 	}
@@ -1228,18 +1238,18 @@ void PostTheta::convert_theta2interpret(Vect& theta_spde, Vect& theta_interpret)
 		exit(1);
 	}
 
-	//std::cout << "theta           = " << theta_spde.transpose() << std::endl;
+	//std::cout << "theta           = " << theta.transpose() << std::endl;
 	//std::cout << "theta interpret = " << theta_interpret.transpose() << std::endl;
 
 }
 
 // umbrella function that calls respective sub functions 
 // by assumption ns > 0 -> otherwise nothing to convert but check anyway
-void PostTheta::convert_interpret2theta(Vect& theta_interpret, Vect& theta_spde) {
+void PostTheta::convert_interpret2theta(Vect& theta_interpret, Vect& theta){
 
 	int count = 0;
 	if(likelihood.compare("gaussian") == 0){
-		theta_spde[count] = theta_interpret[count];
+		theta[count] = theta_interpret[count];
 		count++;
 	}
 
@@ -1250,15 +1260,15 @@ void PostTheta::convert_interpret2theta(Vect& theta_interpret, Vect& theta_spde)
 		}
 #endif
 	}else if(ns > 0 && nt <= 1){
-		convert_interpret2theta_spat(theta_interpret[count], theta_interpret[count+1], theta_spde[count], theta_spde[count+1]);
+		convert_interpret2theta_spat(theta_interpret[count], theta_interpret[count+1], theta[count], theta[count+1]);
 		count = count + 2;
 
 	} else if(ns > 0 && nt > 1){
-		convert_interpret2theta_spatTemp(theta_interpret[count], theta_interpret[count+1], theta_interpret[count+2], theta_spde[count], theta_spde[count+1], theta_spde[count+2]);
+		convert_interpret2theta_spatTemp(theta_interpret[count], theta_interpret[count+1], theta_interpret[count+2], theta[count], theta[count+1], theta[count+2]);
 		count = count + 3;
 		
 		if(nss > 0){
-			convert_interpret2theta_spat(theta_interpret[count], theta_interpret[count+1], theta_spde[count], theta_spde[count+1]);
+			convert_interpret2theta_spat(theta_interpret[count], theta_interpret[count+1], theta[count], theta[count+1]);
 			count = count + 2;
 		}
 	}
@@ -1268,7 +1278,7 @@ void PostTheta::convert_interpret2theta(Vect& theta_interpret, Vect& theta_spde)
 		exit(1);
 	}
 
-	//std::cout << "theta           = " << theta_spde.transpose() << std::endl;
+	//std::cout << "theta           = " << theta.transpose() << std::endl;
 	//std::cout << "theta interpret = " << theta_interpret.transpose() << std::endl;
 
 }
@@ -1385,6 +1395,19 @@ void PostTheta::convert_interpret2theta_spatTemp(double ranT, double ranS, doubl
 }
 #endif // endif convert interpret2theta()
 
+// just SPATIAL model conversion
+
+/*
+### ltheta = c(log_tau, log_kappa)
+theta2interpret_spatial <- function(ltheta, d=2){
+    alpha = 2
+    nu.s = alpha - d/2
+
+    lsigU = 0.5*(lgamma(nu.s) - (lgamma(alpha) + 0.5*d*log(4*pi) + 2*nu.s*ltheta[2] + 2*ltheta[1]))
+    lranS = 0.5*log(8*nu.s) - ltheta[2]
+    return(c(lsigU, lranS))
+}
+*/
 void PostTheta::convert_theta2interpret_spat( double lgamE, double lgamS, double& lranS, double& lsigU){
 	double dim_spat = 2.0;
 	double alpha    = 2.0;
@@ -1420,7 +1443,7 @@ void PostTheta::convert_interpret2theta_spat(double lranS, double lsigU, double&
 // FUNCTIONS TO BE CALLED AFTER THE BFGS SOLVER CONVERGED
 
 // Gaussian case
-void PostTheta::get_mu(Vect& theta_interpret, Vect& mu_){
+void PostTheta::get_mu(Vect& theta, Vect& mu_){
 
 #ifdef PRINT_MSG
 		std::cout << "get_mu()" << std::endl;
@@ -1428,7 +1451,7 @@ void PostTheta::get_mu(Vect& theta_interpret, Vect& mu_){
 
 	// two different mu so that internal mu is used as initial guess in non-gaussian case
 	mu_ = mu_matrix.col(MPI_rank);
-	double f_theta = eval_post_theta(theta_interpret, mu_);
+	double f_theta = eval_post_theta(theta, mu_);
 
 
 #ifdef PRINT_MSG
@@ -1439,7 +1462,7 @@ void PostTheta::get_mu(Vect& theta_interpret, Vect& mu_){
 // non-Gaussian case there are no hyperparameters theta -> no minimization over theta needed 
 // just mode of conditional needs to be found -> initial guess x -> gets overwritten
 #if 0
-void PostTheta::get_mu(Vect& theta_interpret, Vect& x){
+void PostTheta::get_mu(Vect& theta, Vect& x){
 
 #ifdef PRINT_MSG
 		std::cout << "get_mu()" << std::endl;
@@ -1461,22 +1484,22 @@ Vect PostTheta::get_grad(){
 	return t_grad;
 }
 
-void PostTheta::get_Qprior(Vect theta_interpret, SpMat& Qprior){
+void PostTheta::get_Qprior(Vect theta, SpMat& Qprior){
 	
 	// TODO: not very clean ... Qprior <-> Qx
-	construct_Qprior(theta_interpret, Qx);
+	construct_Qprior(theta, Qx);
 	Qprior = Qx;
 }
 
 
-MatrixXd PostTheta::get_Covariance(Vect theta_interpret, double eps){
+MatrixXd PostTheta::get_Covariance(Vect theta, double eps){
 
-	int dim_th = theta_interpret.size();
+	int dim_th = theta.size();
 	MatrixXd hess(dim_th,dim_th);
 
 	// evaluate hessian
 	double timespent_hess_eval = -omp_get_wtime();
-	hess = hess_eval(theta_interpret, eps);
+	hess = hess_eval(theta, eps);
 
 
 	timespent_hess_eval += omp_get_wtime();
@@ -1503,11 +1526,47 @@ MatrixXd PostTheta::get_Covariance(Vect theta_interpret, double eps){
 	return cov;
 }
 
-void PostTheta::get_marginals_f(Vect& theta_interpret, Vect& mu_, Vect& vars){
+
+MatrixXd PostTheta::get_Cov_interpret_param(Vect interpret_theta, double eps){
+
+	int dim_th = interpret_theta.size();
+
+	MatrixXd hess(dim_th,dim_th);
+
+	// evaluate hessian
+	double timespent_hess_eval = -omp_get_wtime();
+	hess = hess_eval_interpret_theta(interpret_theta, eps);
+
+	timespent_hess_eval += omp_get_wtime();
+
+#ifdef PRINT_TIMES
+		std::cout << "time spent hessian evaluation: " << timespent_hess_eval << std::endl;
+#endif 
+
+	if(MPI_rank == 0){
+		std::cout << "estimated hessian         : \n" << hess << std::endl; 
+		std::cout << "eigenvalues hessian : \n" << hess.eigenvalues().real() << std::endl;
+		//std::cout << "eps : " << eps << endl;
+	}
+
+	MatrixXd cov(dim_th,dim_th);
+	// pardiso call with identity as rhs & solve.
+	/*PardisoSolver* hessInv;
+	hessInv = new PardisoSolver;
+	hessInv->compute_inverse_pardiso(hess, cov); */
+
+	// just use eigen solver
+	cov = hess.inverse();
+	//std::cout << "cov  : \n" << cov << std::endl; 
+
+	return cov;
+}
+
+void PostTheta::get_marginals_f(Vect& theta, Vect& mu_, Vect& vars){
 	
 	mu = mu_;
 	SpMat Q(n, n);
-	construct_Q(theta_interpret, mu, Q);
+	construct_Q(theta, mu, Q);
 	//std::cout << "in get marginals f. Q(1:10,1:10) = \n" << Q.block(0,0,10,10) << std::endl;
 
 	/*
@@ -1535,7 +1594,7 @@ void PostTheta::get_marginals_f(Vect& theta_interpret, Vect& mu_, Vect& vars){
 	std::cout << "Correlation mat FE = \n" << Cor_fe << "\n" << std::endl;
 	*/
 
-	//std::cout << "exp(theta_spde[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta_spde[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
+	//std::cout << "exp(theta[0])*AxTAx.bottomRightCorner(10,10) : \n" << exp(theta[0])*MatrixXd(AxTAx).bottomRightCorner(10,10);
 	
 
 #ifdef PRINT_MSG
@@ -1588,10 +1647,10 @@ void PostTheta::get_marginals_f(Vect& theta_interpret, Vect& mu_, Vect& vars){
 
 }
 
-double PostTheta::f_eval(Vect& theta_interpret) {
+double PostTheta::f_eval(Vect& theta){
 	// x[1]^3*x[2]^2*x[3]
 
-	return(pow(theta_interpret[0],3)*pow(theta_interpret[1],2)*theta_interpret[2] + pow(theta_interpret[3],3));
+	return(pow(theta[0],3)*pow(theta[1],2)*theta[2] + pow(theta[3],3));
 }
 
 /* Parallelisation here is a bit of a mess, as I haven't found a "natural" way to combine
@@ -1599,7 +1658,7 @@ the parallel structure of MPI process + nested parallelism with the number of fu
 evaluations required here. For none Gaussian data this probably needs to be completely 
 rewritten.
 */
-MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
+MatrixXd PostTheta::hess_eval(Vect theta, double eps){
 
 #ifdef PRINT_MSG
 	if(MPI_rank == 0){
@@ -1608,7 +1667,7 @@ MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
 #endif
 
 	//double eps = 0.005;
-	int dim_th = theta_interpret.size();
+	int dim_th = theta.size();
  	MatrixXd epsG(dim_th, dim_th);
    
 #ifdef SMART_GRAD
@@ -1675,7 +1734,7 @@ MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
 		//std::cout << "in hess eval. mu(1:10) = " << mu.head(10).transpose() << std::endl;
 		mu = mu_matrix.col(MPI_rank);
 		//std::cout << "rank: " << MPI_rank << ", i = 0, j = 0, mu(1:10) = " << mu.head(10).transpose() << std::endl;
-		double f_theta = eval_post_theta(theta_interpret, mu);
+		double f_theta = eval_post_theta(theta, mu);
 	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
     }
     counter++;
@@ -1695,7 +1754,7 @@ MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
 	            //Vect mu_tmp(n);
 				mu = mu_matrix.col(MPI_rank);
 				//std::cout << "rank: " << MPI_rank << ", i = " << i << ", j = " << j << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
-	            Vect theta_forw_i = theta_interpret+ epsG.col(i);
+	            Vect theta_forw_i = theta+epsG.col(i);
 	            //f_i_i(0,i) = f_eval(theta_forw_i);
 	            f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu); 
             }
@@ -1706,7 +1765,7 @@ MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
 	            //Vect mu_tmp(n);
 				mu = mu_matrix.col(MPI_rank);
 				//std::cout << "rank: " << MPI_rank << ", i = " << i << ", j = " << j << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
-	            Vect theta_back_i = theta_interpret-epsG.col(i);
+	            Vect theta_back_i = theta-epsG.col(i);
 	            //f_i_i(2,i) = f_eval(theta_back_i);
 	            f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu);
             }
@@ -1718,45 +1777,45 @@ MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
 
         } else if(j > i) {
 
-        	// compute f(theta_interpret+ eps_i+eps_j)
+        	// compute f(theta+eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){             
 	            //Vect mu_tmp(n);
 				mu = mu_matrix.col(MPI_rank);
 				//std::cout << "rank: " << MPI_rank << ", i = " << i << ", j = " << j << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
-	            Vect theta_forw_i_j 	   = theta_interpret+ epsG.col(i)+epsG.col(j);
+	            Vect theta_forw_i_j 	   = theta+epsG.col(i)+epsG.col(j);
 	            //f_i_j(0,k) = f_eval(theta_forw_i_j);
 	            f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu); 
             }
             counter++;
 
-        	// compute f(theta_interpret+ eps_i-eps_j)
+        	// compute f(theta+eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            //Vect mu_tmp(n);
 				mu = mu_matrix.col(MPI_rank);
 				//std::cout << "rank: " << MPI_rank << ", i = " << i << ", j = " << j << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
-	            Vect theta_forw_i_back_j = theta_interpret+ epsG.col(i)-epsG.col(j);
+	            Vect theta_forw_i_back_j = theta+epsG.col(i)-epsG.col(j);
 	            //f_i_j(1,k) = f_eval(theta_forw_i_back_j);
 	            f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu); 
             }
             counter++;
 
-        	// compute f(theta_interpret-eps_i+eps_j)
+        	// compute f(theta-eps_i+eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            //Vect mu_tmp(n);
 				mu = mu_matrix.col(MPI_rank);
 				//std::cout << "rank: " << MPI_rank << ", i = " << i << ", j = " << j << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
-	            Vect theta_back_i_forw_j = theta_interpret-epsG.col(i)+epsG.col(j);
+	            Vect theta_back_i_forw_j = theta-epsG.col(i)+epsG.col(j);
 	            //f_i_j(2,k) = f_eval(theta_back_i_forw_j);
 	            f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu); 
             }
             counter++;
 
-        	// compute f(theta_interpret-eps_i-eps_j)
+        	// compute f(theta-eps_i-eps_j)
             if(MPI_rank == task_to_rank_list[counter]){ 
 	            //Vect mu_tmp(n);
 				mu = mu_matrix.col(MPI_rank);
 				//std::cout << "rank: " << MPI_rank << ", i = " << i << ", j = " << j << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
-	            Vect theta_back_i_j 	   = theta_interpret-epsG.col(i)-epsG.col(j);
+	            Vect theta_back_i_j 	   = theta-epsG.col(i)-epsG.col(j);
 	            //f_i_j(3,k) = f_eval(theta_back_i_j);
 	            f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu); 
             }
@@ -1837,6 +1896,250 @@ MatrixXd PostTheta::hess_eval(Vect theta_interpret, double eps){
 	return hess;
 }
 
+MatrixXd PostTheta::hess_eval_interpret_theta(Vect interpret_theta, double eps){
+
+	//double eps = 0.005;
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "G : \n" << G << std::endl;
+	}
+#endif
+
+	int dim_th = interpret_theta.size();
+	MatrixXd epsG(dim_th, dim_th);
+   
+#ifdef SMART_GRAD
+	if(thetaDiff_initialized == true){
+		epsG = eps*G;
+	} else {
+		if(MPI_rank == 0){
+			std::cout << "G not initialised! Using canonic basis!" << std::endl;
+		}
+		G = MatrixXd::Identity(dim_th, dim_th);
+		epsG = eps*G;
+	}
+#else
+	MatrixXd G = MatrixXd::Identity(dim_th, dim_th);
+	epsG = eps*G;
+#endif
+
+//#ifdef PRINT_MSG
+	if(MPI_rank == 0)
+		std::cout << "G = \n" << G << std::endl;
+//#endif
+
+	MatrixXd hessUpper = MatrixXd::Zero(dim_th, dim_th);
+
+	// compute upper tridiagonal structure
+	// map 2D structure to 1D to be using omp parallel more efficiently
+	int loop_dim = dim_th*dim_th;    
+
+    // number of rows stems from the required function evaluations of f(theta)
+    Eigen::MatrixXd f_i_i_loc = Eigen::MatrixXd::Zero(3,dim_th);
+    Eigen::MatrixXd f_i_j_loc = Eigen::MatrixXd::Zero(4,loop_dim);
+
+    // ======================================== set up MPI ========================================== //
+	// create list that assigns each of the function evaluations to a rank
+	// we have to evaluate f(theta), 2*dim_th for forward-backward diagonal entries &
+	// 4 * (no_of_upper_diagonal_entries)
+	int no_of_tasks = 1 + 2*dim_th + 4/2*dim_th*(dim_th-1);
+	ArrayXi task_to_rank_list(no_of_tasks);
+
+	for(int i=0; i<task_to_rank_list.size(); i++){
+		task_to_rank_list[i] = i % min(MPI_size, no_f_eval);
+	}
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "in Hessian interpret. task_to_rank_list : " << task_to_rank_list.transpose() << std::endl;	
+		std::cout << "Loop Dim: " << loop_dim << std::endl;
+	}
+#endif
+
+	// TODO: not pretty solution. improve!
+	// determine which mu_matrix column to read from
+	if(MPI_size > mu_matrix.cols() && MPI_rank == 0){
+		std::cout << "MPI size exceeds number of columns in mu matrix. Using reduced task to rank list: " << task_to_rank_list.transpose() << std::endl;
+	}
+
+	int counter = 0;
+
+    double time_omp_task_hess = - omp_get_wtime();
+
+    // compute f(theta) only once.
+	if(MPI_rank == task_to_rank_list[0]){
+		//Vect mu_tmp(n); 
+		mu = mu_matrix.col(MPI_rank);
+		// convert interpret_theta to theta
+		Vect theta(dim_th);
+		convert_interpret2theta(interpret_theta, theta);
+		std::cout << "in hess eval. interpret theta: " << interpret_theta.transpose() << ", theta: " << theta.transpose() << std::endl;
+		double f_theta = eval_post_theta(theta, mu);
+	    f_i_i_loc.row(1) = f_theta * Vect::Ones(dim_th).transpose(); 
+    }
+    counter++;
+
+    for(int k = 0; k < loop_dim; k++){          
+
+        // row index is integer division k / dim_th
+        int i = k/dim_th;
+        // col index is k mod dim_th
+        int j = k % dim_th;
+		//printf("k = %d, i = %d, j = %d\n", k, i, j);
+
+        // diagonal elements
+        if(i == j){
+
+        	// compute f(theta+eps_i)
+            if(MPI_rank == task_to_rank_list[counter]){ 
+	            //Vect mu_tmp(n);
+				mu = mu_matrix.col(MPI_rank);
+            	Vect interpret_theta_forw_i = interpret_theta+epsG.col(i);
+            	Vect theta_forw_i(dim_th);
+				convert_interpret2theta(interpret_theta_forw_i, theta_forw_i);
+
+				f_i_i_loc(0,i) = eval_post_theta(theta_forw_i, mu); 
+            }
+            counter++;
+
+        	// compute f(theta-eps_i)
+            if(MPI_rank == task_to_rank_list[counter]){ 
+	            //Vect mu_tmp(n);
+				mu = mu_matrix.col(MPI_rank);
+				Vect interpret_theta_back_i = interpret_theta-epsG.col(i);
+            	Vect theta_back_i(dim_th);
+				convert_interpret2theta(interpret_theta_back_i, theta_back_i);
+
+				f_i_i_loc(2,i) = eval_post_theta(theta_back_i, mu);
+            }
+            counter++;
+    
+        // symmetric only compute upper triangular part
+        // diagonal entries from f_temp_list_loc(1:2*dim_th+1)
+        } else if(j > i) {
+
+        	// compute f(theta+eps_i+eps_j)
+            if(MPI_rank == task_to_rank_list[counter]){             
+	            //Vect mu_tmp(n);
+				mu = mu_matrix.col(MPI_rank);
+				Vect interpret_theta_forw_i_j 	   = interpret_theta+epsG.col(i)+epsG.col(j);
+            	Vect theta_forw_i_j(dim_th);
+				convert_interpret2theta(interpret_theta_forw_i_j, theta_forw_i_j);
+
+				f_i_j_loc(0,k) 				   = eval_post_theta(theta_forw_i_j, mu); 
+            }
+            counter++;
+
+        	// compute f(theta+eps_i-eps_j)
+            if(MPI_rank == task_to_rank_list[counter]){ 
+	            //Vect mu_tmp(n);
+				mu = mu_matrix.col(MPI_rank);
+	            Vect interpret_theta_forw_i_back_j = interpret_theta+epsG.col(i)-epsG.col(j);
+            	Vect theta_forw_i_back_j(dim_th);
+				convert_interpret2theta(interpret_theta_forw_i_back_j, theta_forw_i_back_j);
+
+				f_i_j_loc(1,k)                 = eval_post_theta(theta_forw_i_back_j, mu); 
+            }
+            counter++;
+
+        	// compute f(theta-eps_i+eps_j)
+            if(MPI_rank == task_to_rank_list[counter]){ 
+	            //Vect mu_tmp(n);
+				mu = mu_matrix.col(MPI_rank);
+	            Vect interpret_theta_back_i_forw_j = interpret_theta-epsG.col(i)+epsG.col(j);
+            	Vect theta_back_i_forw_j(dim_th);
+				convert_interpret2theta(interpret_theta_back_i_forw_j, theta_back_i_forw_j);
+
+				f_i_j_loc(2,k)                 = eval_post_theta(theta_back_i_forw_j, mu); 
+            }
+            counter++;
+
+        	// compute f(theta-eps_i-eps_j)
+            if(MPI_rank == task_to_rank_list[counter]){ 
+	            //Vect mu_tmp(n);
+				mu = mu_matrix.col(MPI_rank);
+            	Vect interpret_theta_back_i_j 	   = interpret_theta-epsG.col(i)-epsG.col(j);
+            	Vect theta_back_i_j(dim_th);
+				convert_interpret2theta(interpret_theta_back_i_j, theta_back_i_j);
+
+				f_i_j_loc(3,k)                 = eval_post_theta(theta_back_i_j, mu); 
+            }
+            counter++;            
+        }
+    }
+
+    //std::cout << "rank : " << MPI_rank << ", counter : " << counter << ", f_i_j : \n" << f_i_j_loc << std::endl;
+    //std::cout << "rank : " << MPI_rank << ", f_i_i : \n" << f_i_i_loc << std::endl;
+
+    // wait for all ranks to finish
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    // number of rows stems from the required function evaluations of f(theta)
+    Eigen::MatrixXd f_i_i(3,dim_th);
+    Eigen::MatrixXd f_i_j(4,loop_dim);
+
+	MPI_Allreduce(f_i_i_loc.data(), f_i_i.data(), 3*dim_th, MPI_DOUBLE, MPI_SUM,
+              MPI_COMM_WORLD);
+
+	MPI_Allreduce(f_i_j_loc.data(), f_i_j.data(), 4*loop_dim, MPI_DOUBLE, MPI_SUM,
+          MPI_COMM_WORLD);
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "f_i_i : \n" << f_i_i << std::endl;
+		std::cout << "f_i_j : \n" << f_i_j << std::endl;
+	}
+#endif
+
+	// compute hessian
+    for(int k = 0; k < loop_dim; k++){          
+
+        // row index is integer division k / dim_th
+        int i = k/dim_th;
+        // col index is k mod dim_th
+        int j = k % dim_th;
+
+        // diagonal elements
+        if(i == j){
+        	/*std::cout << "i = " << i << ",j = " << j << std::endl;
+        	std::cout << "f_i_i(0," << i << ") = " << f_i_i(0,i) << std::endl;
+        	std::cout << "f_i_i(1," << i << ") = " << f_i_i(1,i) << std::endl;
+        	std::cout << "f_i_i(2," << i << ") = " << f_i_i(2,i) << std::endl;*/
+
+            hessUpper(i,i) = (f_i_i(0,i) - 2 * f_i_i(1,i) + f_i_i(2,i))/(eps*eps);
+
+        } else if(j > i){
+            hessUpper(i,j) = (f_i_j(0,k) - f_i_j(1,k) - f_i_j(2,k) + f_i_j(3,k)) / (4*eps*eps);
+        }
+    }
+
+    time_omp_task_hess += omp_get_wtime();
+#ifdef PRINT_TIMES
+    	std::cout << "time hess = " << time_omp_task_hess << std::endl;
+    	//std::cout << "hess Upper      \n" << hessUpper << std::endl;
+#endif
+
+	MatrixXd hess = hessUpper.selfadjointView<Upper>();
+
+#ifdef SMART_GRAD
+	hess = G.transpose().fullPivLu().solve(hess)*G.transpose();
+#endif
+
+#ifdef PRINT_MSG
+	if(MPI_rank == 0){
+		std::cout << "time hess = " << time_omp_task_hess << std::endl;
+		std::cout << "hessian       : \n" << hess << std::endl;
+	}
+#endif
+
+	// check that matrix positive definite otherwise use only diagonal
+	//std::cout << "positive definite check disabled." << std::endl;
+	check_pos_def(hess); 
+
+	return hess;
+}
+
 void PostTheta::check_pos_def(MatrixXd &hess){
 
 	// compute Eigenvalues of symmetric matrix
@@ -1866,9 +2169,9 @@ void PostTheta::check_pos_def(MatrixXd &hess){
 #if 1
 // ============================================================================================ //
 // new EvalPostTheta function -> can handle non-Gaussian likelihoods as well -> requires different structure
-// it will be evaluated in the mode x^* of the conditional p(x | theta_interpret, y) -> which needs to be found first
+// it will be evaluated in the mode x^* of the conditional p(x | theta, y) -> which needs to be found first
 // then evaluate p(x^* | theta), p(y | x^*, theta) & p(theta) -> no more parallelism in numerator & denominator
-double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
+double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	//std::cout << "in beginning eval post theta. MPI rank = " << MPI_rank << ", mu(1:10) = " << mu.head(10).transpose() << std::endl;
 	if(omp_get_thread_num() == 0){
@@ -1876,7 +2179,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 	}			
 
 	// =============== set up ================= //
-	int dim_th = theta_interpret.size();
+	int dim_th = theta.size();
 
 #ifdef PRINT_MSG
 		std::cout << "in eval post theta function. " << std::endl;
@@ -1893,7 +2196,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 	double log_det_l;
 	double val_l; 
 
-	// value : pi(x | theta_interpret, y) or constraint problem pi(x | theta_interpret, y, Ax = e)
+	// value : pi(x | theta, y) or constraint problem pi(x | theta, y, Ax = e)
 	double val_d;
 
 
@@ -1912,14 +2215,14 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 #endif
 
 	//std::cout << "mu(1:10) = " << mu.head(10).transpose() << ", norm(mu) = " << mu.norm() << std::endl;
-	eval_denominator(theta_interpret, val_d, Q, rhs, mu);
+	eval_denominator(theta, val_d, Q, rhs, mu);
 	//std::cout << "in eval post theta. after eval denom. mu(1:10) = " << mu.head(10).transpose() << std::endl;
 
 	/*#pragma omp parallel 
 	{
 	printf("omp get num threads = %d\n", omp_get_num_threads());
 	if(omp_get_thread_num() == 0){
-		eval_denominator(theta_interpret, val_d, Q, rhs, mu);
+		eval_denominator(theta, val_d, Q, rhs, mu);
 	}
 	}*/
 
@@ -1953,14 +2256,14 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 
 	if(prior == "gaussian"){   // || dim_th != 4
 		// evaluate gaussian prior
-		//Vect theta_interpret(dim_th);
-		//convert_theta2interpret(theta_spde, theta_interpret);
+		Vect theta_interpret(dim_th);
+		convert_theta2interpret(theta, theta_interpret);
 		eval_log_gaussian_prior_hp(theta_interpret, theta_prior_param, log_prior_sum);
 
 	} else if(prior == "pc"){
 		// pc prior
-		//Vect theta_interpret(dim_th); 
-		//convert_theta2interpret(theta_spde, theta_interpret);
+		Vect theta_interpret(dim_th); 
+		convert_theta2interpret(theta, theta_interpret);
 
 		//Vect lambda(4);
 		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
@@ -1991,7 +2294,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 #endif
 
 	if(ns > 0){
-		eval_log_prior_lat(theta_interpret, mu, val_prior_lat);
+		eval_log_prior_lat(theta, mu, val_prior_lat);
 	} else {
 		val_prior_lat = 0.0;
 	}
@@ -2010,7 +2313,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 	t_likel = -omp_get_wtime();
 #endif
 
-	eval_likelihood(theta_interpret, mu, log_det_l, val_l);
+	eval_likelihood(theta, mu, log_det_l, val_l);
 
 #ifdef RECORD_TIMES
 	t_likel += omp_get_wtime();
@@ -2030,7 +2333,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
   	double val = -1 * (log_prior_sum + val_prior_lat + log_det_l + val_l - val_d);
 
 #ifdef PRINT_MSG
-  	std::cout << MPI_rank << " " << std::setprecision(4) << "theta: " << theta_interpret.transpose();
+  	std::cout << MPI_rank << " " << std::setprecision(4) << "theta: " << theta.transpose();
   	std::cout << ", prior theta:  " << std::fixed << std::setprecision(6);
   	std::cout << log_prior_sum << ", val prior lat: ";
   	std::cout << val_prior_lat << ", val lik: " << val_l << " val cond: " << val_d << ", total: " << val << std::endl;
@@ -2047,14 +2350,14 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 // ============================================================================================ //
 // ALL FOLLOWING FUNCTIONS CONTRIBUTE TO THE EVALUATION OF F(THETA) & GRADIENT
 // INCLUDE: OpenMP division for computation of nominator & denominator : ie. 2 tasks -> 2 threads!
-double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
+double PostTheta::eval_post_theta(Vect& theta, Vect& mu){
 
 	if(omp_get_thread_num() == 0){
 		fct_count += 1;
 	}			
 
 	// =============== set up ================= //
-	int dim_th = theta_interpret.size();
+	int dim_th = theta.size();
 
 #ifdef PRINT_MSG
 		std::cout << "in eval post theta function. " << std::endl;
@@ -2071,7 +2374,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 	double log_det_l;
 	double val_l; 
 
-	// value : pi(x | theta_interpret, y) or constraint problem pi(x | theta_interpret, y, Ax = e)
+	// value : pi(x | theta, y) or constraint problem pi(x | theta, y, Ax = e)
 	double val_d;
 
 	#pragma omp parallel 
@@ -2098,14 +2401,23 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 
 	if(prior == "gaussian"){   // || dim_th != 4
 		// evaluate gaussian prior
-		//Vect theta_interpret(dim_th);
-		//convert_theta2interpret(theta_spde, theta_interpret);
+		Vect theta_interpret(dim_th);
+		convert_theta2interpret(theta, theta_interpret);
 		eval_log_gaussian_prior_hp(theta_interpret, theta_prior_param, log_prior_sum);
 
 	} else if(prior == "pc"){
 		// pc prior
-		//Vect theta_interpret(dim_th); 
-		//convert_theta2interpret(theta_spde, theta_interpret);
+		Vect theta_interpret(dim_th); 
+		convert_theta2interpret(theta, theta_interpret);
+
+		/*
+		theta_interpret[0] = theta[0];
+		convert_theta2interpret_spatTemp(theta[1], theta[2], theta[3], theta_interpret[1], theta_interpret[2], theta_interpret[3]);
+		//theta_interpret << 0.5, 10, 1, 4; 
+		if(nss > 0){
+			convert_theta2interpret_spat(theta[4], theta[5], theta_interpret[4], theta_interpret[5]);
+		}
+		*/
 
 		//Vect lambda(4);
 		//lambda << 0.7/3.0, 0.2*0.7*0.7, 0.7, 0.7/3.0; // lambda0 & lambda3 equal
@@ -2136,7 +2448,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 #endif
 
 	if(ns > 0){
-		eval_log_prior_lat(theta_interpret, mu, val_prior_lat);
+		eval_log_prior_lat(theta, mu, val_prior_lat);
 	}
 
 #ifdef RECORD_TIMES
@@ -2153,7 +2465,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 	t_likel = -omp_get_wtime();
 #endif
 
-	eval_likelihood(theta_interpret, mu, log_det_l, val_l);
+	eval_likelihood(theta, mu, log_det_l, val_l);
 
 #ifdef RECORD_TIMES
 	t_likel += omp_get_wtime();
@@ -2190,7 +2502,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 	t_condLat = -omp_get_wtime();
 #endif
 
- 	eval_denominator(theta_interpret, val_d, Q, rhs, mu);
+ 	eval_denominator(theta, val_d, Q, rhs, mu);
 
 #ifdef RECORD_TIMES
 	t_condLat += omp_get_wtime();
@@ -2216,7 +2528,7 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 
 
 //#ifdef PRINT_MSG
-  	std::cout << MPI_rank << " " << std::setprecision(6) << theta_interpret.transpose();
+  	std::cout << MPI_rank << " " << std::setprecision(6) << theta.transpose();
   	std::cout << " " << std::fixed << std::setprecision(12);
   	std::cout << log_prior_sum << " ";
   	std::cout << val_prior_lat << " " << log_det_l << " " << val_l << " " << val_d << " " << val << std::endl;
@@ -2357,7 +2669,7 @@ void PostTheta::eval_log_dens_constr(Vect& x, Vect& mu, SpMat&Q, double& log_det
 }
 
 
-void PostTheta::eval_log_prior_lat(Vect& theta_interpret, Vect& mu, double &val){
+void PostTheta::eval_log_prior_lat(Vect& theta, Vect& mu, double &val){
 
 	double log_det;
 
@@ -2373,13 +2685,13 @@ void PostTheta::eval_log_prior_lat(Vect& theta_interpret, Vect& mu, double &val)
 		exit(1);
 	} else if(nt == 1 && nss == 0) {
 		//printf("in eval log prior lat. spatial.\n");
-		construct_Q_spatial(theta_interpret, Qu);
+		construct_Q_spatial(theta, Qu);
 
 	} else if(nt > 1 && nss == 0){
-		construct_Q_spat_temp(theta_interpret, Qu);
+		construct_Q_spat_temp(theta, Qu);
 	} else if(nt > 1 && nss > 0){
 		SpMat Qst_prior(nst, nst);
-		construct_Q_spat_temp(theta_interpret, Qst_prior);
+		construct_Q_spat_temp(theta, Qst_prior);
 
 		// insert entries of Qst
 		for (int k=0; k<Qst_prior.outerSize(); ++k){
@@ -2391,7 +2703,7 @@ void PostTheta::eval_log_prior_lat(Vect& theta_interpret, Vect& mu, double &val)
 
 		// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
 		SpMat Qs_prior(nss, nss);
-		construct_Q_spatial(theta_interpret, Qs_prior);
+		construct_Q_spatial(theta, Qs_prior);
 		nnz_Qs = Qs.nonZeros();
 
 		// insert entries of Qs
@@ -2499,14 +2811,14 @@ void PostTheta::eval_log_prior_lat(Vect& theta_interpret, Vect& mu, double &val)
 }
 
 // ONLY WORKS FOR SUM-TO-ZERO CONSTRAINTS
-// 0.5*theta_interpret[0]*t(y - B*b - A*u)*(y - B*b - A*u) => normally assume x = u,b = 0
+// 0.5*theta[0]*t(y - B*b - A*u)*(y - B*b - A*u) => normally assume x = u,b = 0
 // constraint case -> maybe cannot evaluate in zero i.e. when e != 0, 
 // might make more sense to evaluate x = mu_constraint, from Dxy*mu_constraint = e
-void PostTheta::eval_likelihood(Vect& theta_interpret, Vect& mu, double &log_det, double &val){
+void PostTheta::eval_likelihood(Vect& theta, Vect& mu, double &log_det, double &val){
 	
 	if(likelihood.compare("gaussian") == 0){	
 		// multiply log det by 0.5
-		double theta0 = theta_interpret[0];
+		double theta0 = theta[0];
 
 		if(validate){
 			log_det = 0.5 * w_sum*theta0;  // some are zero ...
@@ -2551,13 +2863,7 @@ void PostTheta::eval_likelihood(Vect& theta_interpret, Vect& mu, double &log_det
 }
 
 // assumed order parameters: theta = prec_obs, lgamE, lgamS
-void PostTheta::construct_Q_spatial(Vect& theta_interpret, SpMat& Qs){
-
-	// convert to spde scale
-	Vect theta_spde(dim_th);
-	convert_interpret2theta(theta_interpret, theta_spde);
-	//Q_spatial(). theta interpret : " << theta_interpret.transpose() << std::endl;
-	//std::cout << "in construct_Q_spatial(). theta spde      : " << theta_spde.transpose() << std::endl;
+void PostTheta::construct_Q_spatial(Vect& theta, SpMat& Qs){
 
 	// Qs <- g[1]^2*Qgk.fun(sfem, g[2], order)
 	// return(g^4 * fem$c0 + 2 * g^2 * fem$g1 + fem$g2)
@@ -2565,17 +2871,17 @@ void PostTheta::construct_Q_spatial(Vect& theta_interpret, SpMat& Qs){
 	double exp_theta2;
 	
 	if(dim_th == 2){
-		exp_theta1 = exp(theta_spde[0]);
-		exp_theta2 = exp(theta_spde[1]);
+		exp_theta1 = exp(theta[0]);
+		exp_theta2 = exp(theta[1]);
 	} else if(dim_th == 3) {
-		exp_theta1 = exp(theta_spde[1]);
-		exp_theta2 = exp(theta_spde[2]);	
+		exp_theta1 = exp(theta[1]);
+		exp_theta2 = exp(theta[2]);	
 	} else if(dim_th == 5) {
-		exp_theta1 = exp(theta_spde[3]);
-		exp_theta2 = exp(theta_spde[4]);	
+		exp_theta1 = exp(theta[3]);
+		exp_theta2 = exp(theta[4]);	
 	} else if(dim_th == 6) {
-		exp_theta1 = exp(theta_spde[4]);
-		exp_theta2 = exp(theta_spde[5]);	
+		exp_theta1 = exp(theta[4]);
+		exp_theta2 = exp(theta[5]);	
 	} else {
 		printf("inv construct_Q_spatial. unknown dim(theta) option!\n");
 		exit(1);
@@ -2601,12 +2907,8 @@ void PostTheta::construct_Q_spatial(Vect& theta_interpret, SpMat& Qs){
 } 
 
 
-void PostTheta::construct_Q_spat_temp(Vect& theta_interpret, SpMat& Qst){
+void PostTheta::construct_Q_spat_temp(Vect& theta, SpMat& Qst){
 	
-	// convert to spde scale
-	Vect theta_spde(dim_th);
-	convert_interpret2theta(theta_interpret, theta_spde);
-
 	int count = 0;
 	// additional noise prec that we have to skip
 	if(likelihood.compare("gaussian") == 0){
@@ -2614,9 +2916,11 @@ void PostTheta::construct_Q_spat_temp(Vect& theta_interpret, SpMat& Qst){
 		count +=1;
 	}
 
-	double exp_theta1 = exp(theta_spde[count]);
-	double exp_theta2 = exp(theta_spde[count+1]);
-	double exp_theta3 = exp(theta_spde[count+2]);
+	//printf("count + 2 = %d. theta[count+2] = %f\n", count+2, theta[count+2]);
+
+	double exp_theta1 = exp(theta[count]);
+	double exp_theta2 = exp(theta[count+1]);
+	double exp_theta3 = exp(theta[count+2]);
 
 	//std::cout << "in construct_Q_spat_temp(). theta : " << theta.transpose() << std::endl;
 
@@ -2707,15 +3011,15 @@ void PostTheta::update_mean_constr(MatrixXd& D, Vect& e, Vect& sol, MatrixXd& V,
 }
 */
 
-void PostTheta::construct_Qprior(Vect& theta_interpret, SpMat& Qx){
+void PostTheta::construct_Qprior(Vect& theta, SpMat& Qx){
 	
 	if(dimList(seq(1,2)).sum() == 0){
 		Qx = Qb;
 	} else {
 		if(dimList(1) == 3){
-			construct_Q_spat_temp(theta_interpret, Qu);
+			construct_Q_spat_temp(theta, Qu);
 		} else if(dimList(2) == 2) {	
-			construct_Q_spatial(theta_interpret, Qu);
+			construct_Q_spatial(theta, Qu);
 		} else {
 			std::cout << "in construct_Qprior. nvalid dimList: " << dimList.transpose() << std::endl;
 		}	
@@ -2730,7 +3034,7 @@ void PostTheta::construct_Qprior(Vect& theta_interpret, SpMat& Qx){
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
-			construct_Q_spatial(theta_interpret, Qs);
+			construct_Q_spatial(theta, Qs);
 			nnz_Qs = Qs.nonZeros();
 
 			// insert entries of Qs
@@ -2748,18 +3052,18 @@ void PostTheta::construct_Qprior(Vect& theta_interpret, SpMat& Qx){
 
 }
 
-void PostTheta::construct_Q(Vect& theta_interpret, Vect& mu, SpMat& Q){
+void PostTheta::construct_Q(Vect& theta, Vect& mu, SpMat& Q){
 	
 	double exp_theta0;
 	if(dimList(0) > 0){
-		exp_theta0 = exp(theta_interpret[0]);
+		exp_theta0 = exp(theta[0]);
 	}
 
 	if(ns > 0){
 		if(nt > 1){
-			construct_Q_spat_temp(theta_interpret, Qu);
+			construct_Q_spat_temp(theta, Qu);
 		} else {	
-			construct_Q_spatial(theta_interpret, Qu);
+			construct_Q_spatial(theta, Qu);
 		}	
 
 		// ovewrite value ptr of Qst part -> Q_fe stays the same 
@@ -2781,7 +3085,7 @@ void PostTheta::construct_Q(Vect& theta_interpret, Vect& mu, SpMat& Q){
 
 		if(nss > 0){
 			// TODO: improve. need to be careful about what theta values are accessed!! now dimension larger
-			construct_Q_spatial(theta_interpret, Qs);
+			construct_Q_spatial(theta, Qs);
 			nnz_Qs = Qs.nonZeros();
 
 			// insert entries of Qs
@@ -2820,7 +3124,7 @@ void PostTheta::construct_Q(Vect& theta_interpret, Vect& mu, SpMat& Q){
 
 		std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
 		std::cout << "Q : \n" << Q.block(0,0,10,10) << std::endl;
-		std::cout << "theta : \n" << theta_interpret.transpose() << std::endl;
+		std::cout << "theta : \n" << theta.transpose() << std::endl;
 
 #endif
 	}
@@ -2856,7 +3160,7 @@ void PostTheta::construct_Q(Vect& theta_interpret, Vect& mu, SpMat& Q){
 #ifdef PRINT_MSG
 			std::cout << "Q  dim : " << Q.rows() << " "  << Q.cols() << std::endl;
 			std::cout << "Q : \n" << Q << std::endl;
-			std::cout << "theta : \n" << theta_interpret.transpose() << std::endl;
+			std::cout << "theta : \n" << theta.transpose() << std::endl;
 #endif 
 
 	}
@@ -2867,9 +3171,9 @@ void PostTheta::construct_Q(Vect& theta_interpret, Vect& mu, SpMat& Q){
 }
 
 
-void PostTheta::construct_b(Vect& theta_interpret, Vect &rhs){
+void PostTheta::construct_b(Vect& theta, Vect &rhs){
 
-	double exp_theta = exp(theta_interpret[0]);
+	double exp_theta = exp(theta[0]);
 
 	if(ns == 0){
 		rhs = exp_theta*BTy;
@@ -2879,7 +3183,7 @@ void PostTheta::construct_b(Vect& theta_interpret, Vect &rhs){
 }
 
 
-void PostTheta::eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, Vect& rhs, Vect& mu){
+void PostTheta::eval_denominator(Vect& theta, double& val, SpMat& Q, Vect& rhs, Vect& mu){
 
 	double log_det;
 
@@ -2894,7 +3198,7 @@ void PostTheta::eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, V
 		t_condLatAMat = -omp_get_wtime();
 #endif
 		// construct Q_x|y,
-		construct_Q(theta_interpret, mu, Q);
+		construct_Q(theta, mu, Q);
 #ifdef RECORD_TIMES
 		t_condLatAMat += omp_get_wtime();
 #endif
@@ -2906,7 +3210,7 @@ void PostTheta::eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, V
 #endif
 
 		//  construct b_xey
-		construct_b(theta_interpret, rhs);
+		construct_b(theta, rhs);
 
 #ifdef PRINT_MSG
 		printf("\nin eval denominator after construct_b call.");
@@ -2914,7 +3218,7 @@ void PostTheta::eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, V
 
 		/*std::string Qprior_fileName = "Q_InEvalDenom.txt";
 		SpMat A_lower = Q.triangularView<Lower>();
-		std::cout << "theta in eval denominator : " << theta_interpret.transpose() << std::endl;
+		std::cout << "theta in eval denominator : " << theta.transpose() << std::endl;
 
 		int n = A_lower.cols();
 		int nnz = A_lower.nonZeros();
@@ -2992,7 +3296,7 @@ void PostTheta::eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, V
 	} else if(likelihood.compare("poisson") == 0 || likelihood.compare("binomial") == 0){
 
 		//std::cout << "\nBEFORE Newton iter. mu(1:10) = " << mu.head(10).transpose() << std::endl;
-		NewtonIter(theta_interpret, mu, Q, log_det);
+		NewtonIter(theta, mu, Q, log_det);
 		//std::cout << "log det: " << log_det << ", mu.transpose()*(Q)*(mu): " << mu.transpose()*(Q)*(mu) << ", norm(mu) = " << mu.norm() << std::endl;
 		//std::cout << "AFTER Newton iter. mu(1:10) = " << mu.head(10).transpose() << std::endl;
 
@@ -3245,7 +3549,7 @@ void PostTheta::FD_diag_hessian(Vect& eta, Vect& diag_hess){
 
 // inner Iteration: form Gaussian approximation to conditional
 //void PostTheta::NewtonIter(SpMat& Qprior, Vect& x){
-void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log_det){
+void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
 	//printf("in Newton iter.\n");
 
     // prepare for iteration
@@ -3269,11 +3573,11 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
     SpMat SoD(n,n);
 
 	// construct prior Q (depends on theta which will remain fixed)
-	construct_Qprior(theta_interpret, Qx);
+	construct_Qprior(theta, Qx);
 
     // iteration
     int counter = 0;
-    while((x_new - x_old).norm() > 1e-3){
+    while((x_new - x_old).norm() > 1e-5){
         x_old = x_new;
         counter += 1;
 		//printf("\ncounter = %d\n", counter);
@@ -3327,15 +3631,23 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
 			//std::cout << "Q(-10:end, -10:end) = \n" << Q.block(n-10, n-10, 10,10) << std::endl;
 		}
 
+        /*
+		solverNewton.compute(hess);
+
+        if(solverNewton.info()!=Success) {
+            cout << "Oh: Very bad. Hessian not pos. definite." << endl;
+            exit(1);
+        }
+        // Newton step hess(x_k)*(x_k+1 - x_k) = - grad(x_k)
+        // x_update = x_new - x_old
+       	x_update = solverNewton.solve(-FoD);
+		*/
+
 		double t_condLatChol, t_condLatSolver;
 		//Vect x_update_new(x_update.size());
 		// TODO: constraint case.
 		solverQ->factorize_solve(Q, negFoD, x_update, log_det, t_condLatChol, t_condLatSolve);
 		//std::cout << "norm(x_update - x_update_new) = " << (x_update - x_update_new).norm() << std::endl;
-
-		if(counter > 20){
-			std::cout << "Rank :" << MPI_rank << ". Iteration " << counter << ": norm of update step = " << x_update.norm() << std::endl;
-		}
 
         x_new    = x_update + x_old;
 

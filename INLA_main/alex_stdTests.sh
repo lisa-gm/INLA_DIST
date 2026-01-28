@@ -12,7 +12,7 @@
 #SBATCH --output=%x.out         #The .output file name
 
 base_path=/home/hpc/ihpc/ihpc060h/b_INLA/develop
-results_folder=${base_path}/standard_tests_updatedMuStorage
+results_folder=${base_path}/standard_tests_jan28_updateThetaScale
 
 if [ ! -d ${results_folder} ]; then
   mkdir -p ${results_folder};
@@ -227,8 +227,8 @@ nb=6
 no=100
 
 data_type=regression
-likelihood=Poisson
-folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/nb${nb}_no${no}
+likelihood=poisson
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}/nb${nb}_no${no}
 test5_output=${results_folder}/INLA_testCase_V_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE V. regression model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -262,8 +262,8 @@ nb=1
 no=966
 
 data_type=synthetic
-likelihood=Poisson
-folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
+likelihood=poisson
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nb${nb}_no${no}
 test6_output=${results_folder}/INLA_testCase_VI_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VI. spatial model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -301,8 +301,8 @@ nb=8
 no=16320
 
 data_type=synthetic
-likelihood=Poisson
-folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nb${nb}_no${no}
+likelihood=poisson
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nb${nb}_no${no}
 test7_output=${results_folder}/INLA_testCase_VII_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VII. spatial-temporal model. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
@@ -341,8 +341,8 @@ nb=8
 no=16320
 
 data_type=synthetic
-likelihood=Poisson
-folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}Data/ns${ns}_nt${nt}_nss${nss}_nb${nb}_no${no}
+likelihood=poisson
+folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nss${nss}_nb${nb}_no${no}
 test8_output=${results_folder}/INLA_testCase_VIII_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_no${no}_${num_ranks}_${l1t}_${l2t}_${likelihood}_${solver_type}.txt
 
 echo "TEST CASE VIII. spatial-temporal model with add. spatial field. Poisson Data. ns = ${ns}, nss = ${nss}, nt = ${nt}, nb = ${nb}, no = ${no}."
