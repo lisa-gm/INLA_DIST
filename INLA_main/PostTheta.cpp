@@ -3333,11 +3333,17 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
 		solverQ->factorize_solve(Q, negFoD, x_update, log_det, t_condLatChol, t_condLatSolve);
 		//std::cout << "norm(x_update - x_update_new) = " << (x_update - x_update_new).norm() << std::endl;
 
-		if(counter > 20){
+		if(counter > 10 && x_update.norm() > 20){
+			x_update = 0.1 * x_update; // dampening
 			std::cout << "Rank :" << MPI_rank << ". Iteration " << counter << ": norm of update step = " << x_update.norm() << std::endl;
 		}
 
         x_new    = x_update + x_old;
+
+		if(counter > 25){
+			x_new.setZero();
+			std::cout << "Rank :" << MPI_rank << ". Iteration " << counter << ": reset x_new to zero vector to avoid divergence." << std::endl;
+		}
 
     }
 
