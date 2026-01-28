@@ -357,7 +357,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nb_, int no_, SpMat Ax_, Vect y_, SpM
 
 	if(MPI_rank == 0){
 		std::cout << "  Calculated dimensions: nu=" << nu << ", n=" << n << std::endl;
-		std::cout << "  Expected: nu should be " << (ns_*nt_) << ", n should be " << (nb_+ns_*nt_) << std::endl;
 	}
 
 	// slow for large datasets!!
@@ -3395,7 +3394,7 @@ double PostTheta::cond_LogPriorLat(SpMat& Qprior, Vect& x){
 
 	// f_val = n/2*log(2*pi) + 0.5*|Q| - 0.5*t(x - mu) %*% Q (x - mu)
 	// Q(theta) -> doesn't change with x -> ignore for now, maybe need later
-    double f_val = -0.5 * (x - mean).transpose() * Qprior * (x - mean);
+	double f_val = -0.5 * (x - mean).transpose() * Qprior * (x - mean);
     return f_val;
 }
 
@@ -3411,7 +3410,6 @@ double PostTheta::cond_LogPoisLik(Vect& eta){
 double PostTheta::cond_negLogPoisLik(Vect& eta){
     // actually link function fixed here but to make input the same ...
 	//printf("in cond_negLogPoisLik. dim(y) = %ld, dim(extraCoeffVecLik) = %ld, dim(eta) = %ld\n", y.size(), extraCoeffVecLik.size(), eta.size());
-	//std::cout << "eta.dot(y) = " << eta.dot(y) << ", sum(E*exp(eta)) = " << (extraCoeffVecLik.array()*(eta.array().exp())).sum() << std::endl;
     double f_val = eta.dot(y) - (extraCoeffVecLik.array()*(eta.array().exp())).sum();
     return -1*f_val;
 }
@@ -3689,9 +3687,9 @@ void PostTheta::NewtonIter(Vect& theta, Vect& x, SpMat& Q, double& log_det){
     x = x_new;
 	//std::cout << "mu(1:10) = " << x.head(10).transpose() << std::endl;
 //#ifdef PRINT_MSG
-	//if(MPI_rank == 0){
+	if(MPI_rank == 0){
 		std::cout << "Newton Iteration converged after " << counter << " iterations." << std::endl;
-	//}
+	}
 //#endif
 }
 

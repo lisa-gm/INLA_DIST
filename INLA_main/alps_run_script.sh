@@ -16,7 +16,7 @@
 
 BASEPATH=/users/lgaedkem
 
-num_ranks=1
+num_ranks=4
 
 #ns=0
 #nss=0
@@ -26,15 +26,15 @@ num_ranks=1
 #nb=6
 #no=200
 
-ns=267
+ns=363
 nss=0
-ntFit=150
+ntFit=30
 ntPred=0
 nt=$((${ntFit}+${ntPred}))
-nb=3
-noPerTs=$((2*${ns}))
+nb=8
+noPerTs=544 # $((2*${ns}))
 #no=$((2*${ns}*${ntFit}))
-no=400500
+# no=400500
 
 # ns=492
 #nss=1442
@@ -60,11 +60,13 @@ no=400500
 solver_type=BTA
 #solver_type=Eigen
 
+#data_type=swiss_rainfall
 data_type=synthetic
 #data_type=regression
 	
 #likelihood=gaussian
 likelihood=poisson
+#likelihood=binomial
 
 export PARDISOLICMESSAGE=1
 export OMP_NESTED=TRUE
@@ -98,8 +100,8 @@ folder_path=$BASEPATH/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nb${nb}
 #source ~/env/cholmod.sh
 source ~/.profile
 
-echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA_sliding_windows ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_output_moving_windows_ns${ns}_nt${nt}_nb${nb}_${likelihood}_${solver_type}_${num_ranks}_${l1t}_${l2t}.txt
+echo "srun -n ${num_ranks} ./call_INLA_sliding_windows ${ns} ${ntFit} ${nss} ${nb} ${noPerTs} ${likelihood} ${folder_path} ${solver_type}" 
+srun -n ${num_ranks} ./call_INLA_sliding_windows ${ns} ${ntFit} ${nss} ${nb} ${noPerTs} ${likelihood} ${folder_path} ${solver_type} >INLA_output_moving_windows_ns${ns}_nt${nt}_nb${nb}_${likelihood}_${solver_type}_${num_ranks}_${l1t}_${l2t}.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 

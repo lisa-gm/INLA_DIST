@@ -45,39 +45,6 @@ typedef Eigen::VectorXd Vect;
 
 using namespace LBFGSpp;
 
-/*void create_validation_set(int& no, int& size_valSet, std::vector<int> &indexSet, std::vector<int> &valSet){
-
-    //int no = 30;
-    //int size_valSet = 8;
-
-    // requires C++-17 !!
-    // create sorted index vector
-    std::mt19937 rbg { 42u }; 
-
-    //std::vector<int> indexSet(no);
-    std::iota(indexSet.begin(), indexSet.end(), 0);
-    //std::vector<int> valSet(size_valSet);
-    // sample random indices
-    std::sample(indexSet.begin(), indexSet.end(), valSet.begin(), valSet.size(), rbg);
-    
-    for (int valIndex: indexSet) std::cout << valIndex << ' '; 
-    std::cout << '\n';
-
-    for (int valIndex: valSet) std::cout << valIndex << ' '; 
-    std::cout << '\n';
-
-    // assuming sorted vectors : removes all elements of valSet that are in indexSet
-    indexSet.erase( remove_if( begin(indexSet),end(indexSet),
-    [&valSet](auto x){return binary_search(begin(valSet),end(valSet),x);}), end(indexSet) );
-
-    for( int elem: valSet) std::cout << elem << ' '; 
-    std::cout << '\n';
-
-    for( int elem: indexSet) std::cout << elem << ' '; 
-    std::cout << '\n';
-}*/
-
-
 void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& g3, SpMat& M0, SpMat& M1, SpMat& M2, SpMat& Qst){
 
     double exp_theta1 = exp(theta[1]);
