@@ -752,39 +752,6 @@ PostTheta::PostTheta(int ns_, int nt_, int nss_, int nb_, int no_, SpMat Ax_, Ve
 		// CAREFUL 1e-3 is arbitrary choice!!
 		Qx.insert(i,i) = 1e-3;
 	}
-
-	//std::cout << "Qx = \n" << Qx << std::endl;
-
-	//std::string Qprior_fileName = "Q_prior.txt";
-	//SpMat A_lower = Qx.triangularView<Lower>();
-		
-	/*std::string Qprior_fileName = "Qxy_" + to_string(n) + ".txt";
-	Qxy = Qx + exp(theta_dummy[0])*AxTAx;
-	SpMat A_lower = Qxy.triangularView<Lower>();
-
-	
-	int n = A_lower.cols();
-	int nnz = A_lower.nonZeros();
-
-	ofstream sol_file(Qprior_fileName);
-	sol_file << n << "\n";
-	sol_file << n << "\n";
-	sol_file << nnz << "\n";
-
-	for (int i = 0; i < nnz; i++){
-		sol_file << A_lower.innerIndexPtr()[i] << "\n";
-	}   
-	for (int i = 0; i < n+1; i++){
-			sol_file << A_lower.outerIndexPtr()[i] << "\n";
-	}     
-	for (int i = 0; i < nnz; i++){
-		sol_file << std::setprecision(15) << A_lower.valuePtr()[i] << "\n";
-	}
-
-	sol_file.close();
-	std::cout << "wrote to file : " << Qprior_fileName << std::endl;
-	
-	exit(1);*/
 	
 	// set prior to be gaussian
 	//prior = "gaussian";
@@ -1047,7 +1014,7 @@ double PostTheta::operator()(Vect& theta_interpret, Vect& grad){
 		iter_acc += 1;
 		double t_bfgs_iter_temp = omp_get_wtime() + t_bfgs_iter; 
 		if(MPI_rank == 0){
-			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << std::endl;
+			std::cout << "theta interpret: " << std::right << std::fixed << std::setprecision(4) << theta_interpret.transpose() << "    f_theta: " << std::right << std::fixed << f_theta << ", norm(grad f): " << std::right << std::fixed << grad.norm() << std::endl;
 		}
 	}
 
@@ -1971,6 +1938,12 @@ double PostTheta::eval_post_theta(Vect& theta_interpret, Vect& mu){
 		exit(1);
 	}
 
+	// check if is nana
+	if(isnan(log_prior_sum) || isinf(log_prior_sum)){
+		printf("MPI rank = %d, in eval_denominator. val = %f, log_det = %f\n", MPI_rank, log_prior_sum);
+		std::cout << "theta: " << theta_interpret.transpose() << std::endl;
+	}
+
 #ifdef RECORD_TIMES
 	t_priorHyp += omp_get_wtime();
 #endif
@@ -2482,7 +2455,13 @@ void PostTheta::eval_log_prior_lat(Vect& theta_interpret, Vect& mu, double &val)
 
 	}
 
-		time_factorize_Qst += omp_get_wtime();
+	time_factorize_Qst += omp_get_wtime();
+
+	// check if is nan
+	if(isnan(val) || isinf(val)){
+		printf("MPI rank = %d, in eval_denominator. val = %f, log_det = %f\n", MPI_rank, val, log_det);
+		std::cout << "theta: " << theta_interpret.transpose() << std::endl;
+	}
 
 #ifdef PRINT_MSG
 	std::cout << "val log prior lat " << val << std::endl;
@@ -2547,6 +2526,12 @@ void PostTheta::eval_likelihood(Vect& theta_interpret, Vect& mu, double &log_det
 		Vect eta = Ax * mu;
 		val      = -1*cond_negLogBinomLik(eta);
 		log_det  = 0.0;
+	}
+
+	// check if is nan
+	if(isnan(val) || isinf(val)){
+		printf("MPI rank = %d, in eval_denominator. val = %f, log_det = %f\n", MPI_rank, val, log_det);
+		std::cout << "theta: " << theta_interpret.transpose() << std::endl;
 	}
 }
 
@@ -3011,6 +2996,12 @@ void PostTheta::eval_denominator(Vect& theta_interpret, double& val, SpMat& Q, V
 		exit(1);
 	}
 
+	// check if val is nan
+	if(isnan(val) || isinf(val)){
+		printf("MPI rank = %d, in eval_denominator. val = %f, log_det = %f\n", MPI_rank, val, log_det);
+		std::cout << "theta: " << theta_interpret.transpose() << std::endl;
+	}
+
 }
 
 // ============================================================================================= //
@@ -3085,16 +3076,82 @@ void PostTheta::link_f_sigmoid(Vect& x, Vect& sigmoidX){
 }
 
 // Binomial
+// double PostTheta::cond_negLogBinomLik(Vect& eta){
+//     int m = eta.size();
+
+//     Vect linkEta(m);
+//     // hardcode sigmoid for now
+//     link_f_sigmoid(eta, linkEta);    
+//     Vect logLinkEta = linkEta.array().log();
+//     Vect tmpLinkEta = (Vect::Ones(m) - linkEta).array().log();
+
+//     double f_val = y.dot(logLinkEta) + (extraCoeffVecLik - y).dot(tmpLinkEta);
+
+// 	if(isnan(f_val) || isinf(f_val)){
+// 		std::cout << "norm(eta) = " << eta.norm() << ", norm(logLinkEta) = " << logLinkEta.norm() << ", norm(tmpLinkEta) = " << tmpLinkEta.norm() << std::endl;
+// 		std::cout << "max(linkEta) = " << linkEta.maxCoeff() << ", min(linkEta) = " << linkEta.minCoeff() << std::endl;
+// 	}		
+//     return -f_val;
+// }
+
+// double PostTheta::cond_negLogBinomLik(Vect& eta){
+//     int m = eta.size();
+    
+//     Vect logLinkEta(m);
+//     Vect log1mLinkEta(m);
+    
+//     for(int i = 0; i < m; i++){
+//         if(eta[i] > 0){
+//             // For positive eta: log(sigmoid(x)) = x - log(1 + exp(x))
+//             logLinkEta[i] = eta[i] - log(1.0 + exp(eta[i]));
+//             // log(1 - sigmoid(x)) = -log(1 + exp(x))
+//             log1mLinkEta[i] = -log(1.0 + exp(eta[i]));
+//         } else {
+//             // For negative eta: log(sigmoid(x)) = -log(1 + exp(-x))
+//             logLinkEta[i] = -log(1.0 + exp(-eta[i]));
+//             // log(1 - sigmoid(x)) = -x - log(1 + exp(-x))
+//             log1mLinkEta[i] = -eta[i] - log(1.0 + exp(-eta[i]));
+//         }
+//     } 
+//     double f_val = y.dot(logLinkEta) + (extraCoeffVecLik - y).dot(log1mLinkEta);
+
+// 	if(isnan(f_val) || isinf(f_val)){
+// 		std::cout << "max(eta): " << eta.maxCoeff() << ", norm(eta): " << eta.norm() << ", norm(logLinkEta) = " << logLinkEta.norm() << ", norm(log1mLinkEta) = " << log1mLinkEta.norm() << std::endl;
+// 	}
+// 	return -f_val;
+// }
+
+
 double PostTheta::cond_negLogBinomLik(Vect& eta){
     int m = eta.size();
+    
+    Vect logLinkEta(m);
+    Vect log1mLinkEta(m);
+    
+    const double MAX_ETA = 300.0;  // Prevent overflow
+    
+    for(int i = 0; i < m; i++){
+        // Clamp eta to prevent overflow
+        double eta_clamped = std::max(-MAX_ETA, std::min(MAX_ETA, eta[i]));
+        
+        if(eta_clamped > 0){
+            logLinkEta[i] = eta_clamped - std::log1p(std::exp(eta_clamped));
+            log1mLinkEta[i] = -std::log1p(std::exp(eta_clamped));
+        } else {
+            logLinkEta[i] = -std::log1p(std::exp(-eta_clamped));
+            log1mLinkEta[i] = -eta_clamped - std::log1p(std::exp(-eta_clamped));
+        }
+    } 
+    
+    double f_val = y.dot(logLinkEta) + (extraCoeffVecLik - y).dot(log1mLinkEta);
 
-    Vect linkEta(m);
-    // hardcode sigmoid for now
-    link_f_sigmoid(eta, linkEta);    
-    Vect logLinkEta = linkEta.array().log();
-    Vect tmpLinkEta = (Vect::Ones(m) - linkEta).array().log();
-
-    double f_val = y.dot(logLinkEta) + (extraCoeffVecLik - y).dot(tmpLinkEta);
+    if(std::isnan(f_val) || std::isinf(f_val)){
+        std::cout << "max(eta): " << eta.maxCoeff() << ", min(eta): " << eta.minCoeff() 
+                  << ", norm(eta): " << eta.norm() 
+                  << ", norm(logLinkEta) = " << logLinkEta.norm() 
+                  << ", norm(log1mLinkEta) = " << log1mLinkEta.norm() << std::endl;
+				  exit(1);
+    }
     return -f_val;
 }
 
@@ -3242,6 +3299,22 @@ void PostTheta::FD_diag_hessian(Vect& eta, Vect& diag_hess){
 
 }
 
+double PostTheta::quadratic_approx_NewtonIter(SpMat& Qprior, Vect& x){
+
+	double val_prior_part = -0.5 * x.transpose() * Qprior * x;
+
+	Vect eta_test = Ax * x;
+	double val_lik_part;
+	if(likelihood.compare("poisson") == 0){
+		val_lik_part = cond_negLogPoisLik(eta_test);
+	} else if(likelihood.compare("binomial") == 0){
+		val_lik_part = cond_negLogBinomLik(eta_test);
+	}
+	std::cout << "max(x): " << x.maxCoeff() << ", max(eta): " << eta_test.maxCoeff() << ", norm(eta): " << eta_test.norm() << ", val_prior_part = " << val_prior_part << ", val_lik_part = " << val_lik_part << std::endl;
+	double fun_val = val_prior_part + val_lik_part;
+	return fun_val;
+}
+
 
 // inner Iteration: form Gaussian approximation to conditional
 //void PostTheta::NewtonIter(SpMat& Qprior, Vect& x){
@@ -3249,8 +3322,12 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
 	//printf("in Newton iter.\n");
 
     // prepare for iteration
-    Vect x_new = x;
+    Vect x_new = x; // Vect::Zero(n); 
     Vect x_old = Vect::Random(n);
+	Vect x_test(n);
+	double c1_armijo = 1e-4;
+
+	double x_update_norm_prev = 1e6;
 
     Vect eta(no);
     Vect gradLik(no);
@@ -3270,6 +3347,8 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
 
 	// construct prior Q (depends on theta which will remain fixed)
 	construct_Qprior(theta_interpret, Qx);
+	// comute current value of objective function
+	double val_test;
 
     // iteration
     int counter = 0;
@@ -3277,6 +3356,7 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
         x_old = x_new;
         counter += 1;
 		//printf("\ncounter = %d\n", counter);
+		//double val_test_old = quadratic_approx_NewtonIter(Qx, x_new);
 
         if(counter > 50){ // 20
             printf("max number of iterations reached in inner Iteration! counter = %d\n", counter);
@@ -3305,7 +3385,8 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
 		// extract hessian
         //std::cout << "x: " << x_new.head(min(10, (int) n)).transpose() << std::endl;
         //FD_diag_hessian(eta, diag_hess_eta);
-        hess_eta.diagonal() = diag_hess_eta;
+        hess_eta.diagonal() = diag_hess_eta; // + 1e-6*Vect::Ones(no); // add for numerical stability
+		// std::cout << "max diagHessEta = " << std::fixed << std::setprecision(10) << diag_hess_eta.maxCoeff() << ", min diagHessEta = " << diag_hess_eta.minCoeff() << std::endl;
 		//std::cout << "diagHessEta = " << diag_hess_eta.head(min(10, (int) n)).transpose() << std::endl;
 
 		//std::cout << "gradLik(1:10)    = " << gradLik.head(10).transpose() << std::endl;
@@ -3331,18 +3412,38 @@ void PostTheta::NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log
 		//Vect x_update_new(x_update.size());
 		// TODO: constraint case.
 		solverQ->factorize_solve(Q, negFoD, x_update, log_det, t_condLatChol, t_condLatSolve);
+		//std::cout << "norm(Q*x_update - negFoD) = " << std::fixed << std::setprecision(10) << (Q * x_update - negFoD).norm() << std::endl;
 		//std::cout << "norm(x_update - x_update_new) = " << (x_update - x_update_new).norm() << std::endl;
+		// - 0.5 * x.transpose() * Q_prior * x + 
+		// for(int i = 0; i<20; i++){
+		// 	x_test = x_old + stepsize_alpha * x_update;
+		// 	if((x_test - x_old).norm() < 1e-3){
+		// 		break;
+		// 	}
+		// 	val_test = quadratic_approx_NewtonIter(Qx, x_test);
+			
+		// 	if (val_test < val_test_old) { // + c1_armijo * stepsize_alpha * negFoD.dot(x_update)
+		// 		std::cout << "Accepted Step. Iter: " << counter << ": Trial step " << i << " alpha : " << stepsize_alpha << ", val_test = " << val_test << ", val test old = " << val_test_old << ", norm(x_test - x_old) = " << (x_test - x_old).norm() << std::endl;
+		// 		val_test_old = val_test;
+		// 		stepsize_alpha = min(1.2*stepsize_alpha, 1.0); // increase step size
+		// 		// accept step
+		// 		break;
+		// 	} else {
+		// 		std::cout << "Rejected Step. Iter: " << counter << ": Trial step " << i << " alpha : " << stepsize_alpha << ", val_test = " << val_test << ", val test old = " << val_test_old << ", norm(x_test - x_old) = " << (x_test - x_old).norm() << std::endl;
+		// 		// reduce step size
+		// 		stepsize_alpha *= 0.5;
+		// 	}
+		// }
 
-		if(counter > 10 && x_update.norm() > 20){
-			x_update = 0.1 * x_update; // dampening
-			std::cout << "Rank :" << MPI_rank << ". Iteration " << counter << ": norm of update step = " << x_update.norm() << std::endl;
-		}
+		if(counter == 1){
+			x_update_norm_prev = x_update.norm();
+		} 
 
-        x_new    = x_update + x_old;
-
-		if(counter > 25){
+		if(counter > 1 && x_update.norm() > 10 * x_update_norm_prev){
 			x_new.setZero();
-			std::cout << "Rank :" << MPI_rank << ". Iteration " << counter << ": reset x_new to zero vector to avoid divergence." << std::endl;
+			std::cout << "Newton Iteration " << counter << " seems to be diverging! Resetting x_new to zero vector. norm(x_update) : " << x_update.norm() << std::endl;
+		} else {
+			x_new    = x_update + x_old;
 		}
 
     }

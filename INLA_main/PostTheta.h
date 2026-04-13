@@ -96,6 +96,8 @@ class PostTheta{
     int fct_count;      /**< count total number of function evaluations     */
     int iter_count;     /**< count total number of operator() call          */
     int iter_acc;
+    double stepsize_alpha = 1.0; // initalize newton iteration step
+    
     Vect y;         /**<  vector of observations y. has length no.      */
     Vect theta_prior_param; /**<  vector with prior values. Constructs normal
  						      distribution with sd = 1 around these values. */
@@ -649,6 +651,13 @@ class PostTheta{
      */
     void NewtonIter(Vect& theta_interpret, Vect& x, SpMat& Q, double& log_det);
 
+
+    /** @brief compute quadratic approximation at the current Newton iterate
+     * @param[in] Qprior SpMat. prior precision matrix.
+     * @param[in] x Vect. current Newton iterate.
+     * @return double. value of the quadratic approximation at x.
+     */
+    double quadratic_approx_NewtonIter(SpMat& Qprior, Vect& x);
 
     // measure times within each iterationstd::string file_name, int& iter_count, double& t_Ftheta_ext, double& t_priorHyp, 
     void record_times(std::string file_name, int iter_count, double t_Ftheta_ext, double t_thread_nom, double t_priorHyp, 
