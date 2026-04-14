@@ -66,8 +66,6 @@ void construct_Q_spat_temp(Vect& theta, SpMat& c0, SpMat& g1, SpMat& g2, SpMat& 
 
 int main(int argc, char* argv[])
 {
-    int whatever = 2;
-
     // start timer for overall runtime
     double t_total = -omp_get_wtime();
 
@@ -121,7 +119,7 @@ int main(int argc, char* argv[])
 #endif
     }  
     
-    if(argc != 1 + 8 && MPI_rank == 0){
+    if(argc != 1 + 9 && MPI_rank == 0){
         std::cout << "wrong number of input parameters. " << std::endl;
 
         std::cerr << "INLA Call : ns nt nss nb noPerTs path/to/files solver_type" << std::endl;
@@ -130,6 +128,7 @@ int main(int argc, char* argv[])
         std::cerr << "[integer:nt]                number of temporal grid points " << std::endl;
         std::cerr << "[integer:nss]               number of spatial grid points add. spatial field" << std::endl;
         std::cerr << "[integer:nb]                number of fixed effects" << std::endl;
+        std::cerr << "[bool:val]                  doing cross validation or not" << std::endl;
         std::cerr << "[integer:noPerTs]           number of data samples per time step" << std::endl;
 
         std::cerr << "[string:likelihood]         Gaussian/Poisson/Binomial" << std::endl;
@@ -149,8 +148,14 @@ int main(int argc, char* argv[])
     size_t nt  = atoi(argv[2]);
     size_t nss = atoi(argv[3]);
     size_t nb  = atoi(argv[4]);
-    size_t noPerTs  = atoi(argv[5]);
-    size_t no = noPerTs; //noPerTs * nt;
+    bool val   = atoi(argv[5]); // cross validation or not 
+    size_t noPerTs  = atoi(argv[6]);
+    size_t no;
+    if(val == 0){
+        no = noPerTs * nt;
+    } else {
+        no = noPerTs;
+    }
 
     // set nt = 1 if ns > 0 & nt = 0
     if(ns > 0 && nt == 0){
@@ -168,9 +173,9 @@ int main(int argc, char* argv[])
     std::string no_s = std::to_string(no); 
     std::string n_s  = std::to_string(n);
 
-    std::string likelihood  = argv[6];
-    std::string base_path   = argv[7];    
-    std::string solver_type = argv[8];
+    std::string likelihood  = argv[7];
+    std::string base_path   = argv[8];    
+    std::string solver_type = argv[9];
 
     // check likelihood among the available options
     if(likelihood.compare("Gaussian") == 0        || likelihood.compare("gaussian") == 0){
@@ -207,11 +212,12 @@ int main(int argc, char* argv[])
 
     // ======================================================================================================== //
     // read in sliding window parameters
-    int no_moving_windows = 1;
-    //std::string moving_window_dim_file        =  base_path + "/temporal_moving_windows_info_" + std::to_string(no_moving_windows) + "_5.dat";
-    //file_exists(moving_window_dim_file); 
-    //MatrixXd moving_window_dim = read_matrix(moving_window_dim_file, no_moving_windows, 5);
-
+    int no_moving_windows;
+    if(val == 0){
+        no_moving_windows = 20;
+    } else {
+        no_moving_windows = 1;
+    }
     // decide this manually
     MatrixXi moving_window_dim = MatrixXi::Zero(no_moving_windows, 5);
     int nt_subset = 30; // length of each moving window
@@ -224,7 +230,11 @@ int main(int argc, char* argv[])
         moving_window_dim(i, 1) = i * offset + 1 + initial_offset;  // start time step (1-based)
         moving_window_dim(i, 2) = i * offset + initial_offset + nt_subset;  // end time step
         moving_window_dim(i, 3) = (i * offset + initial_offset) * noPerTs + 1;  // start observation index (1-based)
-        moving_window_dim(i, 4) = no; //(i * offset + initial_offset + nt_subset) * noPerTs;  // end observation index
+        if( val == 0){
+            moving_window_dim(i, 4) = (i * offset + initial_offset + nt_subset) * noPerTs;
+        } else {
+            moving_window_dim(i, 4) = no; //(i * offset + initial_offset + nt_subset) * noPerTs;  // end observation index // no;  //  
+        }
     }
 
     if(MPI_rank == 0){
@@ -1002,9 +1012,9 @@ int main(int argc, char* argv[])
             
             if(MPI_rank == 0){
                 std::cout << "DEBUG: Ax_window loaded successfully:" << std::endl;
-                std::cout << "  Ax_window.rows() = " << Ax_window.rows() << " (expected: " << no_subset << ")" << std::endl;
-                std::cout << "  Ax_window.cols() = " << Ax_window.cols() << " (expected: " << n_subset << ")" << std::endl;
-                std::cout << "  Ax_window.nonZeros() = " << Ax_window.nonZeros() << std::endl;
+                std::cout << "  Ax_window.rows() = " << Ax_window.rows() << std::endl;
+                std::cout << "  Ax_window.cols() = " << Ax_window.cols() << std::endl;
+                std::cout << "  Ax_window.nonZeros() = " << Ax_window.nonZeros() << ", max(A): " << Ax_window.coeffs().maxCoeff() << std::endl;
                 
                 if(Ax_window.rows() != no_subset || Ax_window.cols() != n_subset) {
                     std::cout << "ERROR: Ax_window dimensions don't match expected!" << std::endl;
@@ -1145,7 +1155,7 @@ int main(int argc, char* argv[])
             //string fileName_Qprior = "Qx_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nss" + to_string(nss) + "_nb" + to_string(nb) + "_no" + to_string(no) + ".dat";
             //write_sym_CSC_matrix(fileName_Qprior, Qx);
             //std::cout << "Qx(1:10,1:10) = \n" << Qx.block(0,0,10,10) << std::endl;
-            fun->NewtonIter(theta_interpret, mu, Qxy, log_det);
+            fun->NewtonIter(theta_param, mu, Qxy, log_det);
         
             /*string fileName_Q = "Qxy_n" + to_string(n) + "_ns" + to_string(ns) + "_nt" + to_string(nt) + "_nss" + to_string(nss) + "_nb" + to_string(nb) + "_no" + to_string(no) + ".dat";
             write_sym_CSC_matrix(fileName_Q, Qxy);
@@ -1178,6 +1188,7 @@ int main(int argc, char* argv[])
             if(MPI_rank == 0){
                 printf("\n====================== CALL BFGS SOLVER =====================\n");
             }
+            double time_bfgs_cov = -omp_get_wtime();
 
             // reinitialize theta to first initial value
             theta_param = theta_original_param;
@@ -1199,7 +1210,7 @@ int main(int argc, char* argv[])
 
             if(MPI_rank == 0){
                 std::cout << niter << " iterations and " << fn_calls << " fn calls." << std::endl;
-                //std::cout << "time BFGS solver             : " << time_bfgs << " sec" << std::endl;
+                std::cout << "time BFGS solver             : " << time_bfgs << " sec" << std::endl;
 
                 std::cout << "\nf(x)                         : " << fx << std::endl;
             }
@@ -1236,6 +1247,7 @@ int main(int argc, char* argv[])
                 // write to file
                 std::string file_name_x_star = base_path + "/mean_latent_INLA_DIST_window" + to_string(window) + "_ntStart" + to_string(moving_window_dim(window,1)) + "_ntEnd" + to_string(moving_window_dim(window,2)) + "_" + to_string(n_subset) + "_1.dat";
                 write_vector(file_name_x_star, mu_initial_window, n_subset);
+                std::cout << "mean latent field written to file: " << file_name_x_star << std::endl;
             }
 
             double eps = sqrt(0.001);
@@ -1249,19 +1261,23 @@ int main(int argc, char* argv[])
                 std::cout << "\nsd theta         : " << sd_theta.transpose() << std::endl;
             }
 
-            eps = sqrt(0.005);
-            std::cout << "\nComputing covariance at theta: " << theta_param.transpose() << " using eps : " << eps << std::endl;
-            cov = fun->get_Covariance(theta_param, eps);
+            // eps = sqrt(0.005);
+            // std::cout << "\nComputing covariance at theta: " << theta_param.transpose() << " using eps : " << eps << std::endl;
+            // cov = fun->get_Covariance(theta_param, eps);
 
-            if(MPI_rank ==0){
-                std::cout << "covariance  : \n" << cov << std::endl;
+            // if(MPI_rank ==0){
+            //     std::cout << "covariance  : \n" << cov << std::endl;
 
-                Vect sd_theta = cov.diagonal().cwiseSqrt();
-                std::cout << "\nsd theta         : " << sd_theta.transpose() << std::endl;
-            }
+            //     Vect sd_theta = cov.diagonal().cwiseSqrt();
+            //     std::cout << "\nsd theta         : " << sd_theta.transpose() << std::endl;
+            // }
 
 
             MPI_Barrier(MPI_COMM_WORLD);
+            time_bfgs_cov += omp_get_wtime();
+            if(MPI_rank == 0){
+                std::cout << "Total time (BFGS+Cov) : " << time_bfgs_cov << " sec" << std::endl;
+            }
 
             // compute covariance matrix hyperparameters 
 

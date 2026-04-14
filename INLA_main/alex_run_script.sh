@@ -1,17 +1,17 @@
 #!/bin/bash
 
 #SBATCH --job-name=call_INLA_BTA # Pardiso #          #Your Job Name
-#SBATCH --nodes=1                   #Number of Nodes desired e.g 1 nodea
+#SBATCH --nodes=1                  #Number of Nodes desired e.g 1 nodea
 #SBATCH --time=00:59:00                 #Walltime: Duration for the Job to run HH:MM:SS
-#SBATCH --gres=gpu:a100:4
+#SBATCH --gres=gpu:a100:8
 #SBATCH --partition=a100
 ###SBATCH --constraint=a100_80
-###SBATCH --qos=a100multi
-###SBATCH --exclusive
+####SBATCH --qos=a100multi
+#SBATCH --exclusive
 #SBATCH --error=%x.err          #The .error file name
 #SBATCH --output=%x.out         #The .output file name
 
-num_ranks=4
+num_ranks=7
 
 #ns=0
 #nss=0
@@ -21,34 +21,27 @@ num_ranks=4
 #nb=6
 #no=200
 
-# ns=129
+# ns=4002
 # nss=0
-# ntFit=8
+# ntFit=30
 # ntPred=0
 # nt=$((${ntFit}+${ntPred}))
-# nb=8
-# #noPerTs=$((2*${ns}))
-# #no=$((2*${ns}*${ntFit}))
-# no=2928
+# nb=6
+# no=$((2*${ns}*${ntFit}))
 
-
-ns=3044
-#nss=1442
-#ns=20252
-#ns=16002
-#ntFit=60
-nss=0
-#ns=642
-ntFit=30
-ntPred=0
-nt=$((${ntFit}+${ntPred}))
 #nss=642
 #nt=30
 #nb=2
-nb=2
+#nb=6
 #no=7872
 #no=$((2*${ns}*${ntFit}))
-#noPerTs=$((2*${ns}))
+
+ns=3044
+nss=0
+ntFit=30
+ntPred=0
+nt=$((${ntFit}+${ntPred}))
+nb=2
 no=30240
 
 #solver_type=$1
@@ -82,16 +75,12 @@ timestamp=$(date +%Y%m%d_%H%M%S)
 
 folder_path=/home/hpc/ihpc/ihpc060h/repositories/approx_non_stationary_models/rainfall_dataset/data/ns${ns}_nt${nt}_nb${nb}
 
-#folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_ntFit${ntFit}_ntPred0_noPerTs${noPerTs}_nss${nss}_nb${nb}
 #folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/${likelihood}/ns${ns}_nt${nt}_nb${nb}
-#folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/ns${ns}_nt${nt}
-#folder_path=/home/hpc/ihpc/ihpc060h/b_INLA/data/${data_type}/GaussianData/nb${nb}_no${no}
+#folder_path=/home/hpc/ihpc/ihpc060h/data/${data_type}/ns${ns}_nt${nt}_nb${nb}
 
-#source ~/env/cholmod.sh
-#source ~/.profile
 
 echo "srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type}" 
-srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${nt}_ntPred0_nss${nss}_nb${nb}_${likelihood}_${num_ranks}_${l1t}_${l2t}_${timestamp}.txt
+srun -n ${num_ranks} ./call_INLA ${ns} ${ntFit} ${nss} ${nb} ${no} ${likelihood} ${folder_path} ${solver_type} >INLA_${solver_type}_output_ns${ns}_ntFit${ntFit}_ntPred0_nss${nss}_nb${nb}_${likelihood}_${num_ranks}_${l1t}_${l2t}_${timestamp}.txt
 #srun -n ${num_ranks} ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type} >INLA_RGF_output_ns${ns}_nt${nt}_nb${nb}_${num_ranks}_${l1t}_${l2t}_singleCopyV.txt
 #likwid-perfctr -C S0:0-15 -g MEM ./call_INLA ${ns} ${nt} ${nb} ${no} ${folder_path} ${solver_type}
 
